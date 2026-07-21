@@ -2,11 +2,11 @@
 project: crypto-riddle
 doc: spec.md (GDD 相当 / 機能仕様)
 feature: 001-mvp
-status: draft-review        # 承認ゲート① レビュー待ち
+status: approved            # 承認ゲート① 通過（2026-07-21 代表承認）
 created: 2026-07-21
 updated: 2026-07-21
 supersedes: docs/concept.md   # 以後の正本は本 spec
-gate: "① spec レビュー（代表承認待ち）"
+gate: "① spec レビュー 通過 → 次工程 plan.md（ゲート②）"
 ---
 
 # crypto-riddle — MVP 仕様書（spec.md 初版）
