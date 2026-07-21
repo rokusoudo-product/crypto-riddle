@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>crypto-riddle プロトタイプ｜第1話 アルファテック社 顧客データ流出事件</title>
+<style>
+  :root{
+    --bg:#0a0e14;
+    --panel:#121a24;
+    --panel2:#0e151d;
+    --border:#26313f;
+    --text:#e6edf3;
+    --text-dim:#8b98a5;
+    --accent:#4ade80;
+    --accent-dim:#1f7a4d;
+    --danger:#f87171;
+    --purple:#a78bfa;
+    --gold:#facc15;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:radial-gradient(circle at 20% 0%, #10202020 0, var(--bg) 60%);
+    background-color:var(--bg);
+    color:var(--text);
+    font-family:"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    min-height:100vh;
+    line-height:1.7;
+  }
+  .mono{font-family:"Consolas","Courier New",monospace;}
+  #app{max-width:920px;margin:0 auto;padding:16px 16px 80px;}
+
+  /* header / progress */
+  header{padding:10px 4px 18px;}
+  .titlebar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+  .titlebar h1{font-size:15px;color:var(--text-dim);margin:0;font-weight:600;letter-spacing:.03em;}
+  .titlebar h1 span{color:var(--accent);}
+  .reset-btn{background:none;border:1px solid var(--border);color:var(--text-dim);font-size:11px;padding:5px 10px;border-radius:6px;cursor:pointer;}
+  .reset-btn:hover{border-color:var(--danger);color:var(--danger);}
+
+  .progress{display:flex;gap:4px;flex-wrap:wrap;}
+  .progress .step{flex:1;min-width:60px;text-align:center;font-size:11px;padding:6px 2px;border-radius:6px;background:var(--panel2);color:var(--text-dim);border:1px solid var(--border);white-space:nowrap;}
+  .progress .step.active{background:var(--accent-dim);color:#eafff1;border-color:var(--accent);}
+  .progress .step.done{color:var(--accent);border-color:var(--accent-dim);}
+
+  /* generic panel/card */
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:16px;}
+  .panel h2{margin-top:0;font-size:18px;color:var(--gold);}
+  .panel h3{color:var(--accent);font-size:15px;}
+  .lead{white-space:pre-line;color:var(--text);}
+  .dim{color:var(--text-dim);}
+  .small{font-size:12px;}
+
+  .btn{
+    background:var(--accent-dim);color:#eafff1;border:1px solid var(--accent);
+    padding:10px 18px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;
+  }
+  .btn:hover{background:var(--accent);color:#04150a;}
+  .btn:disabled{opacity:.35;cursor:not-allowed;}
+  .btn.secondary{background:none;color:var(--text);border-color:var(--border);}
+  .btn.secondary:hover{border-color:var(--text-dim);background:none;color:var(--text);}
+  .btn.danger{background:none;border-color:var(--danger);color:var(--danger);}
+  .btn.danger:hover{background:var(--danger);color:#2a0a0a;}
+  .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+
+  /* explore spots grid */
+  .spot-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:14px;}
+  .spot{
+    background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:14px 8px;
+    text-align:center;cursor:pointer;transition:transform .1s, border-color .15s;
+  }
+  .spot:hover{border-color:var(--accent);transform:translateY(-2px);}
+  .spot .icon{font-size:30px;display:block;margin-bottom:6px;}
+  .spot .label{font-size:12px;color:var(--text);}
+  .spot.visited{border-color:var(--accent-dim);}
+  .spot.visited .icon{opacity:.55;}
+  .spot .check{color:var(--accent);font-size:11px;display:block;margin-top:4px;}
+
+  /* inventory */
+  .inv-toggle{
+    position:fixed;right:16px;bottom:16px;z-index:40;
+    background:var(--accent-dim);color:#eafff1;border:1px solid var(--accent);
+    border-radius:24px;padding:12px 18px;cursor:pointer;font-size:13px;font-weight:700;
+    box-shadow:0 4px 18px rgba(0,0,0,.4);
+  }
+  .inv-drawer{
+    position:fixed;right:16px;bottom:70px;width:320px;max-width:88vw;max-height:60vh;overflow-y:auto;
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;z-index:39;
+    box-shadow:0 8px 30px rgba(0,0,0,.5);
+  }
+  .inv-drawer h4{margin:0 0 8px;font-size:12px;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;}
+  .inv-empty{color:var(--text-dim);font-size:12px;}
+
+  /* card component */
+  .card{
+    background:var(--panel2);border:1px solid var(--border);border-left:4px solid var(--text-dim);
+    border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer;
+  }
+  .card.real{border-left-color:var(--accent);}
+  .card.cipher{border-left-color:var(--purple);}
+  .card.dummy{border-left-color:var(--danger);}
+  .card .ctitle{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .card .cpreview{font-size:11px;color:var(--text-dim);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  .selectable{border:1px solid var(--border);}
+  .selectable.selected{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold) inset;background:#1c1a0e;}
+  .selectable .ctitle{display:flex;justify-content:space-between;align-items:center;}
+  .selectable .chk{width:16px;height:16px;border-radius:4px;border:1px solid var(--text-dim);flex:0 0 auto;}
+  .selectable.selected .chk{background:var(--gold);border-color:var(--gold);}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px;}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:12px;max-width:480px;width:100%;padding:22px;}
+  .modal h3{margin-top:0;}
+  .modal .body{white-space:pre-line;font-size:14px;color:var(--text);}
+  .modal .got{margin-top:14px;padding:8px 10px;background:#0e2a1c;border:1px solid var(--accent-dim);border-radius:8px;font-size:12px;color:var(--accent);}
+
+  /* result banners */
+  .banner{padding:12px 14px;border-radius:8px;margin-top:14px;font-size:13.5px;}
+  .banner.ok{background:#0e2a1c;border:1px solid var(--accent-dim);color:var(--accent);}
+  .banner.ng{background:#2a1414;border:1px solid #6b2a2a;color:var(--danger);}
+  .banner.hint{background:#1c1a0e;border:1px solid #6b5a1a;color:var(--gold);}
+
+  /* cipher decode */
+  .cipherbox{font-size:20px;letter-spacing:.12em;text-align:center;padding:16px;background:var(--panel2);border:1px dashed var(--border);border-radius:8px;margin:14px 0;word-break:break-all;}
+  .shiftctl{display:flex;align-items:center;justify-content:center;gap:14px;margin:14px 0;}
+  .shiftctl button{width:38px;height:38px;border-radius:50%;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:18px;cursor:pointer;}
+  .shiftctl button:hover{border-color:var(--accent);color:var(--accent);}
+  .shiftval{font-size:22px;min-width:70px;text-align:center;}
+
+  .defense-list{display:grid;gap:8px;margin-top:14px;}
+  .footer-note{margin-top:26px;text-align:center;color:var(--text-dim);font-size:11px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ===================== DATA ===================== */
+
+const CARDS = {
+  admin_hash: {
+    title:"田中さんの証言(Webサーバ管理者)", icon:"🧑‍💻", category:"real",
+    text:`「パスワードは MD5 でハッシュ化して保存しています。ソルト…ですか? いえ、使ってないですね。導入から5年、見直したことはないです」`
+  },
+  access_log: {
+    title:"サーバ認証ログ", icon:"📜", category:"real",
+    text:`深夜 3:14、豪州の未登録IPアドレスから、正しいID・パスワードにより "一度のログイン試行" で認証成功。\n直前に総当たり(ブルートフォース)の形跡は無し。`
+  },
+  chat_log: {
+    title:"社内チャットログ(鈴木)", icon:"💬", category:"real",
+    text:`鈴木「正直に言うと、プライベートの通販サイトと同じパスワードを使い回してます…覚えるの大変で。まずかったですか?」`
+  },
+  breach_news: {
+    title:"ニュース検索結果", icon:"📰", category:"real",
+    text:`半年前、大手通販サイト「〇〇ストア」で顧客データベースが流出。\nパスワードは MD5・ソルトなしで保存されており、大半が解析され平文が判明したと報じられている。`
+  },
+  cipher_text: {
+    title:"犯行声明(暗号文)", icon:"🔐", category:"cipher",
+    text:`改ざんされたトップページに残されていた文字列:\n\n"ZHDN KDVK HDVB SUHB"`
+  },
+  cipher_key: {
+    title:"声明文の下の走り書き", icon:"✏️", category:"cipher",
+    text:`声明文の隅に、小さく手書きで数字が残されている。\n\n"+3"\n\n…暗号化のときのズラした数、だろうか?`
+  },
+  dummy_trip: {
+    title:"休憩室の掲示板", icon:"🏖️", category:"dummy",
+    text:`「来月の社員旅行は熱海です! 幹事:総務部 中村」\n\n…今回の事件とは関係なさそうだ。`
+  },
+  dummy_stationery: {
+    title:"経理部の発注メモ", icon:"🖊️", category:"dummy",
+    text:`「文房具発注リスト: ボールペン20本、付箋10個、コピー用紙2箱」\n\n…特に怪しい点はない。`
+  },
+  dummy_password_rule: {
+    title:"田中のデスクの付箋", icon:"📌", category:"dummy",
+    text:`「パスワードに Password123 は絶対使うな!!」(自戒メモらしい)\n\n本人は気を付けているようだが、今回の件と直接関係あるかは怪しい。`
+  },
+  dummy_coffee: {
+    title:"給湯室の張り紙", icon:"☕", category:"dummy",
+    text:`「コーヒー豆を切らしています。買い出しできる人はお願いします」\n\n…事件解決の役には立たなそうだ。`
+  },
+};
+
+const SPOTS = [
+  {card:"admin_hash", icon:"🧑‍💻", label:"Webサーバ管理者 田中"},
+  {card:"access_log", icon:"📜", label:"サーバ認証ログ"},
+  {card:"chat_log", icon:"🙂", label:"カスタムサポート 鈴木"},
+  {card:"breach_news", icon:"📰", label:"ニュース検索(PC)"},
+  {card:"cipher_text", icon:"🔐", label:"改ざんされたTOPページ"},
+  {card:"cipher_key", icon:"✏️", label:"声明文の走り書き"},
+  {card:"dummy_trip", icon:"🏖️", label:"休憩室の掲示板"},
+  {card:"dummy_stationery", icon:"🖊️", label:"経理部の机"},
+  {card:"dummy_password_rule", icon:"📌", label:"田中のデスク"},
+  {card:"dummy_coffee", icon:"☕", label:"給湯室"},
+];
+
+const CIPHER_PLAINTEXT = "WEAK HASH EASY PREY";
+const CIPHER_TEXT = "ZHDN KDVK HDVB SUHB";
+const CORRECT_SHIFT = 3;
+
+const IDENTIFY_POOL = ["admin_hash","access_log","chat_log","breach_news","decoded_message",
+  "dummy_trip","dummy_stationery","dummy_password_rule","dummy_coffee"];
+const IDENTIFY_CORRECT = ["access_log","chat_log","breach_news"];
+
+const DEFENSE_OPTIONS = [
+  {id:"mfa", label:"多要素認証(MFA)の導入", correct:true,
+    explain:"パスワードが割れていても、追加の認証要素があれば不正ログインを防げる。"},
+  {id:"bcrypt", label:"ハッシュ関数を bcrypt / Argon2 に変更しソルトを付与", correct:true,
+    explain:"万一DBが漏えいしても、ソルト付き・低速なハッシュ関数により解析コストを大幅に引き上げられる。"},
+  {id:"longpass", label:"パスワードの最低文字数を12桁に引き上げる", correct:false,
+    explain:"今回は「正しいID・パスワード」でログインされている。桁数を増やしても直接の防止にはならない。"},
+  {id:"firewall", label:"海外IPアドレスを一律ファイアウォールで遮断する", correct:false,
+    explain:"正規利用者にも影響が大きく、運用上現実的でない。今回の根本対策にもならない。"},
+  {id:"antivirus", label:"全社PCへのアンチウイルスソフト導入を徹底する", correct:false,
+    explain:"マルウェア対策であり、今回のパスワードリスト攻撃(クレデンシャルスタッフィング)とは直接関係しない。"},
+];
+
+/* ===================== STATE ===================== */
+
+const state = {
+  phase: "intro", // intro, explore, decode, identify, defense, clear
+  collected: new Set(),
+  visited: new Set(),
+  shift: 0,
+  decodeAttempts: 0,
+  cipherDecoded: false,
+  identifySelected: new Set(),
+  identifyFeedback: null,
+  defenseSelected: new Set(),
+  defenseFeedback: null,
+  invOpen: false,
+  modalCard: null,
+};
+
+function resetGame(){
+  if(!confirm("最初からやり直しますか?(カード・進捗はすべてリセットされます)")) return;
+  state.phase="intro"; state.collected=new Set(); state.visited=new Set();
+  state.shift=0; state.decodeAttempts=0; state.cipherDecoded=false;
+  state.identifySelected=new Set(); state.identifyFeedback=null;
+  state.defenseSelected=new Set(); state.defenseFeedback=null;
+  state.invOpen=false; state.modalCard=null;
+  render();
+}
+
+/* ===================== HELPERS ===================== */
+
+function caesarDecode(text, shift){
+  return text.replace(/[A-Z]/g, c=>{
+    const code = ((c.charCodeAt(0)-65 - shift) % 26 + 26) % 26;
+    return String.fromCharCode(code+65);
+  });
+}
+
+function setEq(a,b){
+  if(a.size!==b.length) return false;
+  return b.every(x=>a.has(x));
+}
+
+function openSpot(cardId){
+  state.visited.add(cardId);
+  state.collected.add(cardId);
+  state.modalCard = cardId;
+  render();
+}
+
+function closeModal(){ state.modalCard=null; render(); }
+function toggleInv(){ state.invOpen=!state.invOpen; render(); }
+
+function goPhase(p){ state.phase=p; render(); }
+
+function tryGoDecode(){
+  if(!state.collected.has("cipher_text") || !state.collected.has("cipher_key")){
+    alert("暗号文と、それを解く手がかりのカードが両方そろっていません。探索パートに戻って調べましょう。");
+    return;
+  }
+  goPhase("decode");
+}
+
+function tryGoIdentify(){
+  if(!state.cipherDecoded){
+    alert("まず犯行声明の暗号を解読してください。");
+    return;
+  }
+  goPhase("identify");
+}
+
+function shiftChange(d){
+  state.shift = ((state.shift + d) % 26 + 26) % 26;
+  render();
+}
+
+function confirmDecode(){
+  const preview = caesarDecode(CIPHER_TEXT, state.shift);
+  state.decodeAttempts++;
+  if(preview === CIPHER_PLAINTEXT){
+    state.cipherDecoded = true;
+    state.collected.add("decoded_message");
+    CARDS["decoded_message"] = CARDS["decoded_message"] || {
+      title:"解読した犯行声明", icon:"🗝️", category:"real",
+      text:`"${CIPHER_PLAINTEXT}"\n(弱いハッシュは格好の餌食)\n\n→ 攻撃者はパスワードのハッシュ化が甘い会社を意図的に狙っていることを示唆している。`
+    };
+  }
+  render();
+}
+
+function toggleIdentify(id){
+  if(state.identifySelected.has(id)) state.identifySelected.delete(id);
+  else state.identifySelected.add(id);
+  state.identifyFeedback=null;
+  render();
+}
+
+function submitIdentify(){
+  const sel = state.identifySelected;
+  if(sel.size===0){ state.identifyFeedback="ng:カードを1枚以上選んでください。"; render(); return; }
+  if(setEq(sel, IDENTIFY_CORRECT)){
+    state.identifyFeedback="ok";
+  } else {
+    state.identifyFeedback="ng:この組み合わせでは攻撃を立証できません。矛盾するカードや、関係のないカードが混ざっていないか見直しましょう。";
+  }
+  render();
+}
+
+function toggleDefense(id){
+  if(state.defenseSelected.has(id)) state.defenseSelected.delete(id);
+  else state.defenseSelected.add(id);
+  state.defenseFeedback=null;
+  render();
+}
+
+function submitDefense(){
+  const sel = state.defenseSelected;
+  const correctIds = DEFENSE_OPTIONS.filter(o=>o.correct).map(o=>o.id);
+  if(sel.size===0){ state.defenseFeedback="ng:対策を1つ以上選んでください。"; render(); return; }
+  if(setEq(sel, correctIds)){
+    state.defenseFeedback="ok";
+    setTimeout(()=>{ goPhase("clear"); }, 900);
+  } else {
+    state.defenseFeedback="ng:その組み合わせでは攻撃を防ぎきれません。今回の攻撃の性質(正しいパスワードでの単発ログイン)を踏まえて選び直しましょう。";
+  }
+  render();
+}
+
+/* ===================== RENDER ===================== */
+
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+
+function cardEl(id, opts={}){
+  const c = CARDS[id];
+  if(!c) return "";
+  const selectable = opts.selectable;
+  const selected = opts.selected;
+  const cls = ["card", c.category];
+  if(selectable) cls.push("selectable");
+  if(selected) cls.push("selected");
+  const onclick = opts.onclick ? `onclick="${opts.onclick}"` : (opts.viewOnly ? `onclick="state.modalCard='${id}';render();"` : "");
+  return `<div class="${cls.join(' ')}" ${onclick}>
+    <div class="ctitle"><span>${c.icon} ${esc(c.title)}</span>${selectable?`<span class="chk"></span>`:""}</div>
+    <div class="cpreview">${esc(c.text.split("\n")[0]).slice(0,40)}${c.text.length>40?"…":""}</div>
+  </div>`;
+}
+
+function renderInvDrawer(){
+  if(!state.invOpen) return "";
+  const ids = [...state.collected];
+  const body = ids.length===0
+    ? `<div class="inv-empty">まだ何も見つけていません。</div>`
+    : ids.map(id=>cardEl(id,{viewOnly:true})).join("");
+  return `<div class="inv-drawer">
+    <h4>手持ちカード (${ids.length})</h4>
+    ${body}
+  </div>`;
+}
+
+function renderInvToggle(){
+  if(state.phase==="intro"||state.phase==="clear") return "";
+  return `<div class="inv-toggle" onclick="toggleInv()">🗂️ カード ${state.collected.size}</div>`;
+}
+
+function renderModal(){
+  if(!state.modalCard) return "";
+  const c = CARDS[state.modalCard];
+  return `<div class="overlay" onclick="if(event.target===this) closeModal()">
+    <div class="modal">
+      <h3>${c.icon} ${esc(c.title)}</h3>
+      <div class="body">${esc(c.text)}</div>
+      <div class="got">✅ ヒントカード「${esc(c.title)}」を入手した</div>
+      <div class="btnrow"><button class="btn" onclick="closeModal()">閉じる</button></div>
+    </div>
+  </div>`;
+}
+
+function progressBar(){
+  const steps = [
+    ["intro","導入"],["explore","探索"],["decode","暗号解読"],
+    ["identify","攻撃特定"],["defense","防衛策"],["clear","クリア"]
+  ];
+  const order = steps.map(s=>s[0]);
+  const curIdx = order.indexOf(state.phase);
+  return `<div class="progress">${steps.map(([key,label],i)=>{
+    let cls="step";
+    if(i<curIdx) cls+=" done";
+    if(i===curIdx) cls+=" active";
+    return `<div class="${cls}">${label}</div>`;
+  }).join("")}</div>`;
+}
+
+function renderIntro(){
+  return `<div class="panel">
+    <h2>第1話: アルファテック社 顧客データ流出事件</h2>
+    <div class="lead">アルファテック株式会社は、雑貨を扱う中堅ECサイトを運営している。
+
+ある朝、同社のトップページが何者かに改ざんされ、こんなメッセージが残されていた。
+「お前らの顧客データはもらった。」
+
+続けて、顧客の氏名・メールアドレス・パスワードハッシュを含むとみられるデータが、闇サイトに投稿されているという通報が入った。
+
+あなたは急遽招集された社内 CSIRT (Computer Security Incident Response Team) の一員として、現地調査を任されることになった。
+
+Webサーバ管理者への聞き取り、アクセスログの確認、社員への聞き込み ── 手がかりを集め、攻撃の全貌を突き止め、再発防止策を提案せよ。</div>
+    <div class="btnrow">
+      <button class="btn" onclick="goPhase('explore')">捜査を開始する ▶</button>
+    </div>
+  </div>`;
+}
+
+function renderExplore(){
+  const spots = SPOTS.map(s=>{
+    const visited = state.visited.has(s.card);
+    return `<div class="spot ${visited?'visited':''}" onclick="openSpot('${s.card}')">
+      <span class="icon">${s.icon}</span>
+      <span class="label">${esc(s.label)}</span>
+      ${visited?'<span class="check">✔ 調査済み</span>':''}
+    </div>`;
+  }).join("");
+  return `<div class="panel">
+    <h2>探索パート</h2>
+    <p class="dim small">気になる人物・場所をクリックして調べよう。手がかりはカードとして手元に残る。すべて調べる必要はないが、見落としがあると解決パートで詰まるかもしれない。</p>
+    <div class="spot-grid">${spots}</div>
+    <div class="btnrow">
+      <button class="btn" onclick="tryGoDecode()">解決パートへ進む(暗号解読) ▶</button>
+    </div>
+  </div>`;
+}
+
+function renderDecode(){
+  const preview = caesarDecode(CIPHER_TEXT, state.shift);
+  const success = preview === CIPHER_PLAINTEXT;
+  return `<div class="panel">
+    <h2>解決パート①: 犯行声明を解読する</h2>
+    <p class="dim small">改ざんページに残された暗号文と、声明文の隅にあった走り書き「+3」を組み合わせて解読しよう。これはシーザー暗号(換字式暗号)だ。</p>
+    <div class="cipherbox mono">${esc(CIPHER_TEXT)}</div>
+    <div class="shiftctl">
+      <button onclick="shiftChange(-1)">−</button>
+      <div class="shiftval mono">shift: ${state.shift}</div>
+      <button onclick="shiftChange(1)">＋</button>
+    </div>
+    <div class="cipherbox mono" style="border-style:solid;${success?'border-color:var(--accent);color:var(--accent);':''}">${esc(preview)}</div>
+    ${state.cipherDecoded
+      ? `<div class="banner ok">✅ 解読成功! 「${esc(CIPHER_PLAINTEXT)}」──「弱いハッシュは格好の餌食」。攻撃者はパスワード管理の甘さを狙ったことを示唆している。</div>`
+      : (state.decodeAttempts>0 ? `<div class="banner ng">まだ意味の通る英文になっていない。走り書きの数字はズラす量のヒントかもしれない。シフト量を変えて試そう。</div>` : "")}
+    <div class="btnrow">
+      <button class="btn secondary" onclick="goPhase('explore')">◀ 探索に戻る</button>
+      <button class="btn" onclick="confirmDecode()">この解読で確定する</button>
+      <button class="btn" ${state.cipherDecoded?'':'disabled'} onclick="tryGoIdentify()">攻撃手段の特定へ進む ▶</button>
+    </div>
+  </div>`;
+}
+
+function renderIdentify(){
+  const pool = IDENTIFY_POOL.filter(id=>state.collected.has(id));
+  const cards = pool.map(id=>cardEl(id,{
+    selectable:true,
+    selected:state.identifySelected.has(id),
+    onclick:`toggleIdentify('${id}')`
+  })).join("");
+  let fb="";
+  if(state.identifyFeedback==="ok"){
+    fb = `<div class="banner ok">✅ 正解! 「パスワードの使い回し」+「他社サービスでの弱いハッシュ運用による漏えい」+「ブルートフォースの痕跡がない単発ログイン」の3点から、これは<b>パスワードリスト攻撃(クレデンシャルスタッフィング)</b>だと特定できる。</div>`;
+  } else if(state.identifyFeedback && state.identifyFeedback.startsWith("ng:")){
+    fb = `<div class="banner ng">❌ ${esc(state.identifyFeedback.slice(3))}</div>`;
+  }
+  return `<div class="panel">
+    <h2>解決パート②: 攻撃手段を特定する</h2>
+    <p class="dim small">集めたカードの中から、今回の攻撃の根拠として組み合わせるべきものを選んで「決定」を押そう。関係ないカードやミスリードを混ぜると不正解になる。</p>
+    <div class="defense-list">${cards || '<div class="dim small">選べるカードがありません。探索パートに戻って調べましょう。</div>'}</div>
+    ${fb}
+    <div class="btnrow">
+      <button class="btn secondary" onclick="goPhase('explore')">◀ 探索に戻る</button>
+      <button class="btn" onclick="submitIdentify()">この組み合わせで決定する</button>
+      <button class="btn" ${state.identifyFeedback==='ok'?'':'disabled'} onclick="goPhase('defense')">防衛策の選定へ進む ▶</button>
+    </div>
+  </div>`;
+}
+
+function renderDefense(){
+  const items = DEFENSE_OPTIONS.map(o=>{
+    const selected = state.defenseSelected.has(o.id);
+    return `<div class="card selectable ${selected?'selected':''}" onclick="toggleDefense('${o.id}')">
+      <div class="ctitle"><span>🛡️ ${esc(o.label)}</span><span class="chk"></span></div>
+    </div>`;
+  }).join("");
+  let fb="";
+  if(state.defenseFeedback==="ok"){
+    fb = `<div class="banner ok">✅ 正解! MFA導入とハッシュ方式の強化(bcrypt/Argon2+ソルト)で、既に流出したパスワードが悪用されても被害を防ぎ、次の漏えいでも被害を最小化できる。</div>`;
+  } else if(state.defenseFeedback && state.defenseFeedback.startsWith("ng:")){
+    fb = `<div class="banner ng">❌ ${esc(state.defenseFeedback.slice(3))}</div>`;
+  }
+  return `<div class="panel">
+    <h2>解決パート③: 防衛策を選ぶ</h2>
+    <p class="dim small">特定した「パスワードリスト攻撃」に対して有効な対策を <b>2つ</b> 選ぼう。もっともらしいが効果の薄い選択肢も混ざっている。</p>
+    <div class="defense-list">${items}</div>
+    ${fb}
+    <div class="btnrow">
+      <button class="btn secondary" onclick="goPhase('identify')">◀ 攻撃特定に戻る</button>
+      <button class="btn" onclick="submitDefense()">この対策で決定する</button>
+    </div>
+  </div>`;
+}
+
+function renderClear(){
+  const dummyFound = [...state.collected].filter(id=>CARDS[id].category==="dummy").length;
+  return `<div class="panel">
+    <h2>🎉 インシデント解決!</h2>
+    <div class="lead">アルファテック社の被害拡大を食い止め、CSIRTとして再発防止策を提言した。
+
+【事件の全貌】
+社員が別のECサイトと同じパスワードを使い回していた。半年前、その別サイトが顧客DBを流出させ、ソルトなしMD5ハッシュが解析されて平文パスワードが割れていた。攻撃者はその情報を使い、アルファテック社に「正しいID・パスワード」でそのままログイン(パスワードリスト攻撃 / クレデンシャルスタッフィング)。ブルートフォースの形跡が無かったのはこのためだ。
+
+【打った対策】
+・多要素認証(MFA)の導入 → 漏えいしたパスワードだけでは突破されなくなる
+・ハッシュ方式を bcrypt / Argon2 + ソルトへ強化 → 万一の漏えい時の被害を最小化
+
+これは情報処理安全確保支援士試験でも頻出の「パスワードリスト攻撃」とその対策そのものだ。</div>
+    <div class="banner ok small">探索で見つけたダミーカード: ${dummyFound}枚(捜査には使わなかった寄り道情報)</div>
+    <div class="btnrow">
+      <button class="btn secondary" onclick="resetGame()">🔁 最初からもう一度遊ぶ</button>
+    </div>
+  </div>`;
+}
+
+function render(){
+  const app = document.getElementById("app");
+  let body="";
+  if(state.phase==="intro") body = renderIntro();
+  else if(state.phase==="explore") body = renderExplore();
+  else if(state.phase==="decode") body = renderDecode();
+  else if(state.phase==="identify") body = renderIdentify();
+  else if(state.phase==="defense") body = renderDefense();
+  else if(state.phase==="clear") body = renderClear();
+
+  app.innerHTML = `
+    <header>
+      <div class="titlebar">
+        <h1>crypto-riddle <span>prototype</span> ── 第1話: アルファテック社 顧客データ流出事件</h1>
+        <button class="reset-btn" onclick="resetGame()">最初からやり直す</button>
+      </div>
+      ${progressBar()}
+    </header>
+    ${body}
+    <div class="footer-note">これは Find the Fun 検証用の使い捨てプロトタイプです(1シナリオ・仮素材)。</div>
+    ${renderInvDrawer()}
+  `;
+  app.insertAdjacentHTML("beforeend", renderModal());
+  app.insertAdjacentHTML("beforeend", renderInvToggle());
+}
+
+render();
+</script>
+</body>
+</html>
