@@ -17,10 +17,34 @@
 
 | ドキュメント | 内容 |
 |--------------|------|
-| [docs/concept.md](docs/concept.md) | 初期コンセプトメモ（2026-07-08 起草、2026-07-20 謎解き型へ方向転換） |
-| `prototype/` | コアループ検証プロトタイプ（承認ゲートP、使い捨て前提。導入予定） |
-| `specs/` | spec-kit による spec.md / plan.md / tasks.md（導入予定） |
+| [specs/001-mvp/spec.md](specs/001-mvp/spec.md) | MVP 仕様書（GDD 相当。ゲート①承認済み） |
+| [specs/001-mvp/plan.md](specs/001-mvp/plan.md) | 実装計画（TDD 相当。技術スタック・アーキテクチャ） |
+| [DESIGN.md](DESIGN.md) | UI デザイン仕様（カラートークン・タイポ・8画面×4状態） |
+| [docs/characters.md](docs/characters.md) | キャラクターバイブル（霧島 悠／橘 澪） |
+| [docs/architecture.md](docs/architecture.md) | 環境構成図（Mermaid） |
+| [docs/concept.md](docs/concept.md) | 初期コンセプトメモ（歴史的経緯。正本は specs/） |
 
 ## アーキテクチャ / 構成図
 
-plan 工程で `docs/architecture.md`（Mermaid）を作成し、本セクションに掲載する。
+MVP は**サーバーレス（静的配信のみ・0円運用）**。セーブは端末の IndexedDB、シナリオは YAML→zod 検証→JSON のビルド時固定。詳細は [docs/architecture.md](docs/architecture.md)。
+
+```mermaid
+flowchart LR
+    subgraph Dev["開発"]
+        Y["scenarios/*.yaml<br/>(オーサリング)"] -->|zod 検証| B["Vite ビルド<br/>(YAML→JSON)"]
+        GH["GitHub<br/>(main)"] --> CI["GitHub Actions<br/>型/lint/test/シナリオ検証/E2E/a11y"]
+        CI -->|デプロイ| CF
+    end
+    subgraph Prod["本番(0円)"]
+        CF["Cloudflare Pages<br/>(静的配信+PWA)"]
+        WA["Cloudflare Web Analytics"]
+    end
+    U["プレイヤー<br/>(スマホ/PC ブラウザ)"] -->|HTTPS| CF
+    U -.計測.-> WA
+    U --- LS[("IndexedDB<br/>(SaveStorage)")]
+    subgraph Phase2["フェーズ2(将来)"]
+        CAP["Capacitor ラップ"] --> AND["Google Play"]
+        CAP --> IOS["App Store"]
+    end
+    CF -.同一コードベース.-> CAP
+```
