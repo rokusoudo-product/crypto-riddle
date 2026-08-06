@@ -2,11 +2,11 @@
 project: crypto-riddle
 doc: plan.md (TDD 相当 / 実装計画)
 feature: 001-mvp
-status: draft            # 承認ゲート② レビュー待ち
+status: approved          # 承認ゲート② 通過（2026-07-29 PR #11 マージ＝代表承認。記録の追随は #12 代表回答 2026-08-02 に基づく）
 created: 2026-07-29
-updated: 2026-07-29
+updated: 2026-08-06
 spec: specs/001-mvp/spec.md
-gate: "② plan レビュー → 承認後 /speckit.tasks へ"
+gate: "② 通過（2026-07-29） → tasks 工程完了。実装順序は specs/001-mvp/tasks.md"
 advisor: "2026-07-29 相談済み・条件付き承認（条件3点は §2/§6/§7 に反映済み）"
 ---
 

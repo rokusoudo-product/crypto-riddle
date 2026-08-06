@@ -18,7 +18,8 @@
 | ドキュメント | 内容 |
 |--------------|------|
 | [specs/001-mvp/spec.md](specs/001-mvp/spec.md) | MVP 仕様書（GDD 相当。ゲート①承認済み） |
-| [specs/001-mvp/plan.md](specs/001-mvp/plan.md) | 実装計画（TDD 相当。技術スタック・アーキテクチャ） |
+| [specs/001-mvp/plan.md](specs/001-mvp/plan.md) | 実装計画（TDD 相当。技術スタック・アーキテクチャ。ゲート②承認済み） |
+| [specs/001-mvp/tasks.md](specs/001-mvp/tasks.md) | タスク分解（実装順序 T001〜T029・依存関係・Issue 対応表） |
 | [DESIGN.md](DESIGN.md) | UI デザイン仕様（カラートークン・タイポ・8画面×4状態） |
 | [docs/characters.md](docs/characters.md) | キャラクターバイブル（霧島 悠／橘 澪） |
 | [docs/architecture.md](docs/architecture.md) | 環境構成図（Mermaid） |
