@@ -1,0 +1,656 @@
+# crypto-riddle 用語カードマスタ(初期セット)
+#
+# 位置づけ:
+# - schemas/term_card.schema.json に準拠する用語カードマスタの正本(Issue #4)。
+# - plan.md §5 の TermCard データモデル(id / 用語 / 読み / 定義 / 分野タグ / 関連用語 / 出典)に対応する。
+# - シナリオ記述フォーマット(scenarios/*.yaml, Issue #3)の related_terms はここに定義された id
+#   (`^term-[a-z0-9_-]+$`)を緩く参照する。#3 側では実在チェックを行わない疎結合設計だが、
+#   本ファイル内の related_terms は scripts/validate_terms.py でマスタ内の実在チェックを行う。
+# - 初期セットは「シラバス全体の網羅」ではなく、SC/NW共通シラバスの主要分野(暗号・認証・Web・
+#   攻撃手法・インシデント対応・法制度・ネットワーク基盤)を代表する用語を選定したもの(計45語)。
+#   全シラバス網羅は別タスクとしてフォローアップを推奨する(docs/term_cards.md §7 参照)。
+# - scenarios/s0-sample.yaml(Issue #3 PR #19)が参照している term-password-list-attack /
+#   term-multi-factor-authentication / term-appi-breach-report の3語は、#3 とのマージ後に
+#   実際に解決できるよう本マスタに含めている。
+# - 内容の正確性はサンプル作成時点の一般知識に基づく。IPA過去問由来ではなく、代表監修前の
+#   ドラフトとして扱うこと(#14 出典表記規則確定後に再確認)。
+
+schema_version: "0.1.0"
+
+terms:
+  # ── 暗号 ──────────────────────────────────────────
+  - id: term-caesar-cipher
+    term: シーザー暗号
+    reading: シーザーあんごう
+    definition: >-
+      平文の各文字をアルファベット上で一定の文字数だけずらして暗号化する、最も基本的な換字式暗号。
+      鍵(シフト数)の候補が少なく総当たりで容易に解読できるため、現代の実用暗号としては用いられない。
+    subject_tags: [暗号]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: general_knowledge }
+
+  - id: term-common-key-cryptography
+    term: 共通鍵暗号方式
+    reading: きょうつうかぎあんごうほうしき
+    aliases: ["対称鍵暗号方式", "秘密鍵暗号方式"]
+    definition: >-
+      暗号化と復号に同一の鍵を用いる暗号方式。処理が高速な一方、通信相手ごとに鍵を安全に
+      共有する「鍵配送問題」が課題となる。代表例はAES。
+    subject_tags: [暗号]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    related_terms: [term-aes, term-key-exchange]
+    source: { type: ipa_syllabus }
+
+  - id: term-public-key-cryptography
+    term: 公開鍵暗号方式
+    reading: こうかいかぎあんごうほうしき
+    aliases: ["非対称鍵暗号方式"]
+    definition: >-
+      暗号化に公開鍵、復号に対応する秘密鍵という異なる鍵を用いる暗号方式。鍵配送問題を
+      解決できる一方、共通鍵暗号方式より処理が低速。代表例はRSA。
+    subject_tags: [暗号, 認証]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    related_terms: [term-rsa, term-digital-signature]
+    source: { type: ipa_syllabus }
+
+  - id: term-hash-function
+    term: ハッシュ関数
+    reading: はっしゅかんすう
+    aliases: ["メッセージダイジェスト関数"]
+    definition: >-
+      任意長のデータから固定長の値(ハッシュ値)を生成する一方向関数。同じ入力からは常に
+      同じ出力が得られるが、出力から入力を逆算(復号)することは事実上できない。改ざん検知や
+      パスワードの安全な保管に利用される。
+    subject_tags: [暗号]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-digital-signature
+    term: デジタル署名
+    reading: でじたるしょめい
+    definition: >-
+      公開鍵暗号方式を応用し、送信者本人が作成したことの証明(本人性)と、データが改ざん
+      されていないことの証明(完全性)を同時に行う仕組み。送信者の秘密鍵で署名し、対応する
+      公開鍵で検証する。
+    subject_tags: [暗号, 認証]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    related_terms: [term-public-key-cryptography, term-hash-function]
+    source: { type: ipa_syllabus }
+
+  - id: term-aes
+    term: AES
+    reading: エーイーエス
+    aliases: ["Advanced Encryption Standard"]
+    definition: >-
+      米国NISTが標準化した共通鍵ブロック暗号アルゴリズム。鍵長は128/192/256ビットから
+      選択でき、現在最も広く使われる共通鍵暗号方式の一つ。
+    subject_tags: [暗号]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: standard, reference: "FIPS 197" }
+
+  - id: term-rsa
+    term: RSA暗号
+    reading: あーるえすえーあんごう
+    aliases: ["RSA"]
+    definition: >-
+      大きな合成数の素因数分解が計算量的に困難であることを安全性の根拠とする公開鍵暗号方式。
+      暗号化だけでなくデジタル署名にも利用される。
+    subject_tags: [暗号]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: general_knowledge }
+
+  - id: term-key-exchange
+    term: 鍵交換
+    reading: かぎこうかん
+    definition: >-
+      通信当事者間で共通鍵暗号方式に用いる鍵を、盗聴されている可能性のある経路上でも
+      安全に共有するための手順の総称。代表例はDiffie-Hellman鍵交換。
+    subject_tags: [暗号]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  # ── 認証 ──────────────────────────────────────────
+  - id: term-multi-factor-authentication
+    term: 多要素認証
+    reading: たようそにんしょう
+    aliases: ["MFA", "二要素認証"]
+    definition: >-
+      知識情報(パスワード等)・所持情報(スマートフォン・ICカード等)・生体情報のうち、
+      種類の異なる2つ以上を組み合わせて本人確認を行う認証方式。単一要素のみの認証より、
+      不正利用のリスクを下げられる。
+    subject_tags: [認証]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-otp
+    term: ワンタイムパスワード
+    reading: わんたいむぱすわーど
+    aliases: ["OTP", "TOTP"]
+    definition: >-
+      一度限り、または短時間のみ有効な使い捨てパスワード。時刻同期方式(TOTP)や
+      チャレンジレスポンス方式などがあり、パスワードの使い回しに起因するリスクを軽減する。
+    subject_tags: [認証]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-biometric-authentication
+    term: 生体認証
+    reading: せいたいにんしょう
+    aliases: ["バイオメトリクス認証"]
+    definition: >-
+      指紋・顔・虹彩・静脈などの身体的特徴を用いて本人確認を行う認証方式。記憶や所持を
+      必要としない一方、生体情報が漏えいした場合にパスワードのように変更ができないという
+      特有のリスクがある。
+    subject_tags: [認証]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  - id: term-single-sign-on
+    term: シングルサインオン
+    reading: しんぐるさいんおん
+    aliases: ["SSO"]
+    definition: >-
+      一度の認証で複数のシステム・サービスを利用できるようにする仕組み。利便性が高まる
+      一方、認証情報が漏えいした場合の影響範囲(被害の波及先)が広がる点に注意が必要。
+    subject_tags: [認証]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-oauth
+    term: OAuth
+    reading: おーおーす
+    aliases: ["OAuth 2.0"]
+    definition: >-
+      第三者アプリケーションに、ユーザーのID・パスワードそのものを渡すことなく、限定的な
+      リソースへのアクセス権限(アクセストークン)を付与するための認可の標準プロトコル。
+    subject_tags: [認証, Web]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    source: { type: standard, reference: "RFC 6749" }
+
+  - id: term-access-control
+    term: アクセス制御
+    reading: あくせすせいぎょ
+    definition: >-
+      主体(利用者・プロセス)が客体(ファイル・機能等)に対して行える操作を、認可された
+      ものだけに制限する仕組み。識別・認証の後段に位置し、最小権限の原則に基づいて設計される。
+    subject_tags: [認証]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  # ── Web ──────────────────────────────────────────
+  - id: term-sql-injection
+    term: SQLインジェクション
+    reading: えすきゅーえるいんじぇくしょん
+    aliases: ["SQLi"]
+    definition: >-
+      Webアプリケーションの入力値検証の不備を突き、想定外のSQL文を実行させてデータベースを
+      不正に操作・情報窃取する攻撃手法。対策の基本はプレースホルダ(バインド機構)の使用。
+    subject_tags: [Web, 攻撃手法]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  - id: term-cross-site-scripting
+    term: クロスサイトスクリプティング
+    reading: くろすさいとすくりぷてぃんぐ
+    aliases: ["XSS"]
+    definition: >-
+      脆弱なWebサイトに悪意のあるスクリプトを埋め込ませ、閲覧者のブラウザ上で実行させる
+      攻撃手法。Cookie窃取やなりすましにつながる。対策は出力時の適切なエスケープ処理等。
+    subject_tags: [Web, 攻撃手法]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  - id: term-csrf
+    term: クロスサイトリクエストフォージェリ
+    reading: くろすさいとりくえすとふぉーじぇり
+    aliases: ["CSRF"]
+    definition: >-
+      ログイン済みの利用者に、利用者が意図しないリクエストを別サイト経由で送信させる
+      攻撃手法。対策はトークン検証・Referer確認等。
+    subject_tags: [Web, 攻撃手法]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  - id: term-https
+    term: HTTPS
+    reading: えいちてぃーてぃーぴーえす
+    aliases: ["HTTP over TLS"]
+    definition: >-
+      HTTP通信をTLS/SSLで暗号化し、通信内容の盗聴・改ざんを防止するプロトコル。
+      サーバ証明書の検証によるサーバ認証(なりすまし防止)も兼ねる。
+    subject_tags: [Web, 暗号]
+    syllabus:
+      domain: テクノロジ系
+      field: ネットワーク
+      exam_relevance: [SC, NW]
+    source: { type: standard, reference: "RFC 9110 / RFC 8446" }
+
+  - id: term-cookie-security
+    term: Cookieのセキュリティ属性
+    reading: くっきーのせきゅりてぃぞくせい
+    definition: >-
+      Webブラウザが保持するCookieに設定する Secure(HTTPS限定送信)・HttpOnly(JavaScript
+      からのアクセス禁止)・SameSite(クロスサイト送信の制御)等の属性。XSS・CSRF対策の
+      一環として利用される。
+    subject_tags: [Web]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    related_terms: [term-cross-site-scripting, term-csrf]
+    source: { type: ipa_syllabus }
+
+  - id: term-directory-traversal
+    term: ディレクトリトラバーサル
+    reading: でぃれくとりとらばーさる
+    aliases: ["パストラバーサル"]
+    definition: >-
+      入力値に「../」等の相対パス表記を含め、本来公開を想定していないディレクトリ・
+      ファイルへ不正にアクセスする攻撃手法。
+    subject_tags: [Web, 攻撃手法]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  # ── 攻撃手法 ──────────────────────────────────────
+  - id: term-password-list-attack
+    term: パスワードリスト攻撃
+    reading: ぱすわーどりすとこうげき
+    definition: >-
+      他のサービスから漏えいしたID・パスワードの組を用いて、別のサービスへのログインを
+      試みる攻撃。利用者がパスワードを複数サービスで使い回していることを悪用する。
+      対策は多要素認証の導入・パスワード使い回しの防止。
+    subject_tags: [攻撃手法, 認証]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    related_terms: [term-multi-factor-authentication]
+    source: { type: ipa_syllabus }
+
+  - id: term-brute-force-attack
+    term: 総当たり攻撃
+    reading: そうあたりこうげき
+    aliases: ["ブルートフォース攻撃"]
+    definition: >-
+      パスワードや暗号鍵として考えられる組合せをすべて試行し、正解を見つけ出そうとする
+      攻撃手法。アカウントロックアウトや試行回数制限が対策となる。
+    subject_tags: [攻撃手法]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-phishing
+    term: フィッシング
+    reading: ふぃっしんぐ
+    definition: >-
+      実在する組織を装った電子メールやWebサイトで利用者を騙し、ID・パスワードや
+      クレジットカード情報等を詐取する攻撃手法。
+    subject_tags: [攻撃手法]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-targeted-email-attack
+    term: 標的型攻撃メール
+    reading: ひょうてきがたこうげきめーる
+    definition: >-
+      特定の組織・個人を狙い、業務に関係がありそうな内容を装って送付される、
+      マルウェア添付や不正リンク付きのメール。初期侵入の代表的な手口の一つ。
+    subject_tags: [攻撃手法]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  - id: term-ransomware
+    term: ランサムウェア
+    reading: らんさむうぇあ
+    definition: >-
+      感染した端末やサーバ内のデータを暗号化する等して利用不能にし、復旧と引き換えに
+      金銭を要求するマルウェア。
+    subject_tags: [攻撃手法]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-ddos-attack
+    term: DDoS攻撃
+    reading: でぃーどすこうげき
+    aliases: ["分散型サービス妨害攻撃"]
+    definition: >-
+      多数の端末(ボットネット等)から標的に大量の通信を送りつけ、サービスを提供
+      不能な状態に陥れる攻撃。
+    subject_tags: [攻撃手法, ネットワーク基盤]
+    syllabus:
+      domain: テクノロジ系
+      field: ネットワーク
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-man-in-the-middle
+    term: 中間者攻撃
+    reading: ちゅうかんしゃこうげき
+    aliases: ["MITM攻撃"]
+    definition: >-
+      通信を行う二者の間に攻撃者が介在し、通信内容を盗聴・改ざんする攻撃。
+      対策は通信経路の暗号化とサーバ証明書の検証。
+    subject_tags: [攻撃手法, ネットワーク基盤]
+    syllabus:
+      domain: テクノロジ系
+      field: ネットワーク
+      exam_relevance: [SC, NW]
+    related_terms: [term-https]
+    source: { type: ipa_syllabus }
+
+  - id: term-privilege-escalation
+    term: 権限昇格
+    reading: けんげんしょうかく
+    definition: >-
+      攻撃者が本来割り当てられている以上のアクセス権限を、脆弱性の悪用等により
+      不正に取得すること。侵入後の水平展開・垂直展開で用いられる。
+    subject_tags: [攻撃手法]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  # ── インシデント対応 ────────────────────────────────
+  - id: term-csirt
+    term: CSIRT
+    reading: しーさーと
+    definition: >-
+      Computer Security Incident Response Team の略。組織内でセキュリティ
+      インシデントの検知・分析・対応・再発防止を担う専門チーム。
+    subject_tags: [インシデント対応]
+    syllabus:
+      domain: マネジメント系
+      field: サービスマネジメント
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  - id: term-incident-response-process
+    term: インシデント対応プロセス
+    reading: いんしでんとたいおうぷろせす
+    definition: >-
+      検知 → トリアージ → 封じ込め → 根絶 → 復旧 → 事後対応(教訓の反映)という、
+      インシデント発生から収束までの標準的な対応の流れ。
+    subject_tags: [インシデント対応]
+    syllabus:
+      domain: マネジメント系
+      field: サービスマネジメント
+      exam_relevance: [SC]
+    related_terms: [term-csirt, term-digital-forensics]
+    source: { type: ipa_syllabus }
+
+  - id: term-digital-forensics
+    term: デジタルフォレンジック
+    reading: でじたるふぉれんじっく
+    definition: >-
+      インシデント発生後に、ログや記憶媒体等の電子的証拠を収集・保全・分析し、
+      原因究明や法的証拠として活用する技術・手続き。
+    subject_tags: [インシデント対応]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  - id: term-log-analysis
+    term: ログ分析
+    reading: ろぐぶんせき
+    definition: >-
+      プロキシログ・認証ログ・EDRアラート等の記録を突き合わせて、攻撃の侵入経路や
+      被害範囲を特定する作業。インシデント対応の初動で重要となる。
+    subject_tags: [インシデント対応]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC, NW]
+    related_terms: [term-edr]
+    source: { type: ipa_syllabus }
+
+  - id: term-edr
+    term: EDR
+    reading: いーでぃーあーる
+    aliases: ["エンドポイント検知対応", "Endpoint Detection and Response"]
+    definition: >-
+      端末(エンドポイント)上の挙動を継続的に監視・記録し、不審な挙動を検知して
+      調査・対応を支援する仕組み・製品群。
+    subject_tags: [インシデント対応]
+    syllabus:
+      domain: テクノロジ系
+      field: セキュリティ
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  - id: term-bcp
+    term: 事業継続計画
+    reading: じぎょうけいぞくけいかく
+    aliases: ["BCP"]
+    definition: >-
+      インシデントや災害等で事業が中断した際に、重要業務を目標時間内に復旧・
+      継続させるための方針・体制・手順を定めた計画。
+    subject_tags: [インシデント対応]
+    syllabus:
+      domain: マネジメント系
+      field: サービスマネジメント
+      exam_relevance: [SC]
+    source: { type: ipa_syllabus }
+
+  # ── 法制度 ────────────────────────────────────────
+  - id: term-appi-breach-report
+    term: 個人情報保護法の漏えい報告義務
+    reading: こじんじょうほうほごほうのろうえいほうこくぎむ
+    definition: >-
+      個人データの漏えい等が発生し、個人の権利利益を害するおそれが大きい場合に、
+      個人情報保護委員会への報告(速報・確報の二段階)と本人への通知を義務付ける、
+      個人情報保護法上の規定。
+    subject_tags: [法制度, インシデント対応]
+    syllabus:
+      domain: ストラテジ系
+      field: 企業と法務
+      exam_relevance: [SC]
+    source: { type: standard, reference: "個人情報の保護に関する法律 第22条の2" }
+
+  - id: term-unauthorized-computer-access-law
+    term: 不正アクセス禁止法
+    reading: ふせいあくせすきんしほう
+    aliases: ["不正アクセス行為の禁止等に関する法律"]
+    definition: >-
+      他人のID・パスワードを無断で用いる等してアクセス制御機能を回避し、制限されている
+      特定利用をし得る状態にする行為等を禁止する法律。
+    subject_tags: [法制度]
+    syllabus:
+      domain: ストラテジ系
+      field: 企業と法務
+      exam_relevance: [SC]
+    source: { type: standard, reference: "不正アクセス行為の禁止等に関する法律 第3条" }
+
+  - id: term-cybersecurity-basic-act
+    term: サイバーセキュリティ基本法
+    reading: さいばーせきゅりてぃきほんほう
+    definition: >-
+      国のサイバーセキュリティに関する施策を総合的かつ効果的に推進するための
+      基本理念、および国・重要インフラ事業者等の責務を定めた法律。
+    subject_tags: [法制度]
+    syllabus:
+      domain: ストラテジ系
+      field: 企業と法務
+      exam_relevance: [SC]
+    source: { type: standard }
+
+  - id: term-copyright-act-software
+    term: 著作権法(プログラムの著作物)
+    reading: ちょさくけんほう
+    definition: >-
+      プログラムを著作物として保護し、無断複製・改変等から権利者を保護する法律上の
+      規定。開発委託・オープンソース利用時の権利関係を扱う際の基礎知識となる。
+    subject_tags: [法制度]
+    syllabus:
+      domain: ストラテジ系
+      field: 企業と法務
+      exam_relevance: [SC]
+    source: { type: standard, reference: "著作権法 第10条第1項第9号" }
+
+  - id: term-my-number-act
+    term: マイナンバー法
+    reading: まいなんばーほう
+    aliases: ["番号利用法", "行政手続における特定の個人を識別するための番号の利用等に関する法律"]
+    definition: >-
+      行政手続における特定の個人を識別するための番号(マイナンバー)の利用範囲・
+      安全管理措置等を定めた法律。特定個人情報は個人情報保護法よりも厳格な取扱いが
+      求められる。
+    subject_tags: [法制度]
+    syllabus:
+      domain: ストラテジ系
+      field: 企業と法務
+      exam_relevance: [SC]
+    source: { type: standard }
+
+  # ── ネットワーク基盤(NW共通シラバス拡張) ────────────────
+  - id: term-tcp-ip
+    term: TCP/IP
+    reading: てぃーしーぴーあいぴー
+    definition: >-
+      インターネットで標準的に用いられるプロトコル群の総称。アプリケーション層・
+      トランスポート層・インターネット層・ネットワークインタフェース層の階層モデルで
+      構成される。
+    subject_tags: [ネットワーク基盤]
+    syllabus:
+      domain: テクノロジ系
+      field: ネットワーク
+      exam_relevance: [NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-firewall
+    term: ファイアウォール
+    reading: ふぁいあうぉーる
+    definition: >-
+      あらかじめ定めた通信規則(ポリシー)に基づき、ネットワーク境界で通信を
+      許可・拒否するセキュリティ機器・ソフトウェア。
+    subject_tags: [ネットワーク基盤]
+    syllabus:
+      domain: テクノロジ系
+      field: ネットワーク
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-ids
+    term: IDS(侵入検知システム)
+    reading: あいでぃーえす
+    aliases: ["侵入検知システム", "Intrusion Detection System"]
+    definition: >-
+      ネットワークやホスト上の通信・挙動を監視し、不正の疑いがある通信を検知して
+      管理者に通知するシステム。検知のみを行い、通信の遮断(防御)までは行わない。
+    subject_tags: [ネットワーク基盤, インシデント対応]
+    syllabus:
+      domain: テクノロジ系
+      field: ネットワーク
+      exam_relevance: [SC, NW]
+    related_terms: [term-ips]
+    source: { type: ipa_syllabus }
+
+  - id: term-ips
+    term: IPS(侵入防止システム)
+    reading: あいぴーえす
+    aliases: ["侵入防止システム", "Intrusion Prevention System"]
+    definition: >-
+      ネットワークやホスト上の不正な通信を検知したうえで、その通信を自動的に
+      遮断・防御まで行うシステム。IDSの検知機能に防御機能を加えたもの。
+    subject_tags: [ネットワーク基盤, インシデント対応]
+    syllabus:
+      domain: テクノロジ系
+      field: ネットワーク
+      exam_relevance: [SC, NW]
+    related_terms: [term-ids]
+    source: { type: ipa_syllabus }
+
+  - id: term-vpn
+    term: VPN
+    reading: ぶいぴーえぬ
+    aliases: ["Virtual Private Network"]
+    definition: >-
+      インターネット等の公衆網上に、暗号化技術等を用いて仮想的な専用線環境を
+      構築する技術。拠点間接続やリモートアクセスに利用される。
+    subject_tags: [ネットワーク基盤, 暗号]
+    syllabus:
+      domain: テクノロジ系
+      field: ネットワーク
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }
+
+  - id: term-dns
+    term: DNS
+    reading: でぃーえぬえす
+    aliases: ["Domain Name System"]
+    definition: >-
+      ドメイン名とIPアドレスを対応付ける仕組み。名前解決の要となる基盤であり、
+      DNSキャッシュポイズニング等の攻撃対象にもなる。
+    subject_tags: [ネットワーク基盤]
+    syllabus:
+      domain: テクノロジ系
+      field: ネットワーク
+      exam_relevance: [SC, NW]
+    source: { type: ipa_syllabus }

@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crypto-riddle.local/schemas/term_card.schema.json",
+  "title": "TermCard",
+  "description": "用語カードマスタ1件分の構造検証(JSON Schema, draft 2020-12)。Issue #4 の受け入れ基準および plan.md §5 の TermCard データモデル(id / 用語 / 読み / 定義 / 分野タグ / 関連用語 / 出典)に対応する。用語ID(termId)はシナリオ記述フォーマット(Issue #3, schemas/scenario.schema.json)の related_terms が参照する形式(`^term-[a-z0-9_-]+$`)と一致させているが、本スキーマは #3 のファイルには依存しない(疎結合)。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "term", "reading", "definition", "subject_tags", "syllabus", "source"],
+  "properties": {
+    "id": { "$ref": "#/$defs/termId" },
+    "term": {
+      "type": "string",
+      "minLength": 1,
+      "description": "用語の正式名称(日本語表記。英字略語はそのまま可。例: 'AES')。"
+    },
+    "reading": {
+      "type": "string",
+      "minLength": 1,
+      "description": "読み(ひらがな/カタカナ)。英字略語はカタカナ読みを記す(例: 'エーイーエス')。"
+    },
+    "aliases": {
+      "type": "array",
+      "description": "別名・略称・正式名称等。図鑑の検索・シナリオ本文とのゆらぎ吸収に用いる想定。",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "definition": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 400,
+      "description": "定義。図鑑カード1枚に収まる分量(目安100〜200字)を想定。"
+    },
+    "subject_tags": {
+      "type": "array",
+      "description": "分野タグ。spec.md §9 の6分野(暗号/認証/Web/攻撃手法/インシデント対応/法制度)に、NW/SC共通シラバスのネットワーク基礎用語を扱うための拡張タグ'ネットワーク基盤'を加えた7種から1つ以上選ぶ。複数分野にまたがる用語は複数タグ可。",
+      "items": { "$ref": "#/$defs/subjectTag" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "syllabus": { "$ref": "#/$defs/syllabus" },
+    "related_terms": {
+      "type": "array",
+      "description": "関連用語(用語カードマスタ内の他エントリへの参照)。参照先の実在は scripts/validate_terms.py がマスタ内で検証する(シナリオ側からの参照とは異なり、こちらはマスタ内で閉じた自己参照のため実在チェックを行う)。",
+      "items": { "$ref": "#/$defs/termId" },
+      "uniqueItems": true
+    },
+    "source": { "$ref": "#/$defs/source" },
+    "status": {
+      "type": "string",
+      "description": "制作ステータス。省略時は draft 扱い。",
+      "enum": ["draft", "reviewed", "published"],
+      "default": "draft"
+    }
+  },
+  "$defs": {
+    "termId": {
+      "type": "string",
+      "description": "用語カードマスタのID。schemas/scenario.schema.json の $defs/termId と同一パターン(`^term-[a-z0-9_-]+$`)。",
+      "pattern": "^term-[a-z0-9_-]+$"
+    },
+    "subjectTag": {
+      "type": "string",
+      "description": "spec.md §9 の6分野 + 拡張1種(ネットワーク基盤)。scenario.schema.json の $defs/subjectTag(6種のみ)とは値集合が異なる点に注意(docs/term_cards.md §3 参照)。",
+      "enum": ["暗号", "認証", "Web", "攻撃手法", "インシデント対応", "法制度", "ネットワーク基盤"]
+    },
+    "syllabus": {
+      "type": "object",
+      "description": "IPA試験のシラバス分類との整合(Issue #4 受け入れ基準)。共通キャリア・スキルフレームワーク(CCSF)のテクノロジ系/マネジメント系/ストラテジ系の大分類・中分類に準拠する。",
+      "additionalProperties": false,
+      "required": ["domain", "field", "exam_relevance"],
+      "properties": {
+        "domain": {
+          "type": "string",
+          "description": "IPAシラバスの大分類。",
+          "enum": ["テクノロジ系", "マネジメント系", "ストラテジ系"]
+        },
+        "field": {
+          "type": "string",
+          "description": "IPAシラバスの中分類(共通キャリア・スキルフレームワークの分類名に準拠)。",
+          "enum": [
+            "基礎理論",
+            "アルゴリズムとプログラミング",
+            "コンピュータ構成要素",
+            "システム構成要素",
+            "ソフトウェア",
+            "ハードウェア",
+            "ヒューマンインタフェース",
+            "マルチメディア",
+            "データベース",
+            "ネットワーク",
+            "セキュリティ",
+            "システム開発技術",
+            "ソフトウェア開発管理技術",
+            "プロジェクトマネジメント",
+            "サービスマネジメント",
+            "システム監査",
+            "システム戦略",
+            "経営戦略",
+            "企業と法務"
+          ]
+        },
+        "exam_relevance": {
+          "type": "array",
+          "description": "この用語が出題範囲として関連する試験。代表の学習連携(study_agent, reading vault Exams/)のため、SC/NWのいずれか、または両方を明示する。",
+          "items": { "type": "string", "enum": ["SC", "NW"] },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "description": "出典表記。scenario.schema.json の $defs/source と役割は同じだが、用語カードは特定の過去問由来ではなく一般的な試験シラバス知識・標準文書由来が中心のため、type の選択肢を用語カード向けに調整している。#14(出典表記規則)確定後に見直す可能性がある。",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ipa_syllabus", "ipa_exam", "standard", "general_knowledge", "other"],
+          "description": "ipa_syllabus=IPA公開シラバス項目に基づく一般知識、ipa_exam=特定の過去問由来(exam_period/question_no必須)、standard=RFC/JIS/法令等の標準文書、general_knowledge=業界一般に定着した教科書的知識(特定出典なし)、other=その他(note必須)。"
+        },
+        "exam_period": {
+          "type": "string",
+          "description": "例: '2025年 秋期'。type=ipa_exam の場合に指定する。"
+        },
+        "question_no": {
+          "type": "string",
+          "description": "例: '問17'。type=ipa_exam の場合に指定する。"
+        },
+        "reference": {
+          "type": "string",
+          "description": "標準文書・法令の参照先(例: 'RFC 5321'、'個人情報の保護に関する法律 第22条の2')。type=standard の場合に指定を推奨。"
+        },
+        "note": {
+          "type": "string",
+          "description": "自由記述。type=other の場合は必須。"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "ipa_exam" } }, "required": ["type"] },
+          "then": { "required": ["exam_period", "question_no"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "other" } }, "required": ["type"] },
+          "then": { "required": ["note"] }
+        }
+      ]
+    }
+  }
+}

@@ -22,6 +22,7 @@
 | [specs/001-mvp/tasks.md](specs/001-mvp/tasks.md) | タスク分解（実装順序 T001〜T029・依存関係・Issue 対応表） |
 | [DESIGN.md](DESIGN.md) | UI デザイン仕様（カラートークン・タイポ・8画面×4状態） |
 | [docs/characters.md](docs/characters.md) | キャラクターバイブル（霧島 悠／橘 澪） |
+| [docs/term_cards.md](docs/term_cards.md) | 用語カードマスタ・誤用検出クイズ設計（Issue #4） |
 | [docs/architecture.md](docs/architecture.md) | 環境構成図（Mermaid） |
 | [docs/concept.md](docs/concept.md) | 初期コンセプトメモ（歴史的経緯。正本は specs/） |
 
