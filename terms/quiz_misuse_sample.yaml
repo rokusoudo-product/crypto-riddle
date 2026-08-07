@@ -1,0 +1,96 @@
+# crypto-riddle 誤用検出クイズ サンプルデータ
+#
+# 位置づけ:
+# - schemas/quiz_misuse.schema.json に準拠するサンプル(Issue #4 受け入れ基準
+#   「誤用検出クイズの出題・判定のデータ構造が定義されている」を満たすためのデータ構造演習)。
+# - Issue #4 の代表回答により、誤用検出クイズの機能(UI・出題ロジック・採点画面)そのものは
+#   MVP スコープ外(リリース後追加候補)。本ファイルはデータ構造の妥当性を示すサンプルであり、
+#   ゲーム内で実際に出題される確定コンテンツではない。
+# - 判定アルゴリズムの説明は docs/term_cards.md §5 を参照。
+# - term_id / confused_with_term_id は terms/terms_core.yaml 内の id を参照する。
+#   実在チェックは scripts/validate_terms.py が行う。
+
+schema_version: "0.1.0"
+
+quiz_items:
+  - id: quiz-misuse-hash-vs-encryption
+    term_id: term-hash-function
+    speaker: 霧島
+    context_text: >-
+      「このパスワードはハッシュ関数で暗号化されているので、必要なときは復号して
+      元のパスワードを確認できます。」
+    is_misuse: true
+    misuse_type: definition_confusion
+    correct_statement: >-
+      ハッシュ関数は一方向関数であり、ハッシュ値から元のパスワードを復号することはできない。
+      パスワードの確認は、入力値を同じ手順でハッシュ化し、結果を照合する方式で行う。
+    explanation: >-
+      ハッシュ関数と暗号化(共通鍵/公開鍵暗号方式)はどちらも「読めない形に変換する」処理
+      である点が似ているため混同されやすい。暗号化は鍵を用いて復号(逆変換)できるのに対し、
+      ハッシュ関数は復号を前提としない一方向関数である点が本質的に異なる。
+    difficulty: 2
+
+  - id: quiz-misuse-ids-ips-swap
+    term_id: term-ids
+    speaker: 橘
+    context_text: >-
+      「IDS(侵入検知システム)を導入したので、不正な通信は検知したうえで
+      自動的に遮断されます。」
+    is_misuse: true
+    misuse_type: term_confusion
+    confused_with_term_id: term-ips
+    correct_statement: >-
+      IDSは不正な通信を検知して通知するシステムであり、通信の自動遮断(防御)は行わない。
+      検知に加えて自動遮断まで行うのはIPS(侵入防止システム)である。
+    explanation: >-
+      IDSとIPSは検知・防御の役割が異なるにもかかわらず同一視されやすい。
+      IDS=Detection(検知)、IPS=Prevention(防止/防御)という語源の違いを踏まえて区別する。
+    difficulty: 2
+
+  - id: quiz-misuse-mfa-scope
+    term_id: term-multi-factor-authentication
+    speaker: 霧島
+    context_text: >-
+      「パスワードに加えて秘密の質問(母の旧姓など)も設定したので、これで多要素認証に
+      なっています。」
+    is_misuse: true
+    misuse_type: scope_error
+    correct_statement: >-
+      秘密の質問はパスワードと同じ「知識情報」に分類されるため、これらを組み合わせても
+      「多要素」にはならず、知識情報のみの多段階認証にとどまる。多要素認証と呼ぶには、
+      所持情報(スマートフォン等)や生体情報など、異なる種類の要素を組み合わせる必要がある。
+    explanation: >-
+      「複数の認証手段を使う=多要素認証」と誤解されやすいが、要素の"種類"
+      (知識・所持・生体)が異なることが多要素認証の条件である。
+    difficulty: 3
+
+  - id: quiz-misuse-aes-key-length
+    term_id: term-aes
+    speaker: 橘
+    context_text: >-
+      「AESは鍵長56ビットの共通鍵暗号方式なので、現在のシステムでは非推奨です。」
+    is_misuse: true
+    misuse_type: factual_error
+    correct_statement: >-
+      鍵長56ビットは旧世代の共通鍵暗号方式DESの鍵長である。AESの鍵長は128/192/256ビット
+      から選択され、現在も広く推奨される共通鍵暗号方式である。
+    explanation: >-
+      DESとAESはどちらも「共通鍵ブロック暗号」という括りで混同されやすいが、鍵長や
+      採用時期が異なる別のアルゴリズムである。
+    difficulty: 3
+
+  - id: quiz-misuse-public-key-correct
+    term_id: term-public-key-cryptography
+    speaker: 霧島
+    context_text: >-
+      「公開鍵暗号方式では、暗号化に公開鍵、復号に対応する秘密鍵を使う。秘密鍵は
+      絶対に他人に渡してはいけない。」
+    is_misuse: false
+    correct_statement: >-
+      公開鍵と秘密鍵の役割(暗号化=公開鍵、復号=秘密鍵)を正しく説明しており、
+      秘密鍵を非公開に保つという運用上の原則にも誤りはない。
+    explanation: >-
+      正用の例。公開鍵暗号方式の定義と、秘密鍵の管理原則を正しく説明できている。
+      誤用検出クイズは「誤りを見つける」だけでなく、正しい説明を正しいと判定できることも
+      評価する必要があるため、is_misuse=false のサンプルとして収録する。
+    difficulty: 1
