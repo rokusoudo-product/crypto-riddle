@@ -1,0 +1,15 @@
+# scripts/validate_terms.py の実行に必要な依存(暫定)。
+# T001(リポジトリ足場)完了後、本番のシナリオ/用語データ検証は plan.md §4 の
+# YAML -> zod 検証 -> JSON パイプライン(T010, Node/TypeScript)に一本化する想定。
+# それまでの間、このスクリプトは Python + venv で単独実行できる。
+#
+# 注記: Issue #3(PR #19)の scripts/requirements.txt と同一内容。#3 マージ後は
+# ファイルが重複するため、どちらかに統合すること(docs/term_cards.md §7)。
+#
+# 使い方:
+#   python3 -m venv .venv-validate
+#   .venv-validate/bin/pip install -r scripts/requirements.txt
+#   .venv-validate/bin/python scripts/validate_terms.py
+
+pyyaml==6.0.3
+jsonschema==4.26.0

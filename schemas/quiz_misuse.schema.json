@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crypto-riddle.local/schemas/quiz_misuse.schema.json",
+  "title": "MisuseQuizItem",
+  "description": "誤用検出クイズ1問分のデータ構造(Issue #4 受け入れ基準)。プレイヤーに会話・証言テキストを提示し、用語の使われ方が正しいか誤り(誤用)かを判定させる出題形式を表現する。MVP では機能(UI・ゲームロジック)の実装は行わない(Issue #4 代表回答)が、データ構造は本スキーマで確定させる。docs/term_cards.md §5 に判定アルゴリズムの説明がある。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "term_id", "context_text", "is_misuse", "correct_statement", "explanation"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^quiz-misuse-[a-z0-9_-]+$",
+      "description": "クイズ問題のID。"
+    },
+    "term_id": {
+      "$ref": "#/$defs/termId",
+      "description": "この設問が扱う用語カードマスタのID。実在は scripts/validate_terms.py が検証する。"
+    },
+    "context_text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "プレイヤーに提示する会話・証言テキスト。用語(term_id)の使われ方が正用・誤用いずれかを含む。spec §5 のサポート役掛け合いや事件関係者の証言を想定した文体でよい。"
+    },
+    "speaker": {
+      "type": "string",
+      "description": "発言者(任意)。例: '霧島'、'橘'、または事件関係者名。docs/characters.md の表記に準拠することを推奨。"
+    },
+    "is_misuse": {
+      "type": "boolean",
+      "description": "この設問の正解(期待される判定)。true=context_text に用語の誤用が含まれる、false=正しい用法。"
+    },
+    "misuse_type": {
+      "$ref": "#/$defs/misuseType",
+      "description": "誤用の種類。is_misuse=true の場合は必須。"
+    },
+    "confused_with_term_id": {
+      "$ref": "#/$defs/termId",
+      "description": "misuse_type='term_confusion' の場合、混同された相手の用語カードID。実在は用語カードマスタ内で検証する。"
+    },
+    "correct_statement": {
+      "type": "string",
+      "minLength": 1,
+      "description": "正しい用法・訂正文。is_misuse=false の場合は context_text の内容が正しいことを裏付ける補足説明でもよい。"
+    },
+    "explanation": {
+      "type": "string",
+      "minLength": 1,
+      "description": "誤用/正用と判定される理由の解説。spec §5「クリア後に知識の要点を解説」と同様、正誤に関わらずプレイヤーの理解を助ける解説を書く。"
+    },
+    "difficulty": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "難易度目安。1(易)〜5(難)。spec §9 の difficulty と同じ尺度。"
+    },
+    "source_scenario": {
+      "type": "string",
+      "description": "着想元・出題文脈にしたシナリオID等の緩い参照(任意、自由記述)。シナリオ記述フォーマット(#3)側との実在チェックは行わない(#3 のファイル形式に依存しない疎結合とするため)。"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "reviewed", "published"],
+      "default": "draft",
+      "description": "制作ステータス。省略時は draft 扱い。"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "is_misuse": { "const": true } },
+        "required": ["is_misuse"]
+      },
+      "then": { "required": ["misuse_type"] }
+    },
+    {
+      "if": {
+        "properties": { "misuse_type": { "const": "term_confusion" } },
+        "required": ["misuse_type"]
+      },
+      "then": { "required": ["confused_with_term_id"] }
+    }
+  ],
+  "$defs": {
+    "termId": {
+      "type": "string",
+      "description": "用語カードマスタのID(schemas/term_card.schema.json の $defs/termId と同一パターン)。",
+      "pattern": "^term-[a-z0-9_-]+$"
+    },
+    "misuseType": {
+      "type": "string",
+      "description": "definition_confusion=用語の定義そのものの取り違え、term_confusion=類似・混同しやすい別用語との取り違え(confused_with_term_id必須)、scope_error=適用範囲・条件の誤り(例: 要件を満たさないのに用語の適用対象だと誤認)、factual_error=数値・仕様等の付随情報の誤り。",
+      "enum": ["definition_confusion", "term_confusion", "scope_error", "factual_error"]
+    }
+  }
+}
