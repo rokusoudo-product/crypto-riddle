@@ -33,18 +33,18 @@ issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
 `future` で止まっている #3〜#6 に依存せず着手できる唯一のフェーズ。
 CI とテスト基盤が無いままコードを書き始めるのを防ぐため、最優先で完了させる。
 
-- [ ] **T001** プロジェクト初期化
+- [x] **T001** プロジェクト初期化
   - Vite + React + TypeScript（**strict**）+ Tailwind CSS + shadcn/ui を初期化し、
     `src/core/`（scenario/ judge/ save/ model/）・`src/ui/`・`src/data/` の構成（plan §2）を作る
   - 完了条件: `npm run build` と `npm run dev` が成功しプレースホルダ画面が表示される。
     `tsconfig.json` が strict。ディレクトリ構成が plan §2 と一致する
-- [ ] **T002** アーキテクチャ制約の機械的担保（依存: T001）
+- [x] **T002** アーキテクチャ制約の機械的担保（依存: T001）
   - ESLint + Prettier を設定し、**`src/core/` からの `src/ui/` および `react` 系モジュールの import を
     lint エラーにする**（`eslint-plugin-import` の `import/no-restricted-paths`（zones で core→ui を禁止）＋
     core 配下への `no-restricted-imports`（react / react-dom / zustand 等 UI 依存を禁止）で担保する。plan §2 の advisor 承認条件①）
   - 完了条件: `src/core/` に `react` または `../ui/` の import を書いた検証用ファイルで lint が fail することを確認し、
     確認後に検証用ファイルを削除している
-- [ ] **T003** CI パイプライン（依存: T002）
+- [x] **T003** CI パイプライン（依存: T002）
   - GitHub Actions（`.github/workflows/ci.yml`）: 型チェック → ESLint → Vitest →
     シナリオ検証（T010 完成後にジョブ追加）→ Playwright E2E（T017 完成後に追加）→ axe-core（T026 で追加）。
     PR と main push で実行する
