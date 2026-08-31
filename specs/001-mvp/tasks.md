@@ -84,7 +84,8 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   - `scenarios/*.yaml` → zod 検証 → `src/data/*.json` のビルドスクリプト（plan §4）。
     不正シナリオで CI が fail するよう T003 のワークフローに「シナリオ検証」ジョブを追加。
     法制度データは別ファイル分離
-  - 完了条件: サンプル YAML が JSON 化され、壊した YAML で CI が fail する
+  - 完了条件: サンプル YAML が JSON 化され、壊した YAML で CI が fail する。
+    あわせて、暫定 CI（Issue #23, `.github/workflows/validate-data.yml`）を削除する
 
 **チェックポイント②**: UI なしで「シナリオを読み込み→判定→セーブ」が core 単体テストで一周する
 
