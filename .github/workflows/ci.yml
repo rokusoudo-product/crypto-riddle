@@ -1,0 +1,35 @@
+name: CI
+
+# Phase 1（Issue #21 / T003）: 型チェック → ESLint → Vitest を PR と main への push で実行する。
+# シナリオ検証（T010）・Playwright E2E（T017）・axe-core（T026）のジョブは各タスク完了後に追加する。
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    name: typecheck / lint / test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test

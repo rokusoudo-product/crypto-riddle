@@ -1,0 +1,19 @@
+dist
+node_modules
+package-lock.json
+
+# Phase 1 (Issue #21) はアプリのスキャフォールドのみが対象。
+# 既存のデータ資産・仕様書・spec-kit テンプレートは対象外（無関係な整形差分を防ぐ）。
+.claude
+.specify
+docs
+legal
+scenarios
+schemas
+scripts
+specs
+terms
+tmp
+CLAUDE.md
+DESIGN.md
+README.md
