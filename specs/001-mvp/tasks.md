@@ -138,12 +138,29 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   - DESIGN.md のカラートークンを Tailwind theme に定義する。**hex は仮値**のため、#13（WCAG AA コントラスト実測）の
     確定値が出たらトークン側の差し替えのみで反映できる構造にする（直書き禁止）
   - 完了条件: 色の直書きが lint（tailwind 設定外の任意色禁止）または レビューで検出できる状態になっている
-- [ ] **T013** [P] 状態管理の接続（依存: T007, T011）
+- [x] **T013** [P] 状態管理の接続（依存: T007, T011）
   - Zustand（+ persist は SaveStorage 経由）で core のステートマシンと UI を接続する。ui→core の一方向依存を維持
   - 完了条件: 画面操作でステートマシンが遷移する結線テスト（Vitest + Testing Library）が通る
-- [ ] **T014** カード配置インタラクション（依存: T011）
+  - **完了（2026-09-10）**: `src/ui/store/game-store.ts`(zustand)が `src/core/scenario/state.ts` の
+    `scenarioReducer` をラップして dispatch する形で接続。永続化は zustand/persist ではなく T009 の
+    `SaveStorage`(IndexedDB)経由とし、探索でのカード獲得等の重要進行時とクリア時に保存、起動時
+    (タイトル画面)に読込む(`src/ui/store/save-integration.ts`)。プレイ用データは
+    `src/core/scenario/fixtures/s0-sample.fixture.ts` を既定値として使用(`src/data/*.json` は
+    ビルド成果物で .gitignore 対象・CI も Test の後に build:data する順序のため、テスト時点で
+    存在を前提にできない設計上の理由。詳細は game-store.ts のコメント)。結線テストは
+    `src/ui/screens/play-flow.test.tsx` でタイトル→マップ選択→導入→探索→解決(暗号→攻撃特定→
+    防衛)→結果までの正解ルートと、誤答時の follow_up 遷移・RESUME_FROM_FOLLOW_UP 復帰を確認
+- [x] **T014** カード配置インタラクション（依存: T011）
   - dnd-kit で**タップ配置を第一操作**・ドラッグは補助（WCAG 2.5.1/2.5.7、plan §1）のカード組合せ UI
   - 完了条件: タップのみ・キーボードのみの両方でカード配置が完遂できる
+  - **完了（2026-09-10）**: `src/ui/components/card-placement-board.tsx`(`src/ui/hooks/use-card-placement.ts`
+    が状態管理)で実装。タップ(カード選択→スロットタップで配置)が第一操作、dnd-kit(PointerSensor)の
+    ドラッグは補助。キーボード完遂は素の `<button>` の Tab/Enter/Space に一本化(dnd-kit の
+    KeyboardSensor は同じ要素の Space/Enter を「つかむ」操作に奪ってしまいタップ選択と衝突するため
+    不使用。詳細はコンポーネント冒頭のコメント)。正誤・種別は色だけでなくアイコン(lucide-react を
+    Issue #30 確定までの暫定プレースホルダとして使用)+テキストで表現。タップのみ・キーボードのみの
+    両完遂を `src/ui/components/card-placement-board.test.tsx` で確認(ドラッグ経路は jsdom
+    での再現が難しいため対象外。PR の手動確認項目を参照)
 
 ---
 
