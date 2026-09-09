@@ -16,5 +16,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.ts'],
+    // src/ui/**/*.test.tsx 側は各ファイル先頭の `/** @vitest-environment jsdom */`
+    // docblock で jsdom に切り替える（Vitest 4 は environmentMatchGlobs 廃止）。
+    setupFiles: ['./src/test/setup.ts'],
   },
 })
