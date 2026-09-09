@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-08-06
+updated: 2026-09-09
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -63,12 +63,22 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 すべて `src/core/` の純 TypeScript。Vitest の単体テストを各タスクの完了条件に含める（plan §1）。
 
-- [ ] **T005** zod スキーマ定義（**#3 と同時**。依存: T001、**Issue #3 の ready 付与**）
+- [x] **T005** zod スキーマ定義（依存: T001。#3 は PR #19 で完了済み・着手条件は成立済み）
   - Scenario / Card / TermCard / SaveData の zod スキーマ（plan §5）。zod が正、YAML は入力形式。
-    暗号はまず1種（シーザー）から、拡張余地を持たせる（#3 代表回答）
-  - 完了条件: スキーマの単体テスト（正常系・境界・不正データ reject）が通る
-- [ ] **T006** model 型の導出（依存: T005）
-  - `z.infer` で `src/core/model/` の型を zod スキーマから導出し、手書きの重複型を持たない
+    暗号はまず1種（シーザー）から、拡張余地を持たせる（#3 代表回答。`cipher_stages` を判別可能 union
+    にして実装、`src/core/model/scenario.ts`）
+  - 既存 `schemas/scenario.schema.json` / `schemas/term_card.schema.json` / `schemas/quiz_misuse.schema.json` /
+    `schemas/legal.schema.json`（PR #19/#20 由来の JSON Schema, 手書き）を出発点とし、
+    `src/core/model/{scenario,term-card,quiz-misuse,legal,save-data,tags,common}.ts` の zod スキーマへ移し、
+    **正本を zod 1つに一本化した**（plan §4「zod が正」に従い、JSON Schema 側は削除。理由は本タスク
+    完了 PR の本文を参照）
+  - 分野タグ（`subject_tags`）は Issue #22（案2・7種統一）に基づき `src/core/model/tags.ts` の
+    `SUBJECT_TAGS` を単一の正本とし、シナリオ・用語カード・SaveData の全てがこれを参照する
+  - 完了条件: スキーマの単体テスト（正常系・境界・不正データ reject）が通る。
+    **同じ制約定義が zod と JSON Schema に二重に手書きで存在しない**（Issue #24 受け入れ基準）
+- [x] **T006** model 型の導出（依存: T005）
+  - `z.infer` で `src/core/model/`（`scenario.ts`/`term-card.ts`/`quiz-misuse.ts`/`legal.ts`/`save-data.ts`/
+    `tags.ts`/`common.ts`、`index.ts` から re-export）の型を zod スキーマから導出し、手書きの重複型を持たない
   - 完了条件: core 全体がこの型のみを参照して型チェックが通る
 - [ ] **T007** [P] シナリオ進行ステートマシン（依存: T006）
   - 導入→探索→解決（暗号→特定→防衛）の明示的ステートマシン（`src/core/scenario/`）
@@ -80,12 +90,18 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   - `SaveStorage` インターフェース＋IndexedDB（idb）実装。スキーマ `version`＋マイグレーション関数、
     **エクスポート/インポートの core ロジック**（FR-9・自己完結 JSON）を含む（plan §6）
   - 完了条件: 保存/読込/マイグレーション/エクスポート往復の単体テスト（fake-indexeddb）が通る
-- [ ] **T010** YAML→JSON ビルドパイプライン（依存: T005）
-  - `scenarios/*.yaml` → zod 検証 → `src/data/*.json` のビルドスクリプト（plan §4）。
-    不正シナリオで CI が fail するよう T003 のワークフローに「シナリオ検証」ジョブを追加。
-    法制度データは別ファイル分離
-  - 完了条件: サンプル YAML が JSON 化され、壊した YAML で CI が fail する。
-    あわせて、暫定 CI（Issue #23, `.github/workflows/validate-data.yml`）を削除する
+- [x] **T010** YAML→JSON ビルドパイプライン（依存: T005）
+  - `scenarios/*.yaml`（および `terms/*.yaml`・`legal/*.yaml`） → zod 検証 → `src/data/*.json` の
+    TypeScript ビルドスクリプト（`scripts/build-data.ts`、`npm run build:data`。plan §4）。
+    アプリ本体には YAML パーサを載せず、`js-yaml` は devDependency（スクリプト専用）とした。
+    不正シナリオで CI が fail するよう T003 のワークフロー（`.github/workflows/ci.yml`）に
+    「シナリオ検証」ステップを追加済み。法制度データは `legal/*.yaml` として別ファイル分離を維持
+  - 旧 `scripts/validate_scenarios.py` / `scripts/validate_terms.py`（Issue #3/#4 由来の Python 検証、
+    暫定 CI 用）と、それ専用の `scripts/requirements.txt` は削除した（他用途で使われていないことを
+    確認済み）。同様に暫定 CI（Issue #23, `.github/workflows/validate-data.yml`）も削除済み
+    （#24 提案3「一本化時に削除」を採用）
+  - 完了条件: サンプル YAML が JSON 化され、壊した YAML で検証が fail する（`scripts/build-data.test.ts`
+    の Vitest で担保）
 
 **チェックポイント②**: UI なしで「シナリオを読み込み→判定→セーブ」が core 単体テストで一周する
 
@@ -148,8 +164,16 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 ## Phase 6: 用語カード・図鑑・セーブ UI（plan §11-6）
 
-- [ ] **T023** 用語カードマスタ（依存: T005、**Issue #4 の ready 付与**）
+- [ ] **T023** 用語カードマスタ（依存: T005。#4 は PR #20 で完了済み・`ready` ラベル付与済み）
   - SC シラバス全体を先行整備・マスタはリポジトリ内（#4 代表回答）。誤用検出クイズは MVP 外
+  - **既存成果物**: `terms/terms_core.yaml`（45語、`src/core/model/term-card.ts` の zod 検証を通過済み）・
+    `terms/quiz_misuse_sample.yaml`（誤用検出クイズのデータ構造サンプル5問）が PR #20 で既に整備されている。
+    45語は「シラバス全体の網羅」ではなく SC/NW共通シラバスの主要分野を代表する初期セット
+    （`docs/term_cards.md` §6/§7.2 参照）
+  - **残作業**: シラバス全体の網羅（別 Issue としてフォローアップ推奨、`docs/term_cards.md` §7.2）。
+    シナリオ側 `related_terms` が用語カードマスタに実在するかの参照整合性チェックの追加
+    （`src/core/model/validate-collection.ts` に未実装。誤用検出クイズの `term_id` 実在チェックは
+    T010 で実装済み）
   - 完了条件: 用語カードマスタが zod 検証を通り、シナリオから参照できる
 - [ ] **T024** [P] カード図鑑画面（依存: T016, T023）
   - 完了条件: 獲得済みカード・用語カードが図鑑で閲覧できる
@@ -176,17 +200,20 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 | Issue | ラベル | 対応タスク | 備考 |
 |---|---|---|---|
-| [#3](https://github.com/rokusoudo-product/crypto-riddle/issues/3) シナリオ記述フォーマット（zod/YAML） | future | **T005・T006・T010** | 着手条件「plan.md 後」は成立済み。着手には代表の `ready` 付与が必要 |
-| [#4](https://github.com/rokusoudo-product/crypto-riddle/issues/4) 用語カードマスタ＋習得機構 | future | **T023**（T024 が後続） | シラバス全体を先行整備 |
+| [#3](https://github.com/rokusoudo-product/crypto-riddle/issues/3) シナリオ記述フォーマット（zod/YAML） | closed（完了・PR #19、2026-08-07） | **T005・T006・T010** | 成果物: `schemas/scenario.schema.json`（暫定, T005で削除済み）・`scenarios/s0-sample.yaml`・`legal/laws_sample.yaml`・`scripts/validate_scenarios.py`（T010で削除済み）・`docs/scenario_schema.md` |
+| [#4](https://github.com/rokusoudo-product/crypto-riddle/issues/4) 用語カードマスタ＋習得機構 | closed（完了・PR #20、2026-08-07） | **T023**（T024 が後続） | 成果物: `schemas/term_card.schema.json`/`schemas/quiz_misuse.schema.json`（暫定, T005で削除済み）・`terms/terms_core.yaml`（45語）・`terms/quiz_misuse_sample.yaml`・`scripts/validate_terms.py`（T010で削除済み）・`docs/term_cards.md` |
 | [#5](https://github.com/rokusoudo-product/crypto-riddle/issues/5) シナリオS1完全版 | future | **T015**（T016〜T018 が後続） | #3 確定が前提。#14 の出典規則も前提 |
 | [#6](https://github.com/rokusoudo-product/crypto-riddle/issues/6) S2-S8 バックログ | future | **T019〜T021** | フォーマット確定後に個別 Issue 切り出し。MVP は計4本 |
-| [#13](https://github.com/rokusoudo-product/crypto-riddle/issues/13) カラートークン AA 実測 | proposal | **T012** に合流 | 採用時は T012 の完了条件に AA 実測値の確定を含める |
-| [#14](https://github.com/rokusoudo-product/crypto-riddle/issues/14) IPA 過去問の出典表記規則 | proposal | **T015 の前提** | 採用時は T015 より先に完了させる |
+| [#13](https://github.com/rokusoudo-product/crypto-riddle/issues/13) カラートークン AA 実測 | future | **T012** に合流 | 採用時は T012 の完了条件に AA 実測値の確定を含める |
+| [#14](https://github.com/rokusoudo-product/crypto-riddle/issues/14) IPA 過去問の出典表記規則 | future | **T015 の前提** | 採用時は T015 より先に完了させる |
+| [#22](https://github.com/rokusoudo-product/crypto-riddle/issues/22) 分野タグ（subject_tags）の値集合統一 | proposal（本 PR マージで closed 予定・`Closes #22`） | **T005**（zod 移行と同時実施） | 案2（7種に統一・`ネットワーク基盤`を正式採用）を採用。決定理由は `specs/001-mvp/spec.md` §9 に記載。値集合の正本は `src/core/model/tags.ts` |
 
 ## 依存関係の要約
 
 - **Phase 1（T001〜T004）が全体をブロックする**。ただし #3〜#6 に依存しないため即着手できる
-- Phase 2 の入口 **T005 は Issue #3 の `ready` 待ち**。T005 が Phase 2 以降の実質的なクリティカルパス
+- Phase 2 の入口 **T005 は完了済み**（2026-09-09）。#3 は PR #19 のマージで完了しており、`ready` 待ちの
+  状態は解消されている。T005 の完了により T006・T010 も着手可能になり、Phase 2 の実質的なクリティカル
+  パスは T007〜T009（未着手）に移った
 - Phase 3（T011, T012, T014）は T001 のみに依存し、**Phase 2 と並行で進められる**
 - Phase 4 で Phase 2/3 が合流して縦スライス。**T018（代表プレイテスト）が量産の関門**
 - 自動実装（po-agent-daily-issue-check）に乗せる場合も、【代表】タスク（T004・T018・T029）は必ず代表操作で行う
@@ -194,6 +221,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 ## 実装戦略
 
 1. **まず Phase 1 を完了させる**（唯一のブロック解除条件。0円構成の実証まで）
-2. 代表が #3 に `ready` を付けたら Phase 2 を開始。並行して Phase 3 を進める
+2. Phase 2 は 2026-09-09 の代表承認（Issue #22/#24 対応 PR）により T005・T006・T010 が完了済み。
+   残る T007〜T009 に着手する。並行して Phase 3 を進める
 3. 縦スライス（Phase 4）を最短で通し、T018 のプレイテストで物差しを作ってから量産（Phase 5〜6）に入る
 4. 仕様とのずれが出たら実装より先に spec/plan を更新する（ドキュメントが常に正）

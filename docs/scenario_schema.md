@@ -3,15 +3,17 @@ project: crypto-riddle
 doc: scenario_schema.md（シナリオ記述フォーマット）
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/3
 related:
-  - specs/001-mvp/spec.md（§4〜§8: 3パート構成・カード種別・暗号解読・防衛策）
+  - specs/001-mvp/spec.md（§4〜§8: 3パート構成・カード種別・暗号解読・防衛策、§9: 分野タグ）
   - specs/001-mvp/plan.md（§1・§4: YAML→zod検証→JSON パイプライン、§5: データモデル概要）
-  - schemas/scenario.schema.json（構造検証の実体）
-  - schemas/legal.schema.json
+  - src/core/model/scenario.ts（構造検証の実体。T005 の zod スキーマ）
+  - src/core/model/legal.ts
+  - src/core/model/validate-collection.ts（複数ファイルにまたがる参照整合性チェック）
   - scenarios/s0-sample.yaml（サンプルデータ）
   - legal/laws_sample.yaml（サンプル法制度データ）
-  - scripts/validate_scenarios.py（検証スクリプト）
-status: draft
+  - scripts/build-data.ts（YAML→JSON ビルドパイプライン。T010）
+status: reviewed
 created: 2026-08-07
+updated: 2026-09-09
 ---
 
 # crypto-riddle — シナリオ記述フォーマット
@@ -22,32 +24,30 @@ YAML スキーマの説明。Issue #3 に対応する。
 ## 0. 位置づけ（正本は何か）
 
 - **plan.md §1/§4 の決定が正**: 「YAML →（ビルド時）zod 検証 → JSON」がシナリオデータの本番パイプライン。
-  **zod スキーマ（`src/core/model/` 、tasks.md T005）が最終的な正本**であり、YAML はオーサリング用の入力形式にすぎない。
-- しかし本 Issue に着手した時点で、リポジトリにはまだ TypeScript プロジェクトの足場（tasks.md T001〜T004）が
-  存在しない（`package.json` すら未作成）。T005 は T001 に依存するため、今の時点で zod スキーマそのものを
-  書くことはできない。
-- そのため本 PR では、**`schemas/*.json`（JSON Schema, draft 2020-12）を暫定の構造検証手段**として用意した。
-  これは:
-  - Issue #3 の受け入れ基準（スキーマの定義・サンプル・バリデーション方針の記載）を先に満たす。
-  - T005 着手時の**設計メモ・移行元**として使える（フィールド名・必須項目・enum 値はここでほぼ確定している）。
-  - T005 完了後は、JSON Schema を zod スキーマに置き換えるか、`zod-to-json-schema` 等で
-    zod から自動生成する形に一本化し、本ファイル群の手動メンテナンスをやめること。
-- **YAML の構造そのもの（フィールド名・ネスト）は T005 でも維持する前提**で設計した。zod 移行時に
-  シナリオ YAML ファイル自体の書き直しが不要になることを狙っている。
+  **zod スキーマ（`src/core/model/scenario.ts`、tasks.md T005）が唯一の正本**であり、YAML はオーサリング用の
+  入力形式にすぎない。
+- **2026-09-09 T005/T010 完了により一本化済み**: 当初（Issue #3 着手時点、TypeScript の足場が無かった頃）は
+  `schemas/*.json`（JSON Schema, draft 2020-12）を暫定の構造検証手段として用意していたが、T005 で zod スキーマに
+  移行した際に `schemas/*.json` と `scripts/validate_scenarios.py` は削除した（Issue #22/#24 対応 PR）。
+  同じ制約定義を zod と JSON Schema に二重に手書きしない状態にするための判断であり、エディタ補完用途にも
+  YAML 側の `$schema` 参照コメントは使われていなかったため、`zod-to-json-schema` 等での再生成も採用していない
+  （理由は当該 PR 本文を参照）。
+- YAML の構造そのもの（フィールド名・ネスト）は zod 移行後も維持しており、既存の `scenarios/*.yaml` は
+  書き直し不要で新スキーマ（`src/core/model/scenario.ts`）を通過する。
 
 ## 1. ディレクトリ構成
 
 ```
-schemas/
-  scenario.schema.json   # 1マップの構造検証(JSON Schema)
-  legal.schema.json       # 法制度データの構造検証(JSON Schema)
+src/core/model/
+  scenario.ts              # 1マップの構造検証+単一シナリオ内参照整合性(zod, T005)
+  legal.ts                 # 法制度データの構造検証(zod, T005)
+  validate-collection.ts   # 複数ファイルにまたがる参照整合性チェック(純関数)
 scenarios/
   s0-sample.yaml           # スキーマ演習用サンプル(本番シナリオではない。§5 参照)
 legal/
   laws_sample.yaml         # 法制度データのサンプル
 scripts/
-  validate_scenarios.py    # 検証スクリプト(Python, pyyaml + jsonschema)
-  requirements.txt
+  build-data.ts             # YAML→JSON ビルドパイプライン(Node/TypeScript, T010)
 ```
 
 - `scenarios/*.yaml` のパスは README.md / plan.md の環境構成図で既に固定されているため、それに合わせた
@@ -56,16 +56,16 @@ scripts/
 
 ## 2. シナリオ YAML の全体構造
 
-`schemas/scenario.schema.json` が構造上の正。ここでは spec.md との対応を中心に説明する。
+`src/core/model/scenario.ts`（zod, `scenarioSchema`）が構造上の正。ここでは spec.md との対応を中心に説明する。
 
 | フィールド | spec 対応 | 説明 |
 |---|---|---|
 | `schema_version` | - | このスキーマのバージョン(semver)。現在 `"0.1.0"` 固定 |
-| `id` | - | マップID。**ファイル名(拡張子除く)と一致必須**(検証スクリプトがチェック) |
+| `id` | - | マップID。**ファイル名(拡張子除く)と一致必須**(`validate-collection.ts` の `checkScenarioFilenames` がチェック) |
 | `title` | §4 | マップタイトル(事件名) |
 | `status` | - | `draft`/`reviewed`/`published`/`sample`。省略時 `draft` |
 | `map_order` | §9 難易度カーブ | 進行順(任意) |
-| `subject_tags` | §9 | 分野タグ。**6種で固定**: `暗号`/`認証`/`Web`/`攻撃手法`/`インシデント対応`/`法制度` |
+| `subject_tags` | §9 | 分野タグ。**7種で固定**（Issue #22 決定・2026-09-09）: `暗号`/`認証`/`Web`/`攻撃手法`/`インシデント対応`/`法制度`/`ネットワーク基盤`。値集合の正本は `src/core/model/tags.ts` の `SUBJECT_TAGS` |
 | `difficulty` | §9 | 1(易)〜5(難) |
 | `estimated_minutes` | US-1 | 想定プレイ時間(分)。目安10〜15分 |
 | `source` | FR-7 | 出典(§4 参照) |
@@ -77,7 +77,7 @@ scripts/
 
 ### 2.1 カード種別（7種で固定）
 
-spec §7 / DESIGN.md に準拠し、次の7種のみを許容する（`schemas/scenario.schema.json` の `$defs.cardType`）:
+spec §7 / DESIGN.md に準拠し、次の7種のみを許容する（`src/core/model/scenario.ts` の `cardTypeSchema`）:
 
 `証言` / `ログ` / `通信記録` / `外部情報` / `暗号文` / `鍵` / `対策`
 
@@ -92,13 +92,17 @@ spec §7 の「①ログを見る ②人に聞く ③文献を引く」を `inve
 
 ### 2.3 暗号解読（解決パート①）
 
-- `resolution.cipher_stages` は配列だが、**MVP では要素数を必ず1個に固定**（`minItems`/`maxItems` = 1）。
+- `resolution.cipher_stages` は配列だが、**MVP では要素数を必ず1個に固定**（zod では `.length(1)`）。
   これは Issue #3 の代表回答「まずは1種ずつ。複数種・複数段の汎用表現は後回し」を反映したもの。
 - 複数段（例: 古典暗号で得た文字列を鍵に別処理→ハッシュ照合、等）が必要になったら、
   **配列に要素を増やすだけ**で対応できるよう設計してある(=拡張時にスキーマの形を壊さない)。
-  `maxItems: 1` の制約を外すだけで良い想定。
-- `method` は enum にしていない。シーザー暗号(`caesar`)から始めるが、`base64`/`xor`/`hash_match` 等の
-  追加を見込んで文字列自由記述にした(#3 代表回答「拡張余地を残す」)。
+  `.length(1)` の制約を外すだけで良い想定。
+- `method` は zod の**判別可能 union（discriminated union）**として実装している
+  （`src/core/model/scenario.ts` の `cipherStageSchema`）。T005 時点では `caesar`（シーザー暗号）の
+  1 variant のみを定義し、`base64`/`xor`/`hash_match` 等を追加する際は `method` を判別子とする
+  variant を1個増やして union の配列に足すだけでよい設計にした（旧 JSON Schema の
+  「`method` を enum にせず自由記述で拡張余地を残す」という方針を、zod では型安全な判別可能 union で
+  代替している）。
 
 ### 2.4 攻撃特定・防衛策の判定方式
 
@@ -146,64 +150,60 @@ plan.md §4「法制度データ（条文・報告期限）は別ファイルに
 
 ## 6. 用語カードマスタとの連携（Issue #4）
 
-Issue #4（用語カードマスタ）は本 PR の時点で未着手・未マージのため、具体的なファイル形式に依存しない
-**疎結合**にとどめる。シナリオ側 (`related_terms` / `cards[].related_terms`) は用語IDの配列
-(`^term-[a-z0-9_-]+$`) を持つだけで、参照先の実在チェックは行わない
-（`legal_refs` とは異なり、`scripts/validate_scenarios.py` では検証しない）。
-#4 のマスタ形式が確定した時点で、実在チェックを追加するかは #4 側で判断する。
+シナリオ側 (`related_terms` / `cards[].related_terms`) は用語IDの配列 (`^term-[a-z0-9_-]+$`) を持つ。
+`scripts/build-data.ts`（T010）は用語カードマスタ（`terms/*.yaml`）を読み込んだ後、
+`src/core/model/validate-collection.ts` の `checkQuizItems` で誤用検出クイズの `term_id` 実在チェックを
+行っているが、シナリオ側の `related_terms` の実在チェックは現時点では行っていない（#4 のマスタ整備後の
+フォローアップ候補として残す）。
 
 ## 7. バリデーション方針
 
-### 7.1 構造検証（JSON Schema, `schemas/*.json`）
+T005/T010（2026-09-09）により、旧 JSON Schema + Python(pyyaml/jsonschema) 方式は廃止し、
+**zod（`src/core/model/`） + Node/TypeScript ビルドスクリプト（`scripts/build-data.ts`）に一本化**した。
 
-- 全プロパティに対して **`additionalProperties: false`**（未定義フィールド・typo を検出するため）。
-- 必須項目は各 `$defs` の `required` を参照。主なもの:
-  - シナリオ直下: `schema_version`, `id`, `title`, `subject_tags`, `difficulty`, `estimated_minutes`,
-    `source`, `intro`, `investigation_points`, `cards`, `resolution`
-  - `intro`: `background`, `victim_company`, `character_intros`
-  - `card`: `id`, `type`, `source`, `investigation_point_id`, `body`, `is_dummy`
-  - `resolution`: `cipher_stages`, `attack_identification`, `countermeasure`,
-    `wrong_answer_follow_ups`, `clear_explanation`
-- 型・enum・文字列パターン(`pattern`)・配列の `minItems`/`maxItems`/`uniqueItems` で表現できる制約は
-  すべて JSON Schema 側に寄せている。
+### 7.1 構造検証・単一シナリオ内の参照整合性（zod, `src/core/model/scenario.ts`）
 
-### 7.2 参照整合性（JSON Schema では表現できないもの。`scripts/validate_scenarios.py`）
+- 全プロパティに対して **`.strict()`**（未定義フィールド・typo を検出するため。旧 `additionalProperties: false` 相当）。
+- 型・enum・文字列パターン・配列の `min`/`length`/一意性制約に加え、以下の**単一シナリオ内で完結する
+  参照整合性チェックも `scenarioSchema` の `superRefine` に含めている**（旧 Python スクリプトの
+  `validate_scenario_semantics` を移植）:
+  1. `cards[].id` / `investigation_points[].id` の重複禁止
+  2. `cards[].investigation_point_id` が実在する `investigation_points[].id` を指しているか
+  3. 各 `investigation_points` に紐づく `card` が最低1件あるか
+  4. `attack_identification.required_card_ids` が実在し、`is_dummy: true` を含まないか
+  5. `countermeasure.required_card_ids` が実在し、`type: 対策` かつ `is_dummy: false` か
 
-JSON Schema は「他のフィールドの値を参照して存在確認する」ような相互参照チェックを表現できないため、
-以下は Python スクリプトのセマンティックチェックで担保する:
+### 7.2 複数ファイルにまたがる参照整合性（`src/core/model/validate-collection.ts`）
 
-1. ファイル名(拡張子除く)とシナリオ `id` の一致
-2. `cards[].id` / `investigation_points[].id` の重複禁止
-3. `cards[].investigation_point_id` が実在する `investigation_points[].id` を指しているか
-4. 各 `investigation_points` に紐づく `card` が最低1件あるか
-5. `attack_identification.required_card_ids` が実在し、`is_dummy: true` を含まないか
-6. `countermeasure.required_card_ids` が実在し、`type: 対策` かつ `is_dummy: false` か
-7. `resolution.legal_refs` が `legal/*.yaml` 内の `id` として解決できるか
-8. （警告のみ）`type: 対策` のダミーカードが1件も無い場合に注意喚起
-   （spec §8.3「本質的でない対策を誤答肢に」を満たしているかの目安。エラーにはしない＝
+ファイル名との突き合わせや別ファイル（`legal/*.yaml`）への参照は、単一シナリオの zod スキーマだけでは
+判定できないため、複数ファイルを読み込んだ後に呼び出す純関数として分離している（`scripts/build-data.ts`
+から呼び出す）:
+
+1. `checkScenarioFilenames`: ファイル名(拡張子除く)とシナリオ `id` の一致
+2. `checkScenarioLegalRefs`: `resolution.legal_refs` が `legal/*.yaml` 内の `id` として解決できるか
+3. `warnScenariosMissingCountermeasureDummy`:（警告のみ）`type: 対策` のダミーカードが1件も無い場合に
+   注意喚起（spec §8.3「本質的でない対策を誤答肢に」を満たしているかの目安。エラーにはしない＝
    防衛策の誤答肢を将来的にカード以外の手段で表現する可能性を残すため）
 
 ### 7.3 実行方法
 
 ```bash
-python3 -m venv .venv-validate
-.venv-validate/bin/pip install -r scripts/requirements.txt
-.venv-validate/bin/python scripts/validate_scenarios.py
+npm run build:data
 ```
 
-`scenarios/*.yaml` と `legal/*.yaml` を自動的に走査し、構造検証→参照整合性検証の順に実行する。
-エラーが1件でもあれば終了コード1で失敗する。
+`scenarios/*.yaml` と `legal/*.yaml`・`terms/*.yaml` を自動的に走査し、構造検証→参照整合性検証の順に
+実行したうえで `src/data/*.json` を生成する。エラーが1件でもあれば終了コード1で失敗する
+（`scripts/build-data.test.ts` に、正常系・壊れたYAML・ファイル名不一致・legal_refs不整合の
+Vitest テストがある）。
 
 ### 7.4 CI への組み込み
 
-現時点では CI ワークフロー自体が未構築（tasks.md T003 が未着手）。
-tasks.md T010「YAML→JSONビルドパイプライン」で本番の zod 検証ジョブを CI に追加する際、
-それまでの間の暫定として本スクリプトを CI に載せても良いし、T010 を待って zod 検証に一本化しても良い
-（判断は T010 着手時に行う）。
+`.github/workflows/ci.yml` の「シナリオ検証」ステップで `npm run build:data` を実行する。
+旧暫定 CI（`.github/workflows/validate-data.yml`）は本一本化にあわせて削除した。
 
 ## 8. 既知の未確定事項
 
 - `source` のフィールド構成は `#14`（IPA 過去問の出典表記規則）確定後に見直す可能性がある。
-- 暗号を複数段にする場合の `cipher_stages` の `maxItems` 制約解除、および各段の入出力の繋ぎ方
+- 暗号を複数段にする場合の `cipher_stages` の `.length(1)` 制約解除、および各段の入出力の繋ぎ方
   （前段の平文を次段の鍵にする等）は、複数段化が実際に必要になった時点で設計する（#3 代表回答により後回し）。
-- `related_terms` の実在チェックは #4 のマスタ形式確定後に追加を検討する。
+- シナリオ側 `related_terms` の実在チェックは #4 のマスタ整備後の追加候補として残る（§6）。

@@ -25,7 +25,7 @@
 | [docs/term_cards.md](docs/term_cards.md) | 用語カードマスタ・誤用検出クイズ設計（Issue #4） |
 | [docs/architecture.md](docs/architecture.md) | 環境構成図（Mermaid） |
 | [docs/concept.md](docs/concept.md) | 初期コンセプトメモ（歴史的経緯。正本は specs/） |
-| [docs/scenario_schema.md](docs/scenario_schema.md) | シナリオ記述フォーマット（`schemas/scenario.schema.json`・`scenarios/*.yaml`・`legal/*.yaml`） |
+| [docs/scenario_schema.md](docs/scenario_schema.md) | シナリオ記述フォーマット（`src/core/model/scenario.ts`・`scenarios/*.yaml`・`legal/*.yaml`） |
 
 ## アーキテクチャ / 構成図
 

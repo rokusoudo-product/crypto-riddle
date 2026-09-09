@@ -7,7 +7,7 @@
 #   id を意図的に s0-sample とし、S1 と衝突しないようにしている。
 # - 内容はゲートPプロトタイプ(prototype/gate-p、パスワードリスト攻撃)のテーマを借用した
 #   イラスト用の創作であり、代表監修前の制作素材としては扱わないこと。
-# - schemas/scenario.schema.json に準拠する。scripts/validate_scenarios.py で検証できる。
+# - src/core/model/scenario.ts (zod, T005) に準拠する。`npm run build:data` で検証できる。
 
 schema_version: "0.1.0"
 id: s0-sample

@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# T010: scenarios/*.yaml・terms/*.yaml・legal/*.yaml から `npm run build:data` が生成する
+# JSON。ビルド成果物であり手編集しないため、YAML の方をコミット対象とする(src/data/README.md 参照)。
+/src/data/*.json
+
 # po_agent 作業用スクラッチ（PR本文ドラフト等。コミット対象外）
 /tmp/
 

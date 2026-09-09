@@ -4,7 +4,7 @@
 # - シナリオ本体(scenarios/*.yaml)から分離した「更新可能なデータ」(plan.md §4)。
 #   条文番号・報告期限は法改正で変わるため、シナリオのセリフやカード本文に直接書かず、
 #   このファイルの id を legal_refs で参照する形に統一する(docs/characters.md §9)。
-# - schemas/legal.schema.json に準拠する。scripts/validate_scenarios.py で検証できる。
+# - src/core/model/legal.ts (zod, T005) に準拠する。`npm run build:data` で検証できる。
 # - 本ファイルは #3(スキーマ定義)のサンプルであり、内容の法的正確性は制作時(#14 出典表記規則確定後)に
 #   代表監修のうえ再確認すること。last_verified はサンプル作成時点のプレースホルダ。
 

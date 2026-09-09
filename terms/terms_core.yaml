@@ -1,7 +1,7 @@
 # crypto-riddle 用語カードマスタ(初期セット)
 #
 # 位置づけ:
-# - schemas/term_card.schema.json に準拠する用語カードマスタの正本(Issue #4)。
+# - src/core/model/term-card.ts (zod, T005) に準拠する用語カードマスタの正本(Issue #4)。
 # - plan.md §5 の TermCard データモデル(id / 用語 / 読み / 定義 / 分野タグ / 関連用語 / 出典)に対応する。
 # - シナリオ記述フォーマット(scenarios/*.yaml, Issue #3)の related_terms はここに定義された id
 #   (`^term-[a-z0-9_-]+$`)を緩く参照する。#3 側では実在チェックを行わない疎結合設計だが、
