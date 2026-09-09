@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-09
+updated: 2026-09-10
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -80,16 +80,32 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   - `z.infer` で `src/core/model/`（`scenario.ts`/`term-card.ts`/`quiz-misuse.ts`/`legal.ts`/`save-data.ts`/
     `tags.ts`/`common.ts`、`index.ts` から re-export）の型を zod スキーマから導出し、手書きの重複型を持たない
   - 完了条件: core 全体がこの型のみを参照して型チェックが通る
-- [ ] **T007** [P] シナリオ進行ステートマシン（依存: T006）
+- [x] **T007** [P] シナリオ進行ステートマシン（依存: T006）
   - 導入→探索→解決（暗号→特定→防衛）の明示的ステートマシン（`src/core/scenario/`）
   - 完了条件: パート遷移・カード獲得・誤答フォロー分岐の単体テストが通る
-- [ ] **T008** [P] 判定エンジン（依存: T006）
+  - **完了（2026-09-10）**: 外部ライブラリを使わない reducer 形式のステートマシン
+    （`src/core/scenario/state.ts` の `scenarioReducer`）として実装。状態はプレーンな
+    JSON 互換オブジェクト（`ScenarioProgressState`）。誤答時は `follow_up` パートに遷移して
+    `wrong_answer_follow_ups` の該当行を保持し、`RESUME_FROM_FOLLOW_UP` で誤答した
+    ステージに戻る（「初動をやり直す」）設計にした。解決パートへの遷移条件は「全
+    investigation_points を調査済み」とした（`canEnterResolution`）。判定は T008 の
+    judge を利用する
+- [x] **T008** [P] 判定エンジン（依存: T006）
   - 単一解・厳密一致（spec §8.2）＋前段の正規化: NFKC・小文字化・カナ→かな・空白除去（plan §3）を `src/core/judge/` に実装
   - 完了条件: 正規化の各規則と判定のテーブル駆動テストが通る
-- [ ] **T009** [P] SaveStorage（依存: T006）
+  - **完了（2026-09-10）**: `normalizeAnswer`（NFKC→小文字化→カタカナ→ひらがな→前後空白除去+
+    連続空白1個への圧縮の順で適用）、`judgeTextAnswer`/`judgeCardSelection`（厳密一致）、
+    `judgeCipherStage`（判別可能 union に対応）を実装。シーザー暗号の復号ヘルパ
+    （`caesarDecode`/`parseCaesarShift`）も判定に必要な範囲で `src/core/judge/cipher.ts` に実装
+- [x] **T009** [P] SaveStorage（依存: T006）
   - `SaveStorage` インターフェース＋IndexedDB（idb）実装。スキーマ `version`＋マイグレーション関数、
     **エクスポート/インポートの core ロジック**（FR-9・自己完結 JSON）を含む（plan §6）
   - 完了条件: 保存/読込/マイグレーション/エクスポート往復の単体テスト（fake-indexeddb）が通る
+  - **完了（2026-09-10）**: `SaveStorage` インターフェース（`storage.ts`）＋`idb` による
+    `IndexedDbSaveStorage`（`indexed-db-storage.ts`、固定キー1レコード）。マイグレーションは
+    `MIGRATIONS`（version→変換関数）のチェーンを `migrateSaveData` が順に適用する枠組みを
+    用意（現行 `SAVE_DATA_SCHEMA_VERSION=1` のみのため中身は空）。エクスポート/インポートは
+    `export-import.ts` に実装（zod 検証込みの自己完結 JSON 往復）
 - [x] **T010** YAML→JSON ビルドパイプライン（依存: T005）
   - `scenarios/*.yaml`（および `terms/*.yaml`・`legal/*.yaml`） → zod 検証 → `src/data/*.json` の
     TypeScript ビルドスクリプト（`scripts/build-data.ts`、`npm run build:data`。plan §4）。
@@ -104,6 +120,11 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
     の Vitest で担保）
 
 **チェックポイント②**: UI なしで「シナリオを読み込み→判定→セーブ」が core 単体テストで一周する
+
+- **達成（2026-09-10）**: `src/core/checkpoint2.integration.test.ts` で
+  `scenarios/s0-sample.yaml` 由来のフィクスチャ（`src/core/scenario/fixtures/s0-sample.fixture.ts`。
+  実データの zod 検証も同テストで確認）を使い、導入→探索（カード獲得）→解決（暗号解読→攻撃特定→
+  防衛策の判定、誤答フォロー分岐と復帰を含む）→クリア→セーブ→読込復元までを UI なしで一周させた
 
 ---
 
@@ -212,8 +233,8 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 - **Phase 1（T001〜T004）が全体をブロックする**。ただし #3〜#6 に依存しないため即着手できる
 - Phase 2 の入口 **T005 は完了済み**（2026-09-09）。#3 は PR #19 のマージで完了しており、`ready` 待ちの
-  状態は解消されている。T005 の完了により T006・T010 も着手可能になり、Phase 2 の実質的なクリティカル
-  パスは T007〜T009（未着手）に移った
+  状態は解消されている。T005 の完了により T006・T010 も着手可能になり、**T007〜T009 も完了した
+  （2026-09-10）ことで Phase 2 が完了し、チェックポイント②を達成した**
 - Phase 3（T011, T012, T014）は T001 のみに依存し、**Phase 2 と並行で進められる**
 - Phase 4 で Phase 2/3 が合流して縦スライス。**T018（代表プレイテスト）が量産の関門**
 - 自動実装（po-agent-daily-issue-check）に乗せる場合も、【代表】タスク（T004・T018・T029）は必ず代表操作で行う
@@ -222,6 +243,6 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 1. **まず Phase 1 を完了させる**（唯一のブロック解除条件。0円構成の実証まで）
 2. Phase 2 は 2026-09-09 の代表承認（Issue #22/#24 対応 PR）により T005・T006・T010 が完了済み。
-   残る T007〜T009 に着手する。並行して Phase 3 を進める
+   T007〜T009 も 2026-09-10 に完了し、チェックポイント②を達成した。並行して Phase 3 を進める
 3. 縦スライス（Phase 4）を最短で通し、T018 のプレイテストで物差しを作ってから量産（Phase 5〜6）に入る
 4. 仕様とのずれが出たら実装より先に spec/plan を更新する（ドキュメントが常に正）
