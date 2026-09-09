@@ -7,7 +7,9 @@ related:
   - specs/001-mvp/spec.md（§7 探索・ヒントカード設計、§9 分野別習熟度）
   - specs/001-mvp/plan.md（§5 データモデル TermCard、§11 実装順序）
   - docs/scenario_schema.md（Issue #3。シナリオ記述フォーマットとの連携方式）
+  - src/core/model/term-card.ts（T005 の zod スキーマ。旧 schemas/term_card.schema.json は削除済み）
 gate: "Issue #4 で作成。正式反映は代表レビュー（PRマージ）で承認"
+updated: 2026-09-09
 ---
 
 # crypto-riddle — 用語カードマスタ・誤用検出クイズ設計ドキュメント（Issue #4）
@@ -25,12 +27,14 @@ gate: "Issue #4 で作成。正式反映は代表レビュー（PRマージ）�
 - 誤用検出クイズは代表回答により **MVP には入れない**（リリース後追加候補）。一方で受け入れ基準の
   「誤用検出クイズの出題・判定のデータ構造が定義されている」は本 Issue のスコープ内であり、
   スキーマ定義とサンプルデータの提供までを行う（動く機能は作らない）。
-- T005（zod スキーマ, plan.md §4/§11）着手前の暫定として、Issue #3（PR #19）と同様に
-  **JSON Schema + Python(pyyaml/jsonschema) の検証スクリプト**を採用した（§7 参照）。
+- 2026-09-09（T005/T010）: 当初 Issue #3（PR #19）と同様に JSON Schema + Python(pyyaml/jsonschema) の
+  検証スクリプトを暫定採用していたが、T005 で zod スキーマ（`src/core/model/term-card.ts` /
+  `src/core/model/quiz-misuse.ts`）に一本化し、`schemas/term_card.schema.json` /
+  `schemas/quiz_misuse.schema.json` と `scripts/validate_terms.py` は削除した（§7 参照）。
 
 ## 2. 用語カードマスタ（TermCard）
 
-`schemas/term_card.schema.json` に準拠する。plan.md §5 の TermCard データモデル
+`src/core/model/term-card.ts`（zod, `termCardSchema`）に準拠する。plan.md §5 の TermCard データモデル
 （id / 用語 / 読み / 定義 / 分野タグ / 関連用語 / 出典）に対応する。
 
 | フィールド | 必須 | 内容 |
@@ -61,23 +65,20 @@ gate: "Issue #4 で作成。正式反映は代表レビュー（PRマージ）�
 
 ### 3.1 ゲーム内分野タグ（`subject_tags`）
 
-spec.md §9 は分野別習熟度を **暗号/認証/Web/攻撃手法/インシデント対応/法制度** の6分野で
-固定しており、schemas/scenario.schema.json（#3）の `$defs/subjectTag` もこの6種のみを
-許容する。
+**2026-09-09 Issue #22 決定（案2採用）**: spec.md §9 の分野別習熟度とシナリオ・用語カード双方の
+`subject_tags` は **暗号/認証/Web/攻撃手法/インシデント対応/法制度/ネットワーク基盤 の7種に統一**した。
+値集合の単一の正本は `src/core/model/tags.ts` の `SUBJECT_TAGS` であり、シナリオ
+（`src/core/model/scenario.ts`）・用語カード（本ファイルが説明する `term-card.ts`）・SaveData の
+分野習熟（`src/core/model/save-data.ts`）のすべてがこの1箇所を import する。
 
-用語カードマスタでは、NW試験（ネットワークスペシャリスト）と共有される基礎的なネットワーク
-用語（TCP/IP、DNS、ファイアウォール等）を扱うため、**拡張タグ「ネットワーク基盤」を7種目として
-追加**した。これは以下の理由による。
-
-- IDS/IPS/DDoS等、攻撃手法や法制度と重なる用語は既存6分野でも表現できるが、TCP/IP・DNS等の
-  純粋な基礎知識はどの既存分野にも自然に収まらない。
-- spec §9 の6分野は「事件解決の分野別習熟度」を表す**ゲームプレイ上の指標**であり、用語カード
-  マスタの分野タグは**知識の分類**という別の目的を持つため、値集合が完全一致している必要はないと
-  判断した。
-- ただし `subject_tags` の値集合を6種から7種に拡張したことで、`schemas/scenario.schema.json`
-  の `subjectTag`（6種）とは列挙値が異なる。図鑑UI（T024）で「ネットワーク基盤」タグの用語を
-  習熟度画面にどう反映するか（7番目の習熟度トラックを追加するか、既存6分野の付随情報として
-  扱うか）は未確定事項として残す（§7）。
+- 経緯: 当初 spec.md §9 とシナリオ側は6分野で固定されていたが、用語カードマスタは NW試験
+  （ネットワークスペシャリスト）と共有される基礎的なネットワーク用語（TCP/IP、DNS、ファイアウォール等）
+  を扱うために独自に「ネットワーク基盤」を7種目として追加しており、両者の値集合が分裂していた
+  （本節はその分裂を最初に記録した節であり、Issue #22 として起票・解決された）。
+- 採用理由（Issue #22 案2）: 代表の NW 試験対策（spec §2）という目的に整合すること、
+  `terms/terms_core.yaml` の既存45語（うち9語が「ネットワーク基盤」を使用）の書き換えが不要なこと。
+- 図鑑UI（T024）での分野習熟度表示は7分野トラックとして扱う想定（実装時に確定）。難易度カーブ
+  （spec §9 の S1-2/S3-6/S7-8）はタグ数と独立のため、7種化による影響はない。
 
 ### 3.2 IPAシラバス分類（`syllabus`）
 
@@ -99,29 +100,28 @@ reading vault（`C:\Users\moets\Dropbox\obsidian\vault`）の `Exams/` 分類は
 
 ## 4. シナリオ記述フォーマット（#3）との連携方式
 
-- シナリオ側（`scenarios/*.yaml`、`schemas/scenario.schema.json`）は、トップレベルの
+- シナリオ側（`scenarios/*.yaml`、`src/core/model/scenario.ts`）は、トップレベルの
   `related_terms` およびカード単位の `cards[].related_terms` に、用語ID
   （`^term-[a-z0-9_-]+$`）の配列を持つ（#3 PR #19 で実装済み）。
-- **疎結合設計**: #3 側は本マスタの具体的なファイル形式・配置場所に依存しない。参照先の実在
-  チェックも #3 の `scripts/validate_scenarios.py` では行わない（#3 が本 Issue より先に着手された
-  ため）。
-- 本 Issue 側（`scripts/validate_terms.py`）は**マスタ内で閉じた** `related_terms`
-  （用語カード同士の関連付け）の実在チェックのみ行い、シナリオ側からの参照が実在するかは
-  チェックしない。
-- **今後の統合案（未実施・フォローアップ）**: #3・#4 の両方がマージされた後、
-  `scripts/validate_scenarios.py` に「シナリオの `related_terms` が `terms/*.yaml` に実在するか」
-  のチェックを追加することが可能になる。あわせて `scripts/validate_scenarios.py` と
-  `scripts/validate_terms.py` を1本の `scripts/validate_all.py`（またはT005のzodパイプライン）に
-  統合することを推奨する。
+- **疎結合設計は維持**: シナリオ側は本マスタの具体的なファイル形式・配置場所に依存しない。
+  `scripts/build-data.ts`（T010）は用語カードマスタを読み込み済みだが、シナリオの `related_terms`
+  が用語カードマスタに実在するかのチェックはまだ追加していない（誤用検出クイズの `term_id` /
+  `confused_with_term_id` は `checkQuizItems` でチェック済み。§7.2 参照）。
+- **統合済み（2026-09-09, T005/T010）**: #3・#4 双方の検証は
+  `scripts/validate_scenarios.py` と `scripts/validate_terms.py` という2本の Python スクリプトに
+  分かれていたが、`scripts/build-data.ts`（Node/TypeScript）1本に統合した。両スクリプトおよび
+  `schemas/*.json` は削除済み。「シナリオの `related_terms` が `terms/*.yaml` に実在するか」の
+  チェックはこの統合後も未追加であり、引き続きフォローアップ候補として残る。
 - 実例: `scenarios/s0-sample.yaml`（#3 PR #19）は `related_terms` として
   `term-password-list-attack` / `term-multi-factor-authentication` / `term-appi-breach-report`
-  を参照している。この3語は本 PR の初期セットに含めており、#3・#4 双方がマージされた時点で
-  実際に解決できる状態になっている。
+  を参照している。この3語は本ファイルが説明する用語カードマスタの初期セットに含まれており、
+  `npm run build:data` で実際に解決できる状態になっている。
 
 ## 5. 誤用検出クイズ（MisuseQuizItem）のデータ構造
 
-`schemas/quiz_misuse.schema.json` に準拠する。**実装（出題UI・判定ロジック）は行わない**
-（Issue #4 代表回答）。以下はデータ構造の説明と、想定される判定アルゴリズムの概念設計。
+`src/core/model/quiz-misuse.ts`（zod, `misuseQuizItemSchema`）に準拠する。
+**実装（出題UI・判定ロジック）は行わない**（Issue #4 代表回答）。以下はデータ構造の説明と、
+想定される判定アルゴリズムの概念設計。
 
 ### 5.1 フィールド概要
 
@@ -181,15 +181,16 @@ reading vault（`C:\Users\moets\Dropbox\obsidian\vault`）の `Exams/` 分類は
 
 ### 7.1 実行方法
 
-```
-python3 -m venv .venv-validate
-.venv-validate/bin/pip install -r scripts/requirements.txt
-.venv-validate/bin/python scripts/validate_terms.py
-# => OK: 45 件の用語カード、5 件の誤用検出クイズが検証を通過しました。
+```bash
+npm run build:data
+# => OK: シナリオ1件・用語カード45件・誤用検出クイズ5件・法制度データ2件を src/data/ に生成しました。
 ```
 
-用語カード id の重複、`related_terms` のマスタ内実在確認、クイズの `term_id` /
-`confused_with_term_id` の実在確認を行う。
+2026-09-09（T005/T010）に `scripts/validate_terms.py`（Python + jsonschema）から
+`scripts/build-data.ts`（Node/TypeScript + zod）に一本化した。用語カード id の重複、
+`related_terms` のマスタ内実在確認、クイズの `term_id` / `confused_with_term_id` の実在確認は
+`src/core/model/validate-collection.ts` の `collectTerms` / `checkTermReferences` / `checkQuizItems`
+が担う。
 
 ### 7.2 未確定事項・フォローアップ
 
@@ -198,13 +199,15 @@ python3 -m venv .venv-validate
   スコープが調整されていた。両者の間に差があるため、本 PR は**両者の中間として45語の
   代表セット**を用意し、シラバス全体の網羅は**別Issueとしてフォローアップすることを推奨**する
   （判断の詳細は本 PR の説明を参照）。
-- **`subjectTag` の値集合の乖離**: §3.1 のとおり、用語カードマスタは7種（ゲーム分野6種+
-  ネットワーク基盤）、シナリオスキーマ（#3）は6種のまま。図鑑・習熟度UI設計時に統一するか
-  どうかを代表判断とする。
-- **`scripts/requirements.txt` の重複**: #3（PR #19）と本 Issue が同一内容のファイルを
-  別々に追加しているため、両方がマージされる際にどちらか一方に統合する必要がある。
-- **`scripts/validate_scenarios.py` との統合**: §4 のとおり、シナリオ→用語カードの参照整合性
-  チェックは両 Issue のマージ後に追加を検討する。
+- **`subject_tags` の値集合の乖離は解消済み（2026-09-09, Issue #22 決定）**: §3.1 のとおり、
+  用語カードマスタ・シナリオ・SaveData の分野習熟のすべてが `src/core/model/tags.ts` の
+  `SUBJECT_TAGS`（7種）を単一の正本として参照する状態になった。図鑑・習熟度UIでの7分野トラック
+  表示の具体的な見せ方は T024 実装時に確定する。
+- **旧 `scripts/requirements.txt` の重複**: 解消済み。#3（PR #19）・#4（PR #20）がそれぞれ追加していた
+  Python 検証スクリプトと `requirements.txt` は、T010 での zod 一本化にあわせて両方削除した。
+- **`scripts/validate_scenarios.py` との統合**: 解消済み。`scripts/build-data.ts` 1本に統合し、
+  シナリオ・用語カード・誤用検出クイズ・法制度データを一括で検証・JSON化する。ただし §4 のとおり
+  「シナリオの `related_terms` が `terms/*.yaml` に実在するか」のチェックは未追加のまま残っている。
 - **法制度データ（`term-appi-breach-report` 等）の内容の正確性**: 出典は記載しているが、
   法改正等による陳腐化がありうるため、`legal/*.yaml`（#3）と同様に代表監修前のドラフトとして
   扱うこと。
