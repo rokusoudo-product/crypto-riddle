@@ -2,6 +2,7 @@ import { Check } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
 import { canEnterResolution } from '@/core/scenario'
+import { SceneExplorer } from '@/ui/components/explore/scene-explorer'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
@@ -11,6 +12,15 @@ import { useScreenState } from '@/ui/state/use-screen-state'
 
 // ④探索（ダーク文脈）。目的=手がかり収集／主要アクション=調査ポイント→カード獲得。
 // T013: core のシナリオ進行ステートマシンと接続する。調査ポイントは s0-sample の実データを使う。
+//
+// 2026-09-10(#52/#56・T038): 探索を「背景シーン＋ホットスポット」方式に刷新した。
+// `scenario.scenes`(#55/T037で追加された省略可能フィールド)がある場合は SceneExplorer
+// (背景シーン・シーンタブ・ホットスポット・アクションシート・人物証言の会話フレーム)を
+// 表示し、無い場合は従来どおり本ファイルの一覧のみを表示する(docs/scenario_schema.md §2.5)。
+// 「調査ポイント一覧」は scenes の有無に関わらず**常に併設**し、背景に頼らずキーボードのみで
+// 全ポイント調査→解決へ進めることを保証する(Issue #56 完了条件・WCAG)。
+// scenes・一覧のどちらも同じ dispatch({type:'INVESTIGATE'}) に接続するだけで、core の
+// シナリオ進行ステートマシン(src/core/scenario/state.ts)には一切手を入れていない。
 export function ExploreScreen() {
   const state = useScreenState()
   const navigate = useNavigate()
@@ -46,6 +56,10 @@ export function ExploreScreen() {
   }
 
   const canProceed = canEnterResolution(progress, scenario)
+  const scenes = scenario.scenes
+  const hasScenes = (scenes?.length ?? 0) > 0
+  const investigatedCount = progress.investigatedPointIds.length
+  const totalCount = scenario.investigation_points.length
 
   return (
     <ScreenContainer title="探索">
@@ -55,7 +69,24 @@ export function ExploreScreen() {
         empty={<p>まだ調査していません。調査ポイントをタップしよう。</p>}
         error={<p className="text-destructive">エラーが発生しました。</p>}
       >
-        <ul className="flex flex-col gap-4">
+        {hasScenes && scenes && (
+          <SceneExplorer
+            scenario={scenario}
+            scenes={scenes}
+            investigatedPointIds={progress.investigatedPointIds}
+            onCollect={handleInvestigate}
+          />
+        )}
+
+        <div className="flex items-center justify-between gap-2">
+          <h2 id="investigation-point-list-heading" className="font-heading text-lg">
+            調査ポイント一覧
+          </h2>
+          <span className="text-muted-foreground text-sm">
+            {investigatedCount}/{totalCount} 件調査済み
+          </span>
+        </div>
+        <ul aria-labelledby="investigation-point-list-heading" className="flex flex-col gap-4">
           {scenario.investigation_points.map((point) => {
             const investigated = progress.investigatedPointIds.includes(point.id)
             return (

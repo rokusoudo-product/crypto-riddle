@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-10 (#55: T037 完了)
+updated: 2026-09-10 (#56: T038 完了)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -324,9 +324,24 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
     確認。`scenes` 省略時はスキップ）を追加。既存 `scenarios/*.yaml`・対応 fixture・関連テストの
     `schema_version` を 0.3.0→0.4.0 に一括更新（`scenes` データ自体はまだ追加していない。本番データ投入は
     #57/T040 の範囲）。
-- [ ] **T038** 探索UI（背景シーン＋ホットスポット）（依存: T011, T037, T033）
+- [x] **T038** 探索UI（背景シーン＋ホットスポット）（依存: T011, T037, T033）
   - 背景シーン＋シーンタブ＋ホットスポット（実 `<button>` 48px+・ラベル・フォーカス可視）＋PC操作アクションシート（ログ取得／電源を落とす〔教育的FBのみ・減算なし・操作継続可〕／今は触らない）＋**一覧フォールバック**（キーボード完遂）。人物の証言は**会話フレーム**で表示（#50 の探索④部分を統合）。16:9 をモバイル縦でレターボックス＋横パン
   - 完了条件: 背景・一覧の両方で、キーボードのみで全ポイント調査→解決へ進める結線テストが通る
+  - **完了（2026-09-10, #56）**: `src/ui/components/explore/scene-explorer.tsx`（新規）で
+    `SceneExplorer` を実装し、`scenario.scenes` がある場合に `src/ui/screens/explore-screen.tsx`
+    へ組み込んだ。シーンタブ（矢印キー対応のroving tabindex）・ホットスポット（実`<button>`・
+    48px以上・アイコン+可視ラベル・フォーカス可視）・複数actionのアクションシート（固定順）・
+    danger の教育的フィードバック（dispatchしない=ペナルティ無し・操作継続可）・単一collect
+    actionの即実行・人物ホットスポットの証言を会話フレーム(`conversation-frame.tsx`)で表示
+    （話者=橘固定、話者フィールドはcoreスキーマに無いためUI都合の割り当て。DESIGN.md「探索
+    シーン」節に追記）を実装。「調査ポイント一覧」は scenes の有無に関わらず常に併設し、
+    どちらも既存の `dispatch({type:'INVESTIGATE'})` に接続するのみで **core のシナリオ進行
+    ステートマシン(`src/core/scenario/state.ts`)・zodスキーマ(`scenario.ts`)は無改修**。
+    背景画像は T039 未着手のためトークン色のプレースホルダ(単色地+シーン名)で表示。実データ
+    `scenarios/*.yaml` への `scenes` 投入は行わず(#57/T040 の範囲)、テスト専用フィクスチャ
+    (`src/ui/screens/explore-scene.fixture.ts`)で `src/ui/screens/explore-screen.test.tsx`
+    の結線テスト（背景・一覧の両経路でキーボードのみ全ポイント調査→解決へ進める、danger の
+    教育的FB・詰み防止、人物証言の会話フレーム表示、4状態）を追加した。
 - [ ] **T039** S1 探索背景の生成（依存: #52 PR マージ、IMAGE_WORKFLOW）
   - S1 の2背景（執務室／サーバ室＝`bg-s1-office`/`bg-s1-server`）を IMAGE_WORKFLOW の承認ゲート（アセット定義＋プロンプト提示→代表承認→image_agent 生成）で用意。16:9・アニメ調で立ち絵と統一。生成物パス・プロンプトを DESIGN.md アセット節に追記
   - 完了条件: 2背景が確定し DESIGN.md に記録、`assets/` に配置
