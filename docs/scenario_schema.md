@@ -21,6 +21,13 @@ updated: 2026-09-10
 1マップ(=1インシデント事件)を、コード直書きではなく**データとして追加できる**ようにするための
 YAML スキーマの説明。Issue #3 に対応する。
 
+> **⚠️ 2026-09-10 会話モードへ移行中（#42・T018 プレイテスト反映）**: 解決パート（`resolution`）を、カード配置＋
+> `required_card_ids` 方式から、**会話の中で問いに2〜3択で答える「会話モード」**（`resolution.questions[]`）へ刷新する。
+> `schema_version` は **0.2.0 → 0.3.0**。**スキーマ本体（zod）の改訂は tasks.md Phase 4.5 の T030 で実施**し、本節の
+> 該当箇所（§2 の `resolution` 行・§2.4・§7.1 の 4/5）はその目標形を記述している。**T030 マージ前の現行コードは
+> まだ `required_card_ids` 方式**である点に注意（本ドキュメント改訂 PR〔#42〕はドキュメント先行）。会話モードの
+> 仕様の正本は spec §8、画面は DESIGN.md「会話フレーム」節。
+
 ## 0. 位置づけ（正本は何か）
 
 - **plan.md §1/§4 の決定が正**: 「YAML →（ビルド時）zod 検証 → JSON」がシナリオデータの本番パイプライン。
@@ -60,7 +67,7 @@ scripts/
 
 | フィールド | spec 対応 | 説明 |
 |---|---|---|
-| `schema_version` | - | このスキーマのバージョン(semver)。現在 `"0.1.0"` 固定 |
+| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.2.0"`。**会話モード（#42・T030）で `"0.3.0"` に更新予定** |
 | `id` | - | マップID。**ファイル名(拡張子除く)と一致必須**(`validate-collection.ts` の `checkScenarioFilenames` がチェック) |
 | `title` | §4 | マップタイトル(事件名) |
 | `status` | - | `draft`/`reviewed`/`published`/`sample`。省略時 `draft` |
@@ -73,7 +80,7 @@ scripts/
 | `intro` | §4.1 導入 | 背景・被害会社・サポート役の導入台詞 |
 | `investigation_points` | §7 探索 | 調査ポイント(3系統) |
 | `cards` | §7 探索 | ヒントカード(正解・ダミーを含む) |
-| `resolution` | §8 解決 | 暗号解読→攻撃特定→防衛策 |
+| `resolution` | §8 解決 | **会話モード**（#42）: `cipher_stages`（暗号・維持／S1 は0件）＋ `questions[]`（問い列）。旧 `attack_identification`／`countermeasure` は `questions` へ統合（§2.4） |
 
 ### 2.1 カード種別（7種で固定）
 
@@ -107,14 +114,40 @@ spec §7 の「①ログを見る ②人に聞く ③文献を引く」を `inve
   「`method` を enum にせず自由記述で拡張余地を残す」という方針を、zod では型安全な判別可能 union で
   代替している）。
 
-### 2.4 攻撃特定・防衛策の判定方式
+### 2.4 会話モードの問い（`resolution.questions[]`）〔#42・T030 で実装〕
 
-- spec §8.2 の決定「MVP は単一解・厳密一致」に合わせ、`attack_identification.required_card_ids` /
-  `countermeasure.required_card_ids` は**唯一の正解カードID集合**として持つ。複数の正解ルート、
-  部分点、選択式の「不正解の選択肢テキスト」は持たない
-  (不正解の見た目は `cards[].is_dummy: true` のカード自体が担う)。
-- `attack_identification.required_card_ids` に `is_dummy: true` のカードを含めてはならない。
-- `countermeasure.required_card_ids` は `type: 対策` のカードのみを参照できる。
+解決パートは、旧「カード配置＋`required_card_ids`」から、**会話の中で問いに答える会話モード**へ刷新する（spec §8）。
+
+- `resolution.questions[]` は**問いを出題順に並べた配列**。当面は「攻撃の起点 → 初動対応」の**2問構成**（spec §8.5）。
+- 各 `question` の目標フィールド構成:
+
+```yaml
+resolution:
+  cipher_stages: []          # 暗号（維持）。S1 は 0 件
+  questions:
+    - id: q-entry-point
+      subject_tag: 攻撃手法    # この問いの分野。解説役が決まる（技術系→霧島／法制度→橘。characters.md）
+      speaker: kirishima       # 出題キャラ（省略時は subject_tag から決定してよい）
+      prompt: この攻撃、どこから入られたと見る？   # 問い（キャラの台詞）
+      choices:                 # 2〜3個。判断は2択、知識を要する候補は3択（#42）
+        - text: 取引先を装ったメールの添付ファイル
+          is_correct: true
+        - text: 公開サーバーの脆弱性を突かれた
+          is_correct: false
+          reply: その場合だと、境界の通信記録に外→内の不審なアクセスが残るはずだ。だが痕跡はない。
+        - text: USBメモリの持ち込み
+          is_correct: false
+          reply: その線なら入退室ログか資産管理に痕跡が出る。今回はどちらも異常なしだ。
+      explanations:            # 外すたびに深まる段階解説（教育的失敗の統合。任意・多段）
+        - 一次情報（ログ）と証言のどちらを裏取りに使えるかを考えてみよう。
+      consult_hint: 手元の手掛かり（メールゲートウェイ/EDR/証言）を分野で整理して提示  # 相談時の詳細ヒント
+```
+
+- **判定（spec §8.2 維持）**: **問い単位で単一解・厳密一致**。`choices[].is_correct: true` は**各問いにちょうど1つ**。部分点・複数正解ルートは持たない。
+- **誤答肢**: `is_correct: false` の選択肢に、キャラが理由を添えて返す `reply`（「その場合だと〜」）を持たせる。誤答しても選択肢は残り再挑戦でき、`explanations` を段階的に見せて解説を深める。
+- **カードとの関係**: 探索で集めた `cards` は会話中いつでも無料閲覧できる判断材料（カードドロワー）。`is_dummy: true` のカードは引き続き「もっともらしい引っかけ」を担う。会話モードでは**カードを直接答えとして選ばせない**（答えは選択肢テキスト）。
+- **相談**: `consult_hint`（または集めたカードからの自動整理）を、マップ単位3回まで提示する（spec §8.4）。
+- 旧 `attack_identification` / `countermeasure`（`required_card_ids` 方式）は廃止し、この `questions` に統合する（防衛策の問いは最後の `question`。`subject_tag` は法制度/インシデント対応など）。
 
 ## 3. 出典表記（`references`）
 
@@ -180,8 +213,8 @@ T005/T010（2026-09-09）により、旧 JSON Schema + Python(pyyaml/jsonschema)
   1. `cards[].id` / `investigation_points[].id` の重複禁止
   2. `cards[].investigation_point_id` が実在する `investigation_points[].id` を指しているか
   3. 各 `investigation_points` に紐づく `card` が最低1件あるか
-  4. `attack_identification.required_card_ids` が実在し、`is_dummy: true` を含まないか
-  5. `countermeasure.required_card_ids` が実在し、`type: 対策` かつ `is_dummy: false` か
+  4. `attack_identification.required_card_ids` が実在し、`is_dummy: true` を含まないか〔**#42/T030 で会話モードへ移行**: 各 `questions[]` に正解の選択肢がちょうど1つ、の検証へ置き換え〕
+  5. `countermeasure.required_card_ids` が実在し、`type: 対策` かつ `is_dummy: false` か〔**#42/T030 で移行**: 防衛の問いも `questions[]` の一つとして 4 と同じ検証で担保〕
 
 ### 7.2 複数ファイルにまたがる参照整合性（`src/core/model/validate-collection.ts`）
 
@@ -218,3 +251,4 @@ Vitest テストがある）。
 - 暗号を複数段にする場合の `cipher_stages` の `.max(1)` 制約解除、および各段の入出力の繋ぎ方
   （前段の平文を次段の鍵にする等）は、複数段化が実際に必要になった時点で設計する（#3 代表回答により後回し）。
 - シナリオ側 `related_terms` の実在チェックは #4 のマスタ整備後の追加候補として残る（§6）。
+- **会話モード（#42）の細部**: `questions[]` の各フィールド名・`explanations` の段数上限・`consult_hint` を明示持ちにするか集めたカードから自動生成するか・`speaker` を必須にするか（`subject_tag` から導出するか）は、**T030 の zod 改訂時に確定**する（本節 §2.4 は目標形）。

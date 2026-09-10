@@ -4,7 +4,7 @@ doc: plan.md (TDD 相当 / 実装計画)
 feature: 001-mvp
 status: approved          # 承認ゲート② 通過（2026-07-29 PR #11 マージ＝代表承認。記録の追随は #12 代表回答 2026-08-02 に基づく）
 created: 2026-07-29
-updated: 2026-08-06
+updated: 2026-09-10            # 解決パートを会話モードへ刷新（#42）: 判定=選択式・dnd-kit 不要・schema 0.3.0
 spec: specs/001-mvp/spec.md
 gate: "② 通過（2026-07-29） → tasks 工程完了。実装順序は specs/001-mvp/tasks.md"
 advisor: "2026-07-29 相談済み・条件付き承認（条件3点は §2/§6/§7 に反映済み）"
@@ -23,7 +23,7 @@ advisor: "2026-07-29 相談済み・条件付き承認（条件3点は §2/§6/�
 | ビルド | **Vite** | 軽量・高速。静的出力 |
 | UI | **React + Tailwind CSS + shadcn/ui** | DESIGN.md 確定構成。DOM のまま WCAG 2.1 AA を満たす |
 | 状態管理 | **Zustand（+ persist）** | 小規模に十分。Redux は過剰 |
-| D&D | **dnd-kit** | キーボードセンサー標準。**タップ配置を第一操作**、ドラッグは補助（WCAG 2.5.1/2.5.7） |
+| ~~D&D（dnd-kit）~~ | **不要（#42 で会話モード化）** | 解決パートがカード配置→**選択肢ボタン**方式に変わり、ドラッグ操作が無くなったため dnd-kit を削除する。選択式のほうがキーボード完遂が素直（WCAG）。カード閲覧はドロワー（D&D なし） |
 | シナリオ | **YAML →（ビルド時）zod 検証 → JSON** | クライアントに YAML パーサを載せない。zod スキーマが正、YAML は入力形式（#3 の前提） |
 | セーブ | **`SaveStorage` インターフェース + IndexedDB 実装** | 直書き禁止。スキーマ `version`＋マイグレーション必須 |
 | ホスティング | **Cloudflare Pages**（無料枠） | 静的配信で 0 円運用。計測は Cloudflare Web Analytics（cookie レス） |
@@ -44,7 +44,7 @@ advisor: "2026-07-29 相談済み・条件付き承認（条件3点は §2/§6/�
 src/
 ├── core/     # 純粋 TypeScript。React を import してはならない
 │   ├── scenario/   # シナリオ進行（明示的ステートマシン）
-│   ├── judge/      # 判定（単一解・厳密一致＋正規化）
+│   ├── judge/      # 判定（会話モードの選択肢判定＝問い単位で単一解・厳密一致／暗号は正規化＋照合）
 │   ├── save/       # SaveStorage IF・スキーマ・マイグレーション
 │   └── model/      # 型定義（zod スキーマから生成）
 ├── ui/       # React コンポーネント（表示と入力操作のみ）
@@ -73,11 +73,12 @@ scenarios/*.yaml → (build) zod 検証 → src/data/*.json → アプリが imp
 
 ## 5. データモデル（概要）
 
-- **Scenario**: id / title / 分野タグ / 難易度 / 想定時間 / 出典 / parts(導入・探索・解決) / cards / judge / 防衛策
-- **Card**: id / 種別（証言・ログ・通信記録・外部情報・暗号文・鍵・対策）/ 出所（人物・機器）/ 本文 / ダミーフラグ / 用語カード参照
+- **Scenario**: id / title / 分野タグ / 難易度 / 想定時間 / 出典 / parts(導入・探索・解決) / cards / resolution（**会話モード**: 暗号ステージ＋**問い列 questions**）
+  - **resolution（#42 で刷新）**: `cipher_stages`（維持・S1 は0件）＋ `questions[]`（各問い = 問い文・分野タグ・**2〜3択の選択肢**〔各選択肢に正誤と誤答時の返答〕・段階的に深まる解説・相談用の詳細ヒント）。旧 `attack_identification` / `countermeasure`（`required_card_ids` 方式）は questions へ統合。**schema_version 0.2.0 → 0.3.0**。問いの分野タグで解説役が決まる（技術→霧島／法務→橘。`docs/characters.md`）
+- **Card**: id / 種別（証言・ログ・通信記録・外部情報・暗号文・鍵・対策）/ 出所（人物・機器）/ 本文 / ダミーフラグ / 用語カード参照（探索で収集。会話モードのカードドロワーで閲覧）
 - **TermCard**（#4）: id / 用語 / 読み / 定義 / 分野タグ / 関連用語 / 出典
-- **SaveData**: version / クリア状況 / 獲得カード / 分野習熟 / XP / 設定
-- 詳細スキーマは `#3`（zod/YAML）で確定する
+- **SaveData**: version / クリア状況 / 獲得カード / 分野習熟 / XP / 設定 ＋ **会話モードの解答試行・相談使用回数**（XP 減算の算定と結果表示に使用。追加フィールドの後方互換／`version` 更新要否は実装 Issue で判断）
+- 詳細スキーマは実装 Issue（#42 分解）で zod を改訂して確定する（会話モード化に伴う破壊的変更。データは s0/s1 の2本を同時移行）
 
 ## 6. セーブ設計（advisor 承認条件③）
 
