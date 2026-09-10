@@ -206,8 +206,8 @@ export const s0SampleFixture: Scenario = {
       },
     ],
     // 会話モード(#42/T030)の問い列。旧 attack_identification/countermeasure/
-    // wrong_answer_follow_ups(required_card_ids 方式)をここへ統合した。
-    // 本フィクスチャはスキーマ演習用サンプルのため、S1の本格移行(#46)に先立つ暫定の書き換え。
+    // wrong_answer_follow_ups(required_card_ids 方式)をここへ統合した(#44)。
+    // 本フィクスチャはスキーマ演習用サンプルであり本番シナリオではない(scenario_schema.md §5)。
     questions: [
       {
         id: 'q-attack-method',
@@ -248,6 +248,9 @@ export const s0SampleFixture: Scenario = {
             is_correct: false,
             reply: '境界を固めるだけでは今回の原因は防げません。根本原因に効く対策を選んでください。',
           },
+        ],
+        explanations: [
+          '境界防御を固めても、正規のID・パスワードでログインされる今回のような攻撃は防げません。認証そのものを強くする対策を選びましょう。',
         ],
         consult_hint:
           '対策カードから本質的でない対策(境界防御のみ)と根本原因に効く対策を整理して提示する。',

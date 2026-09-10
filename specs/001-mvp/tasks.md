@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-10 (#44: T030/T031/T032 core実装完了)
+updated: 2026-09-10 (#46: T035/T036 完了・Phase 4.5 完了)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -273,21 +273,34 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
     を結果画面側で参照して表示するようにした。単体テストは `save-integration.test.ts`
     （`computeClearXpReward`・`applyClearToSaveData`の新フィールド）、結線テストは
     `s1-play-flow.test.tsx` に追加。
-- [ ] **T035** S1・s0 を会話モードへ移植（依存: T030。関連: T015）
+- [x] **T035** S1・s0 を会話モードへ移植（依存: T030。関連: T015）
   - `scenarios/s1-targeted-email-intrusion.yaml` を questions 形式へ書き換え（起点→初動の2問。教育的失敗＝電源断おとりを誤答 `reply`＋深まる解説へ移植）。`scenarios/s0-sample.yaml` も追随。データは本2本のみを同時移行（移行関数は持たない）
   - 完了条件: 両 YAML が新スキーマの zod 検証を通過し、`npm run build:data` が成功する
-  - **付記（2026-09-10, #45）**: #45 の作業中に確認したところ、両 YAML・対応する fixture
-    （`s1-targeted-email-intrusion.fixture.ts`/`s0-sample.fixture.ts`）は既に `schema_version: "0.3.0"`・
-    `questions[]` 形式へ移行済みだった（`npm run build:data` も成功する）。#44 の core 実装時に
-    済ませたと見られるが、本チェックボックスの更新漏れの可能性がある。#45 は Issue 範囲外のため
-    チェックは付けずコメントのみ残す。#46 着手時に事実確認のうえチェックを更新されたい。
-- [ ] **T036** 結線・E2E の更新（依存: T033, T034, T035。関連: T016, T017）
+  - **完了（2026-09-10, #46）**: #45 時点で `questions[]` 形式への機械移植は済んでいたが、事実確認の結果、
+    誤答肢 `reply` が「その場合だと〜」の汎用テンプレ文（旧 `wrong_answer_follow_ups` の使い回し）に
+    留まっており、「読み物として成立する品質」（本執筆）の水準には未達だったため、本 Issue で書き直した。
+    S1 q-entry-point は、誤答肢ごとに探索で集めた具体的なカード（EDR誤検知の時系列＝`card-edr-noise`/
+    `card-edr-macro`、プロキシログの通信方向＝`card-proxy-c2`）を裏付けに引用する reply へ書き換え、
+    選択肢「社内一斉連絡メールの誤送信」（"侵入経路"の問いに対する漏えい系の的外れな選択肢だった）を
+    「公開サーバーの脆弱性を突かれた侵入」（scenario_schema.md §2.4 の記述例に沿う、境界ログで反証できる
+    仮説）に差し替えた。`explanations` を1→2段に拡張（時系列で証拠を辿る視点を追加）。q-initial-response
+    （電源断の教育的失敗）にも `explanations`（1→2段）を追加し、誤答を繰り返した場合に保全順序・
+    説明責任への言及まで深まるようにした。s0-sample は位置づけ通りスキーマ演習用サンプルのまま内容は
+    維持しつつ、q-countermeasure に `explanations` を1件追加して構成をS1と揃えた。両 YAML・対応する
+    fixture（`s1-targeted-email-intrusion.fixture.ts`/`s0-sample.fixture.ts`）を同期し、
+    `npm run build:data` の成功と `scripts/build-data.test.ts` の一致回帰テストを確認済み。
+- [x] **T036** 結線・E2E の更新（依存: T033, T034, T035。関連: T016, T017）
   - `src/ui/screens/s1-play-flow.test.tsx`・`e2e/s1-playthrough.spec.ts` を会話モードへ更新（正解ルート＋誤答で深まる解説＋相談）。旧カード配置テスト（`card-placement-board.test.tsx` 等）を削除
   - 完了条件: Vitest・Playwright E2E が CI で安定して通る
-  - **付記（2026-09-10, #45）**: Vitest側（`s1-play-flow.test.tsx`・`play-flow.test.tsx`）と旧カード配置
-    テスト（`card-placement-board.test.tsx`等）の削除は T033 の完了条件を満たすため #45 で先行実施済み。
-    #46 で残るのは `e2e/s1-playthrough.spec.ts`（Playwright, 現状`test.describe.skip`）の会話モードへの
-    更新のみ。
+  - **完了（2026-09-10, #46）**: Vitest側（`s1-play-flow.test.tsx`・`play-flow.test.tsx`）と旧カード配置
+    テスト（`card-placement-board.test.tsx`等）の削除は #45 で先行実施済み。本 Issue では T035 の文言変更
+    （choices[1] の内容差し替え）に合わせて `s1-play-flow.test.tsx` の誤答選択の期待値を更新した。
+    `e2e/s1-playthrough.spec.ts`（Playwright, 旧 `test.describe.skip`）を会話モードUI向けに全面書き直し
+    （(a) 正解ルート＝起点→初動→クリア→結果・獲得XP+100表示、(b) 教育的失敗ルート＝初動で「電源を
+    直ちに落とす」を選ぶ→橘の揮発性メモリ解説が表示され選択肢は残ったまま→正解「論理的隔離」を選び
+    再挑戦→クリア→誤答1回ぶんXP減算（+90）を確認）の2ケースとし、`describe.skip` を解除。
+    タップ=クリック操作のみで実装。ローカル（WSL非対話）で `npx playwright install chromium`
+    （`--with-deps` は不使用）→ `npm run test:e2e` を実行し、2件とも成功を確認した。
 
 **チェックポイント③'**: 会話モードで S1 を通しプレイでき、代表が量産可と再確認する
 
@@ -353,8 +366,9 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#13](https://github.com/rokusoudo-product/crypto-riddle/issues/13) カラートークン AA 実測 | future | **T012** に合流 | 採用時は T012 の完了条件に AA 実測値の確定を含める |
 | [#14](https://github.com/rokusoudo-product/crypto-riddle/issues/14) IPA 過去問の出典表記規則 | future | **T015 の前提** | 採用時は T015 より先に完了させる |
 | [#22](https://github.com/rokusoudo-product/crypto-riddle/issues/22) 分野タグ（subject_tags）の値集合統一 | proposal（本 PR マージで closed 予定・`Closes #22`） | **T005**（zod 移行と同時実施） | 案2（7種に統一・`ネットワーク基盤`を正式採用）を採用。決定理由は `specs/001-mvp/spec.md` §9 に記載。値集合の正本は `src/core/model/tags.ts` |
-| [#42](https://github.com/rokusoudo-product/crypto-riddle/issues/42) 解決パートを会話モードに刷新 | closed（ドキュメント改訂 PR マージ済み） | **T014 を supersede**・**Phase 4.5（T030〜T036）** | T018 プレイテスト由来。spec §8＝会話モード。実装は #44（T030〜T032, core）で着手済み。残りは #45（T033/T034, UI）・#46（T035/T036, データ・結線） |
-| [#44](https://github.com/rokusoudo-product/crypto-riddle/issues/44) 会話モード core 実装 | 実装中（本PR） | **T030・T031・T032** | zod スキーマ・判定エンジン・ステートマシンを会話モードへ改訂。S1/s0 は暫定機械移植のみ（本格移行は #46）。UI(resolve/result/fail-screen等)は型エラー解消の最小限に留めた（#45） |
+| [#42](https://github.com/rokusoudo-product/crypto-riddle/issues/42) 解決パートを会話モードに刷新 | closed（ドキュメント改訂 PR マージ済み） | **T014 を supersede**・**Phase 4.5（T030〜T036）** | T018 プレイテスト由来。spec §8＝会話モード。実装は #44（T030〜T032, core）・#45（T033/T034, UI）で完了済み。#46（T035/T036, データ本執筆・結線）も実装完了（本PR、代表マージ待ち）でPhase 4.5が完了する |
+| [#44](https://github.com/rokusoudo-product/crypto-riddle/issues/44) 会話モード core 実装 | closed（完了） | **T030・T031・T032** | zod スキーマ・判定エンジン・ステートマシンを会話モードへ改訂。S1/s0 は暫定機械移植のみ（本格移行は #46）。UI(resolve/result/fail-screen等)は型エラー解消の最小限に留めた（#45） |
+| [#46](https://github.com/rokusoudo-product/crypto-riddle/issues/46) 会話モード データ本執筆・結線・E2E | 実装完了（本PR、代表マージ待ち） | **T035・T036** | S1 q-entry-point の誤答肢 reply を具体的なカード裏付き文へ本執筆し、explanations を多段化。s0-sample も形式を追随。`e2e/s1-playthrough.spec.ts` を会話モードUI向けに書き直し `describe.skip` 解除。マージで Phase 4.5 完了（チェックポイント③'） |
 | [#41](https://github.com/rokusoudo-product/crypto-riddle/issues/41) タイトル CTA が実セーブ状態と未接続 | bug + question（代表回答待ち） | 別途（Phase 7 の a11y/仕上げ候補） | T018 プレイテスト由来。会話モードとは独立 |
 
 ## 依存関係の要約
