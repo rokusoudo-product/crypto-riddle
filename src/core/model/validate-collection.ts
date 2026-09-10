@@ -64,18 +64,6 @@ export function checkScenarioLegalRefs(
   return errors
 }
 
-/**
- * spec §8.3「本質的でない対策を誤答肢に」を満たしているかの目安(警告のみ)。
- * type='対策' のダミーカードが1件も無いシナリオのファイル名一覧を返す。
- */
-export function warnScenariosMissingCountermeasureDummy(
-  scenarios: NamedFile<Scenario>[],
-): string[] {
-  return scenarios
-    .filter(({ data }) => !data.cards.some((card) => card.type === '対策' && card.is_dummy))
-    .map(({ filename }) => filename)
-}
-
 /** terms/*.yaml 全体から用語カード id の重複を検出し、id -> TermCard の索引を作る。 */
 export function collectTerms(termFiles: NamedFile<TermCard[]>[]): {
   byId: Map<string, TermCard>

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { hasNoDummyCountermeasure, scenarioSchema, type Scenario } from './scenario.ts'
+import { scenarioSchema, type Scenario } from './scenario.ts'
 
 function validScenario(): Scenario {
   return {
-    schema_version: '0.2.0',
+    schema_version: '0.3.0',
     id: 's0-sample',
     title: 'アルファテック社 顧客データ流出事件(テスト用)',
     status: 'sample',
@@ -91,17 +91,38 @@ function validScenario(): Scenario {
           card_ref: 'card-proxy-log',
         },
       ],
-      attack_identification: {
-        required_card_ids: ['card-proxy-log', 'card-witness-tanaka'],
-        attack_name: 'パスワードリスト攻撃',
-        attack_description: '流出パスワードの使い回しを悪用する攻撃。',
-      },
-      countermeasure: {
-        required_card_ids: ['card-countermeasure-mfa'],
-        summary: '多要素認証の導入。',
-      },
-      wrong_answer_follow_ups: [
-        { trigger: 'cipher', character: '霧島', line: 'ずれ幅は一定のはずだ。' },
+      questions: [
+        {
+          id: 'q-attack',
+          subject_tag: '攻撃手法',
+          speaker: '霧島',
+          prompt: 'この攻撃は何か？',
+          choices: [
+            { text: 'パスワードリスト攻撃', is_correct: true },
+            {
+              text: '標的型メール攻撃',
+              is_correct: false,
+              reply: 'その場合だとマクロ実行の痕跡が残るはずだが見当たらない。',
+            },
+          ],
+          explanations: ['流出パスワードとの一致に注目しよう。'],
+          consult_hint: '認証ログとパスワードの使い回しを整理して提示',
+        },
+        {
+          id: 'q-countermeasure',
+          subject_tag: '認証',
+          speaker: '橘',
+          prompt: '有効な対策は？',
+          choices: [
+            { text: '多要素認証の導入', is_correct: true, reply: 'それで防げます。' },
+            {
+              text: 'ファイアウォールの追加導入',
+              is_correct: false,
+              reply: '境界を固めるだけでは今回の原因は防げません。',
+            },
+          ],
+          consult_hint: '対策カードから本質的な対策を整理して提示',
+        },
       ],
       clear_explanation: [{ character: '霧島', line: '侵入経路はパスワードの使い回しだ。' }],
       legal_refs: ['LAW-APPI-BREACH-REPORT'],
@@ -203,38 +224,97 @@ describe('scenarioSchema', () => {
     })
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
+})
 
-  it('reject: attack_identification.required_card_ids がダミーカードを含む場合を拒否する', () => {
+describe('resolution.questions(会話モード, #42/T030)', () => {
+  it('reject: questions が空配列を拒否する', () => {
     const scenario = validScenario()
-    scenario.resolution.attack_identification.required_card_ids = ['card-countermeasure-firewall']
-    const result = scenarioSchema.safeParse(scenario)
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.issues.some((issue) => issue.message.includes('ダミーカード'))).toBe(true)
-    }
-  })
-
-  it('reject: attack_identification.required_card_ids が実在しないcardを参照する場合を拒否する', () => {
-    const scenario = validScenario()
-    scenario.resolution.attack_identification.required_card_ids = ['card-not-exist']
+    scenario.resolution.questions = []
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 
-  it("reject: countermeasure.required_card_ids が type='対策' 以外を参照する場合を拒否する", () => {
+  it('reject: questions の id が重複している場合を拒否する', () => {
     const scenario = validScenario()
-    scenario.resolution.countermeasure.required_card_ids = ['card-proxy-log']
+    scenario.resolution.questions[1] = { ...scenario.resolution.questions[1], id: 'q-attack' }
     const result = scenarioSchema.safeParse(scenario)
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(
-        result.error.issues.some((issue) => issue.message.includes("type='対策' ではありません")),
+        result.error.issues.some((issue) => issue.message.includes('questions の id が重複')),
       ).toBe(true)
     }
   })
 
-  it('reject: countermeasure.required_card_ids がダミーカードを参照する場合を拒否する', () => {
+  it('reject: choices が1個以下(2択未満)を拒否する', () => {
     const scenario = validScenario()
-    scenario.resolution.countermeasure.required_card_ids = ['card-countermeasure-firewall']
+    scenario.resolution.questions[0].choices = [{ text: '唯一の選択肢', is_correct: true }]
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: choices が4個以上(3択超)を拒否する', () => {
+    const scenario = validScenario()
+    scenario.resolution.questions[0].choices = [
+      { text: 'A', is_correct: true },
+      { text: 'B', is_correct: false, reply: 'x' },
+      { text: 'C', is_correct: false, reply: 'x' },
+      { text: 'D', is_correct: false, reply: 'x' },
+    ]
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: 正解(is_correct: true)の選択肢が0個の場合を拒否する', () => {
+    const scenario = validScenario()
+    scenario.resolution.questions[0].choices = [
+      { text: 'A', is_correct: false, reply: 'x' },
+      { text: 'B', is_correct: false, reply: 'y' },
+    ]
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(
+        result.error.issues.some((issue) => issue.message.includes('ちょうど1つ')),
+      ).toBe(true)
+    }
+  })
+
+  it('reject: 正解の選択肢が2個以上の場合を拒否する(単一解・厳密一致)', () => {
+    const scenario = validScenario()
+    scenario.resolution.questions[0].choices = [
+      { text: 'A', is_correct: true },
+      { text: 'B', is_correct: true },
+    ]
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: 誤答の選択肢に reply が無い場合を拒否する(discriminated union)', () => {
+    const scenario = validScenario()
+    scenario.resolution.questions[0].choices = [
+      { text: 'A', is_correct: true },
+      // @ts-expect-error 意図的に reply を欠落させる
+      { text: 'B', is_correct: false },
+    ]
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('正常系: 正解の選択肢は reply を省略できる', () => {
+    const scenario = validScenario()
+    scenario.resolution.questions[0].choices = [
+      { text: 'A', is_correct: true },
+      { text: 'B', is_correct: false, reply: 'x' },
+    ]
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: explanations を省略できる(任意項目)', () => {
+    const scenario = validScenario()
+    delete scenario.resolution.questions[0].explanations
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: consult_hint が無い場合を拒否する(必須)', () => {
+    const scenario = validScenario()
+    // @ts-expect-error 意図的に必須フィールドを欠落させる
+    delete scenario.resolution.questions[0].consult_hint
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 })
@@ -272,17 +352,5 @@ describe('references(出典表記, docs/citation-policy.md §5)', () => {
     // @ts-expect-error 意図的に必須フィールドを欠落させる
     scenario.references = [{ note: 'x' }]
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
-  })
-})
-
-describe('hasNoDummyCountermeasure', () => {
-  it('type=対策 のダミーカードがあれば false を返す', () => {
-    expect(hasNoDummyCountermeasure(validScenario())).toBe(false)
-  })
-
-  it('type=対策 のダミーカードが無ければ true を返す(警告対象)', () => {
-    const scenario = validScenario()
-    scenario.cards = scenario.cards.filter((card) => card.id !== 'card-countermeasure-firewall')
-    expect(hasNoDummyCountermeasure(scenario)).toBe(true)
   })
 })

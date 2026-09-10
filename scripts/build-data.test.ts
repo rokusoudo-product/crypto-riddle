@@ -24,7 +24,7 @@ laws:
 
 function validScenarioYaml(id: string): string {
   return `
-schema_version: "0.2.0"
+schema_version: "0.3.0"
 id: ${id}
 title: テストシナリオ
 subject_tags: [ネットワーク基盤]
@@ -64,17 +64,18 @@ resolution:
       key: "1"
       key_hint: x
       plaintext: X
-  attack_identification:
-    required_card_ids: [card-1]
-    attack_name: x
-    attack_description: x
-  countermeasure:
-    required_card_ids: [card-2]
-    summary: x
-  wrong_answer_follow_ups:
-    - trigger: cipher
-      character: 霧島
-      line: x
+  questions:
+    - id: q-1
+      subject_tag: ネットワーク基盤
+      speaker: 霧島
+      prompt: x
+      choices:
+        - text: A
+          is_correct: true
+        - text: B
+          is_correct: false
+          reply: x
+      consult_hint: x
   clear_explanation:
     - character: 霧島
       line: x

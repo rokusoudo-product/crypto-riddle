@@ -59,8 +59,17 @@ export function ResultScreen() {
               ))}
             </ul>
             <ul className="border-border bg-card flex flex-col gap-2 rounded-lg border p-4 text-sm">
-              <li>攻撃手段: {scenario.resolution.attack_identification.attack_name}</li>
-              <li>対策: {scenario.resolution.countermeasure.summary}</li>
+              {/* 2026-09-10(#42/#44): 会話モードへの刷新で単一の attack_name/countermeasure.summary
+                  が questions[] へ分解されたため、各問いの正解選択肢を列挙する形に変更した。
+                  会話モードUIとしての本格的な見せ方は #45(T033)で検討する。 */}
+              {scenario.resolution.questions.map((question) => {
+                const correctChoice = question.choices.find((c) => c.is_correct)
+                return (
+                  <li key={question.id}>
+                    {question.prompt}: {correctChoice?.text}
+                  </li>
+                )
+              })}
               <li>獲得XP: +{CLEAR_XP_REWARD}</li>
               <li>累計XP: {saveData?.xp ?? 0}</li>
             </ul>

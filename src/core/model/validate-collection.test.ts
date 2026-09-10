@@ -11,12 +11,11 @@ import {
   checkTermReferences,
   collectLawIds,
   collectTerms,
-  warnScenariosMissingCountermeasureDummy,
 } from './validate-collection.ts'
 
 function baseScenario(overrides: Partial<Scenario> = {}): Scenario {
   return {
-    schema_version: '0.2.0',
+    schema_version: '0.3.0',
     id: 's0-sample',
     title: 'サンプル',
     subject_tags: ['認証'],
@@ -50,13 +49,19 @@ function baseScenario(overrides: Partial<Scenario> = {}): Scenario {
       cipher_stages: [
         { id: 'cs-1', method: 'caesar', ciphertext: 'x', key: '1', key_hint: 'x', plaintext: 'X' },
       ],
-      attack_identification: {
-        required_card_ids: ['card-1'],
-        attack_name: 'x',
-        attack_description: 'x',
-      },
-      countermeasure: { required_card_ids: ['card-2'], summary: 'x' },
-      wrong_answer_follow_ups: [{ trigger: 'cipher', character: '霧島', line: 'x' }],
+      questions: [
+        {
+          id: 'q-1',
+          subject_tag: '認証',
+          speaker: '霧島',
+          prompt: 'x',
+          choices: [
+            { text: 'A', is_correct: true },
+            { text: 'B', is_correct: false, reply: 'x' },
+          ],
+          consult_hint: 'x',
+        },
+      ],
       clear_explanation: [{ character: '霧島', line: 'x' }],
     },
     ...overrides,
@@ -120,29 +125,6 @@ describe('collectLawIds / checkScenarioLegalRefs', () => {
       new Set(),
     )
     expect(errors).toHaveLength(1)
-  })
-})
-
-describe('warnScenariosMissingCountermeasureDummy', () => {
-  it('対策ダミーカードが無いシナリオのファイル名を返す', () => {
-    const warnings = warnScenariosMissingCountermeasureDummy([
-      { filename: 'scenarios/s0-sample.yaml', data: baseScenario() },
-    ])
-    expect(warnings).toEqual(['scenarios/s0-sample.yaml'])
-  })
-
-  it('対策ダミーカードがあれば警告しない', () => {
-    const scenario = baseScenario()
-    scenario.cards.push({
-      id: 'card-3',
-      type: '対策',
-      source: 'x',
-      investigation_point_id: 'ip-1',
-      body: 'x',
-      is_dummy: true,
-    })
-    const warnings = warnScenariosMissingCountermeasureDummy([{ filename: 'x', data: scenario }])
-    expect(warnings).toEqual([])
   })
 })
 

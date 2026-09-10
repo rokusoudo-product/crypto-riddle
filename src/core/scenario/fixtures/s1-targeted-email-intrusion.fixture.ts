@@ -15,7 +15,7 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const s1TargetedEmailIntrusionFixture: Scenario = {
-  schema_version: '0.2.0',
+  schema_version: '0.3.0',
   id: 's1-targeted-email-intrusion',
   title: '標的型メールからの侵入',
   status: 'reviewed',
@@ -241,32 +241,59 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
   ],
   resolution: {
     cipher_stages: [],
-    attack_identification: {
-      required_card_ids: [
-        'card-mail-phish',
-        'card-edr-macro',
-        'card-proxy-c2',
-        'card-witness-nakano',
-      ],
-      attack_name: '標的型メール攻撃(マクロ悪用によるマルウェア感染とC2通信)',
-      attack_description:
-        '取引先を装った請求書メールの添付ファイル(マクロ付きExcel)を経理担当者が開いたことでマルウェアが実行され、外部のC2サーバへの定期的な通信(ビーコン)が確立された。フィッシングメールの実在、マクロ実行の記録、C2通信の痕跡、担当者の証言が符合する。',
-    },
-    countermeasure: {
-      required_card_ids: ['card-countermeasure-isolate'],
-      summary:
-        '感染が疑われる端末はまずネットワークから論理的に隔離し(電源は落とさない)、揮発性メモリとディスクの証拠を保全したうえでIoCを抽出して被害範囲を特定する。あわせて添付ファイルのマクロ自動実行の組織的な無効化と、標的型メール対応の周知を行う。',
-    },
-    wrong_answer_follow_ups: [
+    // 会話モード(#42/T030)の問い列(spec §8.5「攻撃の起点 → 初動対応」の2問構成)。
+    // 旧 attack_identification/countermeasure/wrong_answer_follow_ups(required_card_ids 方式)を
+    // 機械的に questions[] へ移し替えた暫定版(#44)。本格的な演出・分量調整は #46 で行う。
+    questions: [
       {
-        trigger: 'attack_identification',
-        character: '霧島',
-        line: '怪しく見えるものと、この侵入を直接裏付けるものは別だ。周辺的な異常ではなく、侵入の入口・実行の痕跡・通信の証拠・当事者の説明が噛み合っているかを見直せ。',
+        id: 'q-entry-point',
+        subject_tag: '攻撃手法',
+        speaker: '霧島',
+        prompt: 'この侵入、どこから入られたと見る？',
+        choices: [
+          {
+            text: '取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)',
+            is_correct: true,
+          },
+          {
+            text: 'ウイルス対策ソフトの定義ファイル更新エラーに乗じた侵入',
+            is_correct: false,
+            reply:
+              '怪しく見えるものと、この侵入を直接裏付けるものは別だ。周辺的な異常ではなく、侵入の入口・実行の痕跡・通信の証拠・当事者の説明が噛み合っているかを見直せ。',
+          },
+          {
+            text: '社内一斉連絡メールの誤送信による情報漏えい',
+            is_correct: false,
+            reply:
+              'それは宛先設定ミスによる社内限りの事故で、外部からの侵入とは別件だ。C2通信の痕跡とマクロ実行の記録に立ち返れ。',
+          },
+        ],
+        explanations: [
+          '「怪しく見える」ことと「今回の侵入を裏付ける証拠であること」は違う。侵入口・実行痕跡・通信の証拠・当事者の証言が噛み合っているかを確かめよう。',
+        ],
+        consult_hint:
+          'フィッシングメールの実在・マクロ実行の記録・C2通信の痕跡・中野の証言を分野で整理して提示する。',
       },
       {
-        trigger: 'countermeasure',
-        character: '橘',
-        line: '電源を切れば、事件の証拠になり得る揮発性メモリの情報が失われます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で証拠を保全してからでなければ、後の説明責任が果たせません。',
+        id: 'q-initial-response',
+        subject_tag: 'インシデント対応',
+        speaker: '橘',
+        prompt: '感染が疑われる端末への初動対応は？',
+        choices: [
+          {
+            text: 'ネットワークから論理的に隔離し(LANケーブル抜線・Wi-Fi無効化)、電源は落とさず揮発性メモリとディスクの証拠を保全する',
+            is_correct: true,
+            reply: 'それが正しい初動です。IoCを抽出して被害範囲の特定を進めましょう。',
+          },
+          {
+            text: '感染が疑われる端末の電源を直ちに落とし、被害の拡大を止める',
+            is_correct: false,
+            reply:
+              '電源を切れば、事件の証拠になり得る揮発性メモリの情報が失われます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で証拠を保全してからでなければ、後の説明責任が果たせません。',
+          },
+        ],
+        consult_hint:
+          'インシデント対応ガイドラインの原則(揮発性の高い情報から保全する)と、電源を落とすリスクを整理して提示する。',
       },
     ],
     clear_explanation: [

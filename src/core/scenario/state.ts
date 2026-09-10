@@ -1,30 +1,53 @@
-// src/core/scenario/state.ts — シナリオ進行の明示的ステートマシン（T007、plan.md §2）。
+// src/core/scenario/state.ts — シナリオ進行の明示的ステートマシン（T007/T032、plan.md §2）。
 //
-// 導入→探索→解決(暗号→特定→防衛)の進行を、外部ライブラリを使わない reducer 形式の
+// 導入→探索→解決(暗号→会話モードの問い列)の進行を、外部ライブラリを使わない reducer 形式の
 // 明示的ステートマシンとして実装する(plan.md §1「外部ライブラリ不要」の方針)。
 // 状態(ScenarioProgressState)はプレーンな JSON 互換オブジェクトにし、T009(SaveStorage)での
 // 永続化・T013(Zustand 接続)へそのまま渡せるようにする(手書きクラス・Map/Set 等は使わない)。
 //
-// 状態遷移図(概略):
+// 状態遷移図(概略。#42/T032 で会話モードへ改訂):
 //
-//   intro --(ADVANCE_INTRO)--> exploration --(ENTER_RESOLUTION, 全ポイント調査済み)--> resolution(cipher)
+//   intro --(ADVANCE_INTRO)--> exploration --(ENTER_RESOLUTION, 全ポイント調査済み)--> resolution(cipher|question)
 //   exploration --(INVESTIGATE)--> exploration (カード獲得。全ポイント調査済みになるまでループ)
-//   resolution(cipher) --(正解)--> resolution(attack_identification)
-//   resolution(attack_identification) --(正解)--> resolution(countermeasure)
-//   resolution(countermeasure) --(正解)--> clear
-//   resolution(*) --(不正解)--> follow_up (失敗解説。wrong_answer_follow_ups から該当行を保持)
-//   follow_up --(RESUME_FROM_FOLLOW_UP)--> resolution(誤答したステージに復帰。「初動をやり直す」)
+//   resolution(cipher) --(正解)--> resolution(question, questionIndex=0)
+//   resolution(cipher) --(誤答)--> resolution(cipher) のまま(lastAnswerFeedback を更新。選択肢が
+//     残る会話モードの設計方針(spec §8.2)に合わせ、旧 follow_up パートへは遷移しない)
+//   resolution(question) --(正解, 次の問いがある)--> resolution(question, questionIndex+1)
+//   resolution(question) --(正解, 最後の問い)--> clear
+//   resolution(question) --(誤答)--> resolution(question) のまま。選択肢は残り、
+//     wrongAttemptsByQuestionId を+1し、lastAnswerFeedback に reply と段階解説を積む(spec §8.2)
+//   resolution(question) --(CONSULT, consultsUsed<3)--> consultsUsed+1(マップ単位。spec §8.4)
+//
+// 旧 follow_up パート・pendingFollowUp・resumeStage・FollowUp 型は、会話モードでは誤答しても
+// 同じ問いに選択肢付きで留まり続ける設計(旧「⑥失敗解説の独立画面」を廃止し会話内へ統合。
+// spec §8.2「⑥失敗解説の独立画面は廃止する」)になったことに伴い撤去した(#42/T032)。
 //
 // T015(Issue #5)で追加: scenario.resolution.cipher_stages が0件の「暗号なし」シナリオ(入門編 S1)では
-// ENTER_RESOLUTION が resolution(cipher) をスキップし、直接 resolution(attack_identification) へ進む。
+// ENTER_RESOLUTION が resolution(cipher) をスキップし、直接 resolution(question) へ進む。
 //
 // core/ は React および src/ui/ を import してはならない（plan.md §2、advisor 承認条件）。
-import { judgeCardSelection, judgeCipherStage } from '../judge/index.ts'
-import type { FollowUp, Scenario } from '../model/index.ts'
+import { judgeCipherStage, judgeQuestionChoice } from '../judge/index.ts'
+import type { Scenario } from '../model/index.ts'
 
-export type ScenarioPart = 'intro' | 'exploration' | 'resolution' | 'follow_up' | 'clear'
+export type ScenarioPart = 'intro' | 'exploration' | 'resolution' | 'clear'
 
-export type ResolutionStage = 'cipher' | 'attack_identification' | 'countermeasure'
+export type ResolutionStage = 'cipher' | 'question'
+
+/** 相談(コストあり)の上限回数。マップ単位(spec §8.4)。zod スキーマには持たせない core 定数。 */
+export const MAX_CONSULTS = 3
+
+/**
+ * 直近の解答結果のフィードバック(会話モードの「その場合だと〜」返し＋段階解説、spec §8.2)。
+ * scenarioSchema には存在しない core 内部の一時的な表示用データ(状態は JSON 互換に保つため
+ * オブジェクトリテラルのみで構成する)。次の解答が送られる・次のステージへ進む際に上書き/クリアされる。
+ */
+export interface AnswerFeedback {
+  readonly correct: boolean
+  /** 選択した choice の reply(正解 choice の reply は任意項目のため無ければ null)。 */
+  readonly reply: string | null
+  /** 誤答時、外すたびに深まる段階解説(explanations[min(誤答回数, len-1)])。無ければ null。 */
+  readonly explanation: string | null
+}
 
 /**
  * シナリオ進行の状態。シリアライズ可能なプレーンデータのみで構成する(T009 のセーブ・
@@ -39,10 +62,14 @@ export interface ScenarioProgressState {
   readonly investigatedPointIds: readonly string[]
   /** 獲得済みカードid一覧(ダミーカードも含む。順不同・重複なし)。 */
   readonly ownedCardIds: readonly string[]
-  /** follow_up 中のみ意味を持つ、表示すべきフォロー台詞。 */
-  readonly pendingFollowUp: FollowUp | null
-  /** follow_up から RESUME_FROM_FOLLOW_UP した際に戻る先のステージ。follow_up 中のみ意味を持つ。 */
-  readonly resumeStage: ResolutionStage | null
+  /** resolution(question)中の出題インデックス(scenario.resolution.questions のインデックス)。 */
+  readonly questionIndex: number
+  /** 問いID -> 誤答回数(段階解説の深さ制御に使う。spec §8.2)。マップ内で保持し続ける。 */
+  readonly wrongAttemptsByQuestionId: Readonly<Record<string, number>>
+  /** 相談(コストあり)の使用回数。マップ単位で MAX_CONSULTS まで(spec §8.4)。 */
+  readonly consultsUsed: number
+  /** 直近の解答結果のフィードバック。次の解答/遷移で上書きされる。resolution 以外では null。 */
+  readonly lastAnswerFeedback: AnswerFeedback | null
 }
 
 export type ScenarioEvent =
@@ -50,9 +77,8 @@ export type ScenarioEvent =
   | { type: 'INVESTIGATE'; pointId: string }
   | { type: 'ENTER_RESOLUTION' }
   | { type: 'SUBMIT_CIPHER_ANSWER'; answer: string }
-  | { type: 'SUBMIT_ATTACK_IDENTIFICATION'; cardIds: string[] }
-  | { type: 'SUBMIT_COUNTERMEASURE'; cardIds: string[] }
-  | { type: 'RESUME_FROM_FOLLOW_UP' }
+  | { type: 'SUBMIT_QUESTION_ANSWER'; choiceIndex: number }
+  | { type: 'CONSULT' }
 
 /** 初期状態を作る。導入(intro)パートから開始する。 */
 export function createInitialScenarioState(scenario: Scenario): ScenarioProgressState {
@@ -62,8 +88,10 @@ export function createInitialScenarioState(scenario: Scenario): ScenarioProgress
     resolutionStage: null,
     investigatedPointIds: [],
     ownedCardIds: [],
-    pendingFollowUp: null,
-    resumeStage: null,
+    questionIndex: 0,
+    wrongAttemptsByQuestionId: {},
+    consultsUsed: 0,
+    lastAnswerFeedback: null,
   }
 }
 
@@ -84,14 +112,18 @@ function addUnique(list: readonly string[], value: string): readonly string[] {
   return list.includes(value) ? list : [...list, value]
 }
 
-function findFollowUp(scenario: Scenario, trigger: ResolutionStage): FollowUp {
-  const followUp = scenario.resolution.wrong_answer_follow_ups.find((f) => f.trigger === trigger)
-  if (!followUp) {
-    throw new Error(
-      `シナリオ '${scenario.id}' に trigger='${trigger}' の wrong_answer_follow_ups がありません。`,
-    )
-  }
-  return followUp
+/**
+ * 誤答時の段階解説を選ぶ(spec §8.2「外すたびに解説が段階的に深くなる」)。
+ * `priorWrongAttempts` は今回の誤答より前の誤答回数(初回誤答なら0)。
+ * explanations が無い/空なら null(reply のみで表示する、docs/scenario_schema.md §2.4)。
+ */
+function pickExplanation(
+  explanations: readonly string[] | undefined,
+  priorWrongAttempts: number,
+): string | null {
+  if (!explanations || explanations.length === 0) return null
+  const index = Math.min(priorWrongAttempts, explanations.length - 1)
+  return explanations[index]
 }
 
 /**
@@ -130,12 +162,14 @@ export function scenarioReducer(
 
     case 'ENTER_RESOLUTION': {
       if (!canEnterResolution(state, scenario)) return state
-      // 暗号なしシナリオ(T015, Issue #5)は cipher ステージを飛ばす。
+      // 暗号なしシナリオ(T015, Issue #5)は cipher ステージを飛ばし、直接 question[0] へ進む。
       const hasCipher = scenario.resolution.cipher_stages.length > 0
       return {
         ...state,
         part: 'resolution',
-        resolutionStage: hasCipher ? 'cipher' : 'attack_identification',
+        resolutionStage: hasCipher ? 'cipher' : 'question',
+        questionIndex: 0,
+        lastAnswerFeedback: null,
       }
     }
 
@@ -144,61 +178,64 @@ export function scenarioReducer(
       const [stage] = scenario.resolution.cipher_stages
       const correct = judgeCipherStage(stage, event.answer)
       if (correct) {
-        return { ...state, resolutionStage: 'attack_identification' }
+        return {
+          ...state,
+          resolutionStage: 'question',
+          questionIndex: 0,
+          lastAnswerFeedback: null,
+        }
       }
+      // 会話モード(#42)は誤答しても暗号ステージに留まり、選択肢(この場合は入力欄)は残る。
+      // cipher は自由記述のため choice 単位の reply/explanation を持たず、正誤のみを表示する。
       return {
         ...state,
-        part: 'follow_up',
-        pendingFollowUp: findFollowUp(scenario, 'cipher'),
-        resumeStage: 'cipher',
+        lastAnswerFeedback: { correct: false, reply: null, explanation: null },
       }
     }
 
-    case 'SUBMIT_ATTACK_IDENTIFICATION': {
-      if (state.part !== 'resolution' || state.resolutionStage !== 'attack_identification') {
-        return state
-      }
-      const correct = judgeCardSelection(
-        event.cardIds,
-        scenario.resolution.attack_identification.required_card_ids,
-      )
+    case 'SUBMIT_QUESTION_ANSWER': {
+      if (state.part !== 'resolution' || state.resolutionStage !== 'question') return state
+      const question = scenario.resolution.questions[state.questionIndex]
+      if (!question) return state
+      if (event.choiceIndex < 0 || event.choiceIndex >= question.choices.length) return state
+
+      const { correct, choice } = judgeQuestionChoice(question, event.choiceIndex)
+
       if (correct) {
-        return { ...state, resolutionStage: 'countermeasure' }
+        const nextIndex = state.questionIndex + 1
+        const hasNext = nextIndex < scenario.resolution.questions.length
+        return {
+          ...state,
+          part: hasNext ? 'resolution' : 'clear',
+          resolutionStage: hasNext ? 'question' : null,
+          questionIndex: hasNext ? nextIndex : state.questionIndex,
+          lastAnswerFeedback: {
+            correct: true,
+            reply: choice.reply ?? null,
+            explanation: null,
+          },
+        }
       }
+
+      const priorAttempts = state.wrongAttemptsByQuestionId[question.id] ?? 0
       return {
         ...state,
-        part: 'follow_up',
-        pendingFollowUp: findFollowUp(scenario, 'attack_identification'),
-        resumeStage: 'attack_identification',
+        wrongAttemptsByQuestionId: {
+          ...state.wrongAttemptsByQuestionId,
+          [question.id]: priorAttempts + 1,
+        },
+        lastAnswerFeedback: {
+          correct: false,
+          reply: choice.reply ?? null,
+          explanation: pickExplanation(question.explanations, priorAttempts),
+        },
       }
     }
 
-    case 'SUBMIT_COUNTERMEASURE': {
-      if (state.part !== 'resolution' || state.resolutionStage !== 'countermeasure') return state
-      const correct = judgeCardSelection(
-        event.cardIds,
-        scenario.resolution.countermeasure.required_card_ids,
-      )
-      if (correct) {
-        return { ...state, part: 'clear', resolutionStage: null }
-      }
-      return {
-        ...state,
-        part: 'follow_up',
-        pendingFollowUp: findFollowUp(scenario, 'countermeasure'),
-        resumeStage: 'countermeasure',
-      }
-    }
-
-    case 'RESUME_FROM_FOLLOW_UP': {
-      if (state.part !== 'follow_up' || state.resumeStage === null) return state
-      return {
-        ...state,
-        part: 'resolution',
-        resolutionStage: state.resumeStage,
-        pendingFollowUp: null,
-        resumeStage: null,
-      }
+    case 'CONSULT': {
+      if (state.part !== 'resolution' || state.resolutionStage !== 'question') return state
+      if (state.consultsUsed >= MAX_CONSULTS) return state
+      return { ...state, consultsUsed: state.consultsUsed + 1 }
     }
 
     default: {

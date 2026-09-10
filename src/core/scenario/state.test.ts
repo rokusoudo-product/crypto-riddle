@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { Scenario } from '../model/index.ts'
 
 import {
+  MAX_CONSULTS,
   canEnterResolution,
   createInitialScenarioState,
   scenarioReducer,
@@ -10,13 +11,14 @@ import {
 } from './state.ts'
 
 /**
- * テスト用の最小シナリオ。src/core/model/scenario.ts の scenarioSchema が要求する
- * 参照整合性(投稿ポイントに紐づくカードが最低1件、required_card_ids の実在等)を満たす。
+ * テスト用の最小シナリオ(会話モード, #42/T032)。src/core/model/scenario.ts の scenarioSchema が
+ * 要求する参照整合性(投稿ポイントに紐づくカードが最低1件等)を満たす。
  * シーザー暗号は shift=3 で "KHOOR" -> "HELLO" に復号できる値にしてある。
+ * questions は spec §8.5 の「攻撃の起点 → 初動対応」2問構成を模す。
  */
 function buildScenario(): Scenario {
   return {
-    schema_version: '0.2.0',
+    schema_version: '0.3.0',
     id: 'test-scenario',
     title: 'テストシナリオ',
     subject_tags: ['ネットワーク基盤'],
@@ -56,14 +58,6 @@ function buildScenario(): Scenario {
         body: 'カードB',
         is_dummy: false,
       },
-      {
-        id: 'card-defense',
-        type: '対策',
-        source: '情報システム部',
-        investigation_point_id: 'ip-2',
-        body: '対策カード',
-        is_dummy: false,
-      },
     ],
     resolution: {
       cipher_stages: [
@@ -76,19 +70,39 @@ function buildScenario(): Scenario {
           plaintext: 'HELLO',
         },
       ],
-      attack_identification: {
-        required_card_ids: ['card-a', 'card-b'],
-        attack_name: 'テスト攻撃',
-        attack_description: '攻撃の説明',
-      },
-      countermeasure: {
-        required_card_ids: ['card-defense'],
-        summary: '対策の説明',
-      },
-      wrong_answer_follow_ups: [
-        { trigger: 'cipher', character: '霧島', line: '暗号のフォロー' },
-        { trigger: 'attack_identification', character: '霧島', line: '特定のフォロー' },
-        { trigger: 'countermeasure', character: '橘', line: '防衛のフォロー' },
+      questions: [
+        {
+          id: 'q-entry-point',
+          subject_tag: '攻撃手法',
+          speaker: '霧島',
+          prompt: 'どこから入られたと見る？',
+          choices: [
+            { text: '正解の起点', is_correct: true },
+            {
+              text: '誤りの起点A',
+              is_correct: false,
+              reply: '一次解説: それは違う。',
+            },
+            {
+              text: '誤りの起点B',
+              is_correct: false,
+              reply: '再誤答の返し。',
+            },
+          ],
+          explanations: ['一段目の解説。', '二段目の解説。'],
+          consult_hint: '起点に関する詳細ヒント',
+        },
+        {
+          id: 'q-initial-response',
+          subject_tag: 'インシデント対応',
+          speaker: '橘',
+          prompt: '初動はどうする？',
+          choices: [
+            { text: '正しい初動', is_correct: true, reply: 'その通りです。' },
+            { text: '誤った初動', is_correct: false, reply: 'それでは証拠が消えます。' },
+          ],
+          consult_hint: '初動に関する詳細ヒント',
+        },
       ],
       clear_explanation: [{ character: '霧島', line: 'クリア解説' }],
     },
@@ -105,14 +119,24 @@ function stateAfterFullExploration(scenario: Scenario): ScenarioProgressState {
   return state
 }
 
+function stateAtResolution(scenario: Scenario): ScenarioProgressState {
+  return scenarioReducer(scenario, stateAfterFullExploration(scenario), {
+    type: 'ENTER_RESOLUTION',
+  })
+}
+
 describe('createInitialScenarioState', () => {
-  it('intro パートから開始し、獲得済みカード・調査済みポイントは空である', () => {
+  it('intro パートから開始し、獲得済みカード・調査済みポイント・相談回数は空/0である', () => {
     const scenario = buildScenario()
     const state = createInitialScenarioState(scenario)
     expect(state.part).toBe('intro')
     expect(state.resolutionStage).toBeNull()
     expect(state.investigatedPointIds).toEqual([])
     expect(state.ownedCardIds).toEqual([])
+    expect(state.questionIndex).toBe(0)
+    expect(state.wrongAttemptsByQuestionId).toEqual({})
+    expect(state.consultsUsed).toBe(0)
+    expect(state.lastAnswerFeedback).toBeNull()
   })
 })
 
@@ -201,24 +225,19 @@ describe('canEnterResolution / ENTER_RESOLUTION(解決パートへの遷移条�
 })
 
 describe('ENTER_RESOLUTION: 暗号なしシナリオ(Issue #5, T015)は cipher ステージを飛ばす', () => {
-  it('cipher_stages が0件の場合、resolution(attack_identification) に直接進む', () => {
+  it('cipher_stages が0件の場合、resolution(question, questionIndex=0) に直接進む', () => {
     const scenario = buildScenario()
     scenario.resolution.cipher_stages = []
     const fullyExplored = stateAfterFullExploration(scenario)
     const resolving = scenarioReducer(scenario, fullyExplored, { type: 'ENTER_RESOLUTION' })
     expect(resolving.part).toBe('resolution')
-    expect(resolving.resolutionStage).toBe('attack_identification')
+    expect(resolving.resolutionStage).toBe('question')
+    expect(resolving.questionIndex).toBe(0)
   })
 })
 
-describe('解決パート: 正解ルート(暗号 -> 特定 -> 防衛 -> クリア)', () => {
-  function stateAtResolution(scenario: Scenario): ScenarioProgressState {
-    return scenarioReducer(scenario, stateAfterFullExploration(scenario), {
-      type: 'ENTER_RESOLUTION',
-    })
-  }
-
-  it('暗号の正解で attack_identification ステージに進む', () => {
+describe('解決パート: 暗号ステージ', () => {
+  it('暗号の正解で question ステージ(questionIndex=0)に進む', () => {
     const scenario = buildScenario()
     const resolving = stateAtResolution(scenario)
     const next = scenarioReducer(scenario, resolving, {
@@ -226,131 +245,186 @@ describe('解決パート: 正解ルート(暗号 -> 特定 -> 防衛 -> クリ�
       answer: 'hello',
     })
     expect(next.part).toBe('resolution')
-    expect(next.resolutionStage).toBe('attack_identification')
+    expect(next.resolutionStage).toBe('question')
+    expect(next.questionIndex).toBe(0)
   })
 
-  it('攻撃特定の正解で countermeasure ステージに進む', () => {
+  it('暗号の誤答では cipher ステージのまま、lastAnswerFeedback に不正解が記録される(旧follow_upへは遷移しない)', () => {
     const scenario = buildScenario()
-    const afterCipher = scenarioReducer(scenario, stateAtResolution(scenario), {
+    const resolving = stateAtResolution(scenario)
+    const failed = scenarioReducer(scenario, resolving, {
+      type: 'SUBMIT_CIPHER_ANSWER',
+      answer: 'まちがい',
+    })
+    expect(failed.part).toBe('resolution')
+    expect(failed.resolutionStage).toBe('cipher')
+    expect(failed.lastAnswerFeedback).toEqual({ correct: false, reply: null, explanation: null })
+
+    // 誤答後も再挑戦でき、正しい答えを送れば通常どおり次ステージに進める。
+    const succeeded = scenarioReducer(scenario, failed, {
       type: 'SUBMIT_CIPHER_ANSWER',
       answer: 'HELLO',
     })
-    const next = scenarioReducer(scenario, afterCipher, {
-      type: 'SUBMIT_ATTACK_IDENTIFICATION',
-      cardIds: ['card-a', 'card-b'],
-    })
-    expect(next.resolutionStage).toBe('countermeasure')
-  })
-
-  it('防衛策の正解で clear に到達する', () => {
-    const scenario = buildScenario()
-    const afterCipher = scenarioReducer(scenario, stateAtResolution(scenario), {
-      type: 'SUBMIT_CIPHER_ANSWER',
-      answer: 'HELLO',
-    })
-    const afterIdentification = scenarioReducer(scenario, afterCipher, {
-      type: 'SUBMIT_ATTACK_IDENTIFICATION',
-      cardIds: ['card-a', 'card-b'],
-    })
-    const cleared = scenarioReducer(scenario, afterIdentification, {
-      type: 'SUBMIT_COUNTERMEASURE',
-      cardIds: ['card-defense'],
-    })
-    expect(cleared.part).toBe('clear')
-    expect(cleared.resolutionStage).toBeNull()
+    expect(succeeded.resolutionStage).toBe('question')
   })
 })
 
-describe('誤答時のフォロー分岐(失敗解説への遷移と「初動をやり直す」復帰)', () => {
-  function stateAtResolution(scenario: Scenario): ScenarioProgressState {
-    return scenarioReducer(scenario, stateAfterFullExploration(scenario), {
-      type: 'ENTER_RESOLUTION',
+describe('解決パート: 問い(questions)の出題順・誤答再挑戦・クリア', () => {
+  function stateAtFirstQuestion(scenario: Scenario): ScenarioProgressState {
+    return scenarioReducer(scenario, stateAtResolution(scenario), {
+      type: 'SUBMIT_CIPHER_ANSWER',
+      answer: 'HELLO',
     })
   }
 
-  it('暗号の誤答で follow_up に遷移し、該当キャラの台詞を保持する', () => {
+  it('1問目に正解すると2問目(questionIndex=1)に進む', () => {
     const scenario = buildScenario()
-    const resolving = stateAtResolution(scenario)
-    const failed = scenarioReducer(scenario, resolving, {
-      type: 'SUBMIT_CIPHER_ANSWER',
-      answer: 'まちがい',
-    })
-    expect(failed.part).toBe('follow_up')
-    expect(failed.pendingFollowUp).toEqual({
-      trigger: 'cipher',
-      character: '霧島',
-      line: '暗号のフォロー',
-    })
-    expect(failed.resumeStage).toBe('cipher')
+    const q1 = stateAtFirstQuestion(scenario)
+    const next = scenarioReducer(scenario, q1, { type: 'SUBMIT_QUESTION_ANSWER', choiceIndex: 0 })
+    expect(next.part).toBe('resolution')
+    expect(next.resolutionStage).toBe('question')
+    expect(next.questionIndex).toBe(1)
+    expect(next.lastAnswerFeedback).toEqual({ correct: true, reply: null, explanation: null })
   })
 
-  it('RESUME_FROM_FOLLOW_UP で誤答したステージ(cipher)に復帰し、resolution が続けられる', () => {
+  it('最後の問いに正解すると clear に到達する', () => {
     const scenario = buildScenario()
-    const resolving = stateAtResolution(scenario)
-    const failed = scenarioReducer(scenario, resolving, {
-      type: 'SUBMIT_CIPHER_ANSWER',
-      answer: 'まちがい',
-    })
-    const resumed = scenarioReducer(scenario, failed, { type: 'RESUME_FROM_FOLLOW_UP' })
-    expect(resumed.part).toBe('resolution')
-    expect(resumed.resolutionStage).toBe('cipher')
-    expect(resumed.pendingFollowUp).toBeNull()
-    expect(resumed.resumeStage).toBeNull()
-
-    // 復帰後、正しい答えを送れば通常どおり次ステージに進める。
-    const succeeded = scenarioReducer(scenario, resumed, {
-      type: 'SUBMIT_CIPHER_ANSWER',
-      answer: 'HELLO',
-    })
-    expect(succeeded.resolutionStage).toBe('attack_identification')
-  })
-
-  it('攻撃特定の誤答(ダミーカード混入)で follow_up(attack_identification)に遷移する', () => {
-    const scenario = buildScenario()
-    const afterCipher = scenarioReducer(scenario, stateAtResolution(scenario), {
-      type: 'SUBMIT_CIPHER_ANSWER',
-      answer: 'HELLO',
-    })
-    const failed = scenarioReducer(scenario, afterCipher, {
-      type: 'SUBMIT_ATTACK_IDENTIFICATION',
-      cardIds: ['card-a', 'card-dummy'],
-    })
-    expect(failed.part).toBe('follow_up')
-    expect(failed.pendingFollowUp?.trigger).toBe('attack_identification')
-    expect(failed.resumeStage).toBe('attack_identification')
-  })
-
-  it('防衛策の誤答で follow_up(countermeasure)に遷移し、復帰後に再提出してクリアできる', () => {
-    const scenario = buildScenario()
-    const afterCipher = scenarioReducer(scenario, stateAtResolution(scenario), {
-      type: 'SUBMIT_CIPHER_ANSWER',
-      answer: 'HELLO',
-    })
-    const afterIdentification = scenarioReducer(scenario, afterCipher, {
-      type: 'SUBMIT_ATTACK_IDENTIFICATION',
-      cardIds: ['card-a', 'card-b'],
-    })
-    const failed = scenarioReducer(scenario, afterIdentification, {
-      type: 'SUBMIT_COUNTERMEASURE',
-      cardIds: [],
-    })
-    expect(failed.part).toBe('follow_up')
-    expect(failed.pendingFollowUp?.trigger).toBe('countermeasure')
-
-    const resumed = scenarioReducer(scenario, failed, { type: 'RESUME_FROM_FOLLOW_UP' })
-    expect(resumed.resolutionStage).toBe('countermeasure')
-
-    const cleared = scenarioReducer(scenario, resumed, {
-      type: 'SUBMIT_COUNTERMEASURE',
-      cardIds: ['card-defense'],
+    const q1 = stateAtFirstQuestion(scenario)
+    const q2 = scenarioReducer(scenario, q1, { type: 'SUBMIT_QUESTION_ANSWER', choiceIndex: 0 })
+    const cleared = scenarioReducer(scenario, q2, {
+      type: 'SUBMIT_QUESTION_ANSWER',
+      choiceIndex: 0,
     })
     expect(cleared.part).toBe('clear')
+    expect(cleared.resolutionStage).toBeNull()
+    expect(cleared.lastAnswerFeedback).toEqual({
+      correct: true,
+      reply: 'その通りです。',
+      explanation: null,
+    })
   })
 
-  it('follow_up 以外の状態で RESUME_FROM_FOLLOW_UP を送っても状態は変化しない', () => {
+  it('誤答しても選択肢は残ったまま(同じ questionIndex)で、reply が返る', () => {
+    const scenario = buildScenario()
+    const q1 = stateAtFirstQuestion(scenario)
+    const failed = scenarioReducer(scenario, q1, {
+      type: 'SUBMIT_QUESTION_ANSWER',
+      choiceIndex: 1,
+    })
+    expect(failed.part).toBe('resolution')
+    expect(failed.resolutionStage).toBe('question')
+    expect(failed.questionIndex).toBe(0)
+    expect(failed.wrongAttemptsByQuestionId['q-entry-point']).toBe(1)
+    expect(failed.lastAnswerFeedback).toEqual({
+      correct: false,
+      reply: '一次解説: それは違う。',
+      explanation: '一段目の解説。',
+    })
+  })
+
+  it('外すたびに解説が段階的に深くなる(explanations[min(誤答回数, len-1)])', () => {
+    const scenario = buildScenario()
+    const q1 = stateAtFirstQuestion(scenario)
+    const firstMiss = scenarioReducer(scenario, q1, {
+      type: 'SUBMIT_QUESTION_ANSWER',
+      choiceIndex: 1,
+    })
+    expect(firstMiss.lastAnswerFeedback?.explanation).toBe('一段目の解説。')
+
+    const secondMiss = scenarioReducer(scenario, firstMiss, {
+      type: 'SUBMIT_QUESTION_ANSWER',
+      choiceIndex: 2,
+    })
+    expect(secondMiss.wrongAttemptsByQuestionId['q-entry-point']).toBe(2)
+    expect(secondMiss.lastAnswerFeedback?.explanation).toBe('二段目の解説。')
+
+    // explanations は2段までしかないため、3回目以降も最後の段を使い続ける(len-1でクランプ)。
+    const thirdMiss = scenarioReducer(scenario, secondMiss, {
+      type: 'SUBMIT_QUESTION_ANSWER',
+      choiceIndex: 1,
+    })
+    expect(thirdMiss.wrongAttemptsByQuestionId['q-entry-point']).toBe(3)
+    expect(thirdMiss.lastAnswerFeedback?.explanation).toBe('二段目の解説。')
+  })
+
+  it('explanations が無い問いの誤答は reply のみで explanation は null になる', () => {
+    const scenario = buildScenario()
+    const q1 = stateAtFirstQuestion(scenario)
+    const q2 = scenarioReducer(scenario, q1, { type: 'SUBMIT_QUESTION_ANSWER', choiceIndex: 0 })
+    const failed = scenarioReducer(scenario, q2, {
+      type: 'SUBMIT_QUESTION_ANSWER',
+      choiceIndex: 1,
+    })
+    expect(failed.lastAnswerFeedback).toEqual({
+      correct: false,
+      reply: 'それでは証拠が消えます。',
+      explanation: null,
+    })
+  })
+
+  it('resolution(question) 以外で SUBMIT_QUESTION_ANSWER を送っても状態は変化しない', () => {
+    const scenario = buildScenario()
+    const resolving = stateAtResolution(scenario) // まだ cipher ステージ
+    const noop = scenarioReducer(scenario, resolving, {
+      type: 'SUBMIT_QUESTION_ANSWER',
+      choiceIndex: 0,
+    })
+    expect(noop).toBe(resolving)
+  })
+
+  it('範囲外の choiceIndex を送っても状態は変化しない', () => {
+    const scenario = buildScenario()
+    const q1 = stateAtFirstQuestion(scenario)
+    const noop = scenarioReducer(scenario, q1, { type: 'SUBMIT_QUESTION_ANSWER', choiceIndex: 99 })
+    expect(noop).toBe(q1)
+  })
+})
+
+describe('相談(CONSULT, spec §8.4)', () => {
+  function stateAtFirstQuestion(scenario: Scenario): ScenarioProgressState {
+    return scenarioReducer(scenario, stateAtResolution(scenario), {
+      type: 'SUBMIT_CIPHER_ANSWER',
+      answer: 'HELLO',
+    })
+  }
+
+  it('CONSULT のたびに consultsUsed が増える', () => {
+    const scenario = buildScenario()
+    const q1 = stateAtFirstQuestion(scenario)
+    const once = scenarioReducer(scenario, q1, { type: 'CONSULT' })
+    expect(once.consultsUsed).toBe(1)
+    const twice = scenarioReducer(scenario, once, { type: 'CONSULT' })
+    expect(twice.consultsUsed).toBe(2)
+  })
+
+  it(`マップ単位で${MAX_CONSULTS}回に達すると以降は no-op になる(2問×3回で実質無制限にしない)`, () => {
+    const scenario = buildScenario()
+    let state = stateAtFirstQuestion(scenario)
+    for (let i = 0; i < MAX_CONSULTS; i++) {
+      state = scenarioReducer(scenario, state, { type: 'CONSULT' })
+    }
+    expect(state.consultsUsed).toBe(MAX_CONSULTS)
+
+    const noop = scenarioReducer(scenario, state, { type: 'CONSULT' })
+    expect(noop).toBe(state)
+  })
+
+  it('2問目に進んでも相談回数はマップ単位でリセットされない', () => {
+    const scenario = buildScenario()
+    const q1 = stateAtFirstQuestion(scenario)
+    const consulted = scenarioReducer(scenario, q1, { type: 'CONSULT' })
+    const q2 = scenarioReducer(scenario, consulted, {
+      type: 'SUBMIT_QUESTION_ANSWER',
+      choiceIndex: 0,
+    })
+    expect(q2.questionIndex).toBe(1)
+    expect(q2.consultsUsed).toBe(1)
+  })
+
+  it('resolution(question) 以外(cipher)で CONSULT を送っても状態は変化しない', () => {
     const scenario = buildScenario()
     const resolving = stateAtResolution(scenario)
-    const noop = scenarioReducer(scenario, resolving, { type: 'RESUME_FROM_FOLLOW_UP' })
+    const noop = scenarioReducer(scenario, resolving, { type: 'CONSULT' })
     expect(noop).toBe(resolving)
   })
 })

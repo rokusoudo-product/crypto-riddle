@@ -17,7 +17,7 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const s0SampleFixture: Scenario = {
-  schema_version: '0.2.0',
+  schema_version: '0.3.0',
   id: 's0-sample',
   title: 'アルファテック社 顧客データ流出事件(スキーマサンプル)',
   status: 'sample',
@@ -205,37 +205,52 @@ export const s0SampleFixture: Scenario = {
         card_ref: 'card-cipher-text',
       },
     ],
-    attack_identification: {
-      required_card_ids: [
-        'card-proxy-log',
-        'card-auth-log',
-        'card-witness-tanaka',
-        'card-external-info',
-      ],
-      attack_name: 'パスワードリスト攻撃',
-      attack_description:
-        '他サービスから流出したID・パスワードの組み合わせをそのまま使い回してログインを試行する攻撃。パスワードの使い回しと、流出リストに一致する認証成功の痕跡が根拠となる。',
-    },
-    countermeasure: {
-      required_card_ids: ['card-countermeasure-mfa'],
-      summary:
-        '多要素認証の導入とパスワード使い回し禁止の周知により、流出パスワードのみでの不正ログインを防止する。',
-    },
-    wrong_answer_follow_ups: [
+    // 会話モード(#42/T030)の問い列。旧 attack_identification/countermeasure/
+    // wrong_answer_follow_ups(required_card_ids 方式)をここへ統合した。
+    // 本フィクスチャはスキーマ演習用サンプルのため、S1の本格移行(#46)に先立つ暫定の書き換え。
+    questions: [
       {
-        trigger: 'cipher',
-        character: '霧島',
-        line: '急ぐな。まずアルファベットの並びをよく見ろ。ずれ幅は一定のはずだ。',
+        id: 'q-attack-method',
+        subject_tag: '攻撃手法',
+        speaker: '霧島',
+        prompt: 'この侵入の手口は何だと見る？',
+        choices: [
+          { text: 'パスワードリスト攻撃(流出パスワードの使い回し)', is_correct: true },
+          {
+            text: '標的型メールによるマルウェア感染',
+            is_correct: false,
+            reply:
+              '怪しく見えるログすべてが原因とは限らない。パスワードの使い回しに直結する証拠だけを拾え。',
+          },
+          {
+            text: '元委託社員による内部不正アクセス',
+            is_correct: false,
+            reply:
+              '契約終了後のアクセス自体は気になるが、今回の認証成功の直接証拠にはならない。流出リストとの一致に注目しろ。',
+          },
+        ],
+        explanations: ['一次情報(ログ)と証言のどちらを裏取りに使えるかを考えてみよう。'],
+        consult_hint: 'プロキシログ・認証ログ・田中の証言・外部注意喚起を分野で整理して提示する。',
       },
       {
-        trigger: 'attack_identification',
-        character: '霧島',
-        line: '怪しく見えるログすべてが原因とは限らない。パスワードの使い回しに直結する証拠だけを拾え。',
-      },
-      {
-        trigger: 'countermeasure',
-        character: '橘',
-        line: '境界を固めるだけでは今回の原因は防げません。根本原因に効く対策を選んでください。',
+        id: 'q-countermeasure',
+        subject_tag: '法制度',
+        speaker: '橘',
+        prompt: '有効な再発防止策は？',
+        choices: [
+          {
+            text: '多要素認証(MFA)の導入とパスワード使い回し禁止の周知',
+            is_correct: true,
+            reply: 'それなら流出パスワードのみでの不正ログインを防げます。',
+          },
+          {
+            text: 'ネットワーク境界への新たなファイアウォール追加',
+            is_correct: false,
+            reply: '境界を固めるだけでは今回の原因は防げません。根本原因に効く対策を選んでください。',
+          },
+        ],
+        consult_hint:
+          '対策カードから本質的でない対策(境界防御のみ)と根本原因に効く対策を整理して提示する。',
       },
     ],
     clear_explanation: [
