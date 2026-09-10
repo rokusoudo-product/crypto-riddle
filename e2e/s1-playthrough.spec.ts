@@ -12,7 +12,22 @@
 // (`src/ui/screens/s1-play-flow.test.tsx` の Vitest 版と同じ会話モードUIを実ブラウザで確認する)。
 //
 // 操作経路はタップ(クリック)を第一操作とする(DESIGN.md「タップ配置が第一操作、ドラッグは補助」)。
+//
+// 2026-09-11(#64/T042): 会話フレーム(ConversationFrame)にタイプライター表示を追加したため、
+// 選択肢・相談・カードドロワー・証言パネルの「閉じる」等の操作要素(children)は、会話文の
+// 全文表示(またはスキップ)後にしか描画されなくなった(送り途中の誤タップ防止、DESIGN.md
+// 「タイプライター表示」節)。本ファイルの「選択肢/閉じるがすぐ押せる」前提の操作は、
+// すべてタップでのスキップ操作を挟むよう更新した(skipTypewriter参照)。
 import { expect, test } from '@playwright/test'
+
+/**
+ * ConversationFrame のタイプライター表示をタップでスキップする。演出中、会話文の全文が
+ * スキップボタンの accessible name になる(sr-onlyで支援技術へ一度に渡すため、#64/T042)ので、
+ * その会話文そのもので button ロールとして引ける。
+ */
+async function skipTypewriter(page: import('@playwright/test').Page, line: string) {
+  await page.getByRole('button', { name: line, exact: true }).click()
+}
 
 /** 探索を最後まで終え、解決パート(会話モード, q-entry-point)へ進める共通手順。 */
 async function playThroughExplorationToResolution(page: import('@playwright/test').Page) {
@@ -56,7 +71,8 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
   }) => {
     await playThroughExplorationToResolution(page)
 
-    // q-entry-point: 正解を選ぶ。
+    // q-entry-point: 選択肢はタイプライターの全文表示後(またはスキップ)にしか出ない(#64/T042)。
+    await skipTypewriter(page, 'この侵入、どこから入られたと見る？')
     await page
       .getByRole('button', {
         name: '取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)',
@@ -66,6 +82,7 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
     // q-initial-response(橘)へ進む。正解時の一言(reply)が新しい問いの上に表示される
     // (誤答肢の reply 本執筆(#46/T035)により、この reply も本 PR で新規に追加した内容)。
     await expect(page.getByText('感染が疑われる端末への初動対応は？')).toBeVisible()
+    await skipTypewriter(page, '感染が疑われる端末への初動対応は？')
     await expect(
       page.getByText('その通りだ。フィッシングメールの実在', { exact: false }),
     ).toBeVisible()
@@ -94,13 +111,15 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
   }) => {
     await playThroughExplorationToResolution(page)
 
-    // q-entry-point: 正解を選ぶ。
+    // q-entry-point: 選択肢はタイプライターの全文表示後(またはスキップ)にしか出ない(#64/T042)。
+    await skipTypewriter(page, 'この侵入、どこから入られたと見る？')
     await page
       .getByRole('button', {
         name: '取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)',
       })
       .click()
     await expect(page.getByText('感染が疑われる端末への初動対応は？')).toBeVisible()
+    await skipTypewriter(page, '感染が疑われる端末への初動対応は？')
 
     // わざと「電源を直ちに落とす」対策(教育的失敗の分岐)を選ぶ。
     const shutdownChoice = page.getByRole('button', {
@@ -177,14 +196,22 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await expect(pcHotspot).toHaveAccessibleName('経理部 中野の端末（PC）・調査済み')
 
     // --- 執務室: person(中野・経理部長。単一action=即実行、証言は会話フレームで表示) ---
+    // 「閉じる」は会話フレームのchildrenのため、タイプライターの全文表示(またはスキップ)後に
+    // しか出ない(#64/T042)。証言文そのものがスキップボタンのaccessible nameになる。
     await page.getByRole('button', { name: '中野（人物）', exact: true }).click()
+    const nakanoTestimony =
+      '「月末で請求書処理が立て込んでいて、深く確認せずに開いてしまいました」と中野は証言。ファイルを開いた際にマクロ有効化の警告が出たが、「よくあることだと思い」有効にしたという。'
     await expect(page.getByText('深く確認せずに開いてしまいました', { exact: false })).toBeVisible()
+    await skipTypewriter(page, nakanoTestimony)
     await page.getByRole('button', { name: '閉じる' }).click()
 
     await page.getByRole('button', { name: '経理部長（人物）', exact: true }).click()
+    const buchoTestimony =
+      '経理部長は「今月は取引先の請求サイクルが集中する時期で、多少雑な件名のメールでも本物だと思い込みやすい状況だった」と説明。添付ファイルのマクロ実行に関する社内規程の周知は徹底されていなかったという。'
     await expect(
       page.getByText('取引先の請求サイクルが集中する時期', { exact: false }),
     ).toBeVisible()
+    await skipTypewriter(page, buchoTestimony)
     await page.getByRole('button', { name: '閉じる' }).click()
 
     // --- 執務室: book(資料棚。collectを2件持つ=1件選ぶたびにシートが閉じるため開き直す) ---
@@ -211,7 +238,10 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
 
     // person(情シス担当。単一action=即実行)。証言(非ダミーの対策カードが優先表示される)。
     await page.getByRole('button', { name: '情シス担当（人物）', exact: true }).click()
+    const itStaffTestimony =
+      '感染が疑われる端末をネットワークから論理的に隔離する(LANケーブル抜線・Wi-Fi無効化)。電源は落とさず、揮発性メモリとディスクの証拠を保全した後にIoCを抽出し、被害範囲を特定する。あわせて添付ファイルのマクロ自動実行を組織的に無効化し、標的型メールへの注意喚起を周知する。'
     await expect(page.getByText('ネットワークから論理的に隔離する', { exact: false })).toBeVisible()
+    await skipTypewriter(page, itStaffTestimony)
     await page.getByRole('button', { name: '閉じる' }).click()
 
     // 一覧側(常に併設)でも9/9件が調査済みとして共有されている。

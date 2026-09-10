@@ -57,6 +57,32 @@ function renderApp() {
   )
 }
 
+// #64/T042: 会話フレーム(ConversationFrame)にタイプライター表示を追加したため、選択肢・相談・
+// カードドロワー等の操作要素(children)は、会話文の全文表示(またはスキップ)後にしか描画されない
+// (送り途中の誤タップ防止、DESIGN.md「タイプライター表示」節)。既存の「選択肢がすぐ押せる」
+// 前提のテストは、スキップ操作を挟むよう更新する。
+//
+// タイプライター演出中、スキップ用ボタンは会話ウィンドウ内で最初(かつ唯一)のフォーカス可能要素
+// になる(選択肢等はまだ非表示のため)。スキップするとchildren内の最初のフォーカス可能要素へ
+// 自動的にフォーカスが移る(ConversationFrame側の仕様、#64/T042)ため、Tab+Enterで
+// キーボードのみでスキップできる。
+async function skipTypewriterByKeyboard(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  await user.tab()
+  await user.keyboard('{Enter}')
+}
+
+/**
+ * タップ(クリック)でタイプライターをスキップする。ConversationFrame は演出中、sr-only の
+ * 全文テキストをスキップボタンの accessible name にする(#64/T042)ため、会話文そのもので
+ * `getByRole('button', { name: line })` として引ける。
+ */
+async function skipTypewriterByClick(
+  user: ReturnType<typeof userEvent.setup>,
+  line: string,
+): Promise<void> {
+  await user.click(screen.getByRole('button', { name: line }))
+}
+
 /** 探索を最後まで終え、解決パート(会話モード, q-entry-point)へ進める共通手順。クリック操作。 */
 async function playThroughExplorationToResolution(
   user: ReturnType<typeof userEvent.setup>,
@@ -101,13 +127,19 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       await playThroughExplorationToResolution(user)
 
       // 会話フレーム: 発話者=霧島(立ち絵の名札+会話ウィンドウのピルの2箇所に表示)、問い文が表示される
-      // (会話モード, spec §8.2)。
+      // (会話モード, spec §8.2)。タイプライター演出中でも、問い文の全文は支援技術向けに
+      // sr-only で一度に渡されているため(#64/T042)、この時点で getByText は見つかる。
       expect(screen.getAllByText('霧島').length).toBeGreaterThanOrEqual(2)
       expect(screen.getByText('この侵入、どこから入られたと見る？')).toBeInTheDocument()
 
+      // 選択肢はタイプライターの全文表示(またはスキップ)後にしか出ない(#64/T042)ため、
+      // まずキーボード(Tab→Enter)でスキップする。スキップすると children 内の最初の
+      // フォーカス可能要素(=choice[0])へ自動的にフォーカスが移る。
+      await skipTypewriterByKeyboard(user)
+      expect(document.activeElement).toHaveTextContent('取引先を装った請求書メールの添付ファイル')
+
       // --- q-entry-point: キーボードで誤答を選ぶ(choices[1] = 公開サーバーの脆弱性〜) ---
-      await user.tab() // choice[0](正解)
-      await user.tab() // choice[1](誤答)
+      await user.tab() // choice[1](誤答。直前のスキップでchoice[0]へフォーカス済みのため1回で足りる)
       expect(document.activeElement).toHaveTextContent('公開サーバーの脆弱性を突かれた侵入')
       await user.keyboard('{Enter}')
 
@@ -151,9 +183,12 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       expect(document.activeElement).toHaveTextContent('取引先を装った請求書メールの添付ファイル')
       await user.keyboard('{Enter}')
 
-      // q-initial-response(橘)へ進む。選択肢ボタンが再利用され、choice[0]がそのままフォーカスされ続ける
-      // (React が同じ key のノードを再利用するため)。念のため内容を確認してから決定する。
+      // q-initial-response(橘)へ進む。line(問い文)が変わったのでタイプライターは先頭から
+      // 再生され、選択肢は再び全文表示(またはスキップ)後まで非表示になる(#64/T042)。
+      // 旧版(タイプライター導入前)は選択肢ボタンが同じkeyで再利用されフォーカスが移り続けたが、
+      // 現在は children ごと一旦消えるため、ここでも改めてスキップが必要。
       expect(await screen.findByText('感染が疑われる端末への初動対応は？')).toBeInTheDocument()
+      await skipTypewriterByKeyboard(user)
       expect(document.activeElement).toHaveTextContent('ネットワークから論理的に隔離し')
       await user.keyboard('{Enter}')
 
@@ -194,12 +229,15 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
 
     await playThroughExplorationToResolution(user)
 
+    // 選択肢はタイプライターの全文表示(またはスキップ)後にしか出ない(#64/T042)。
+    await skipTypewriterByClick(user, 'この侵入、どこから入られたと見る？')
     await user.click(
       screen.getByRole('button', {
         name: '取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)',
       }),
     )
     expect(await screen.findByText('感染が疑われる端末への初動対応は？')).toBeInTheDocument()
+    await skipTypewriterByClick(user, '感染が疑われる端末への初動対応は？')
     await user.click(
       screen.getByRole('button', {
         name: 'ネットワークから論理的に隔離し(LANケーブル抜線・Wi-Fi無効化)、電源は落とさず揮発性メモリとディスクの証拠を保全する',
@@ -283,22 +321,23 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       expect(pcHotspot).toHaveAccessibleName('経理部 中野の端末（PC）・調査済み')
 
       // --- 執務室: person(中野。単一action=即実行)。証言が会話フレーム(話者=橘固定)で表示される。 ---
+      // 「閉じる」は会話フレームのchildrenのため、タイプライターの全文表示(またはスキップ)後に
+      // しか出ない(#64/T042)。ここではタップでスキップする(見出しの証言文がスキップボタンの
+      // accessible nameになる)。
       await user.click(screen.getByRole('button', { name: '中野（人物）' }))
       expect(await screen.findAllByText('橘')).not.toHaveLength(0)
-      expect(
-        screen.getByText(
-          '「月末で請求書処理が立て込んでいて、深く確認せずに開いてしまいました」と中野は証言。ファイルを開いた際にマクロ有効化の警告が出たが、「よくあることだと思い」有効にしたという。',
-        ),
-      ).toBeInTheDocument()
+      const nakanoTestimony =
+        '「月末で請求書処理が立て込んでいて、深く確認せずに開いてしまいました」と中野は証言。ファイルを開いた際にマクロ有効化の警告が出たが、「よくあることだと思い」有効にしたという。'
+      expect(screen.getByText(nakanoTestimony)).toBeInTheDocument()
+      await skipTypewriterByClick(user, nakanoTestimony)
       await user.click(screen.getByRole('button', { name: '閉じる' }))
 
       // --- 執務室: person(経理部長。単一action=即実行)。 ---
       await user.click(screen.getByRole('button', { name: '経理部長（人物）' }))
-      expect(
-        await screen.findByText(
-          '経理部長は「今月は取引先の請求サイクルが集中する時期で、多少雑な件名のメールでも本物だと思い込みやすい状況だった」と説明。添付ファイルのマクロ実行に関する社内規程の周知は徹底されていなかったという。',
-        ),
-      ).toBeInTheDocument()
+      const buchoTestimony =
+        '経理部長は「今月は取引先の請求サイクルが集中する時期で、多少雑な件名のメールでも本物だと思い込みやすい状況だった」と説明。添付ファイルのマクロ実行に関する社内規程の周知は徹底されていなかったという。'
+      expect(await screen.findByText(buchoTestimony)).toBeInTheDocument()
+      await skipTypewriterByClick(user, buchoTestimony)
       await user.click(screen.getByRole('button', { name: '閉じる' }))
 
       // --- 執務室: book(資料棚。collectを2件持つ=1件選ぶたびにシートが閉じるため、
@@ -342,11 +381,10 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       // (card-countermeasure-isolate)も紐づいており、pickTestimonyCard は非ダミー優先の
       // ためこちらの本文が表示される(src/ui/components/explore/scene-explorer.tsx)。
       await user.click(screen.getByRole('button', { name: '情シス担当（人物）' }))
-      expect(
-        await screen.findByText(
-          '感染が疑われる端末をネットワークから論理的に隔離する(LANケーブル抜線・Wi-Fi無効化)。電源は落とさず、揮発性メモリとディスクの証拠を保全した後にIoCを抽出し、被害範囲を特定する。あわせて添付ファイルのマクロ自動実行を組織的に無効化し、標的型メールへの注意喚起を周知する。',
-        ),
-      ).toBeInTheDocument()
+      const itStaffTestimony =
+        '感染が疑われる端末をネットワークから論理的に隔離する(LANケーブル抜線・Wi-Fi無効化)。電源は落とさず、揮発性メモリとディスクの証拠を保全した後にIoCを抽出し、被害範囲を特定する。あわせて添付ファイルのマクロ自動実行を組織的に無効化し、標的型メールへの注意喚起を周知する。'
+      expect(await screen.findByText(itStaffTestimony)).toBeInTheDocument()
+      await skipTypewriterByClick(user, itStaffTestimony)
       await user.click(screen.getByRole('button', { name: '閉じる' }))
 
       // 一覧側(常に併設)でも9/9件が調査済みとして共有されている(scenes・一覧は同じ状態を共有)。

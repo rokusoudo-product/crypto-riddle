@@ -105,10 +105,15 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       personHotspot.focus()
       await user.keyboard('{Enter}')
       expect(await screen.findAllByText('橘')).not.toHaveLength(0)
-      expect(
-        screen.getByText('「昼過ぎに画面の様子がおかしくなった」と田中さんは証言した。'),
-      ).toBeInTheDocument()
-      // 証言パネルの「閉じる」ボタンへ自動的にフォーカスが移っている。
+      const tanakaTestimony = '「昼過ぎに画面の様子がおかしくなった」と田中さんは証言した。'
+      expect(screen.getByText(tanakaTestimony)).toBeInTheDocument()
+
+      // 「閉じる」は会話フレームのchildrenのため、タイプライターの全文表示(またはスキップ)後に
+      // しか出ない(#64/T042)。証言文そのものがスキップボタンのaccessible nameになるので、
+      // それをフォーカスしてEnterでキーボードのみスキップする。スキップすると children 内の
+      // 最初のフォーカス可能要素(=「閉じる」)へ自動的にフォーカスが移る(ConversationFrame側の仕様)。
+      screen.getByRole('button', { name: tanakaTestimony }).focus()
+      await user.keyboard('{Enter}')
       expect(document.activeElement).toHaveTextContent('閉じる')
       await user.keyboard('{Enter}')
       expect(
