@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-10 (T015-T017)
+updated: 2026-09-10 (#42 会話モード刷新: T014 superseded・Phase 4.5 追加)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -150,7 +150,8 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
     存在を前提にできない設計上の理由。詳細は game-store.ts のコメント)。結線テストは
     `src/ui/screens/play-flow.test.tsx` でタイトル→マップ選択→導入→探索→解決(暗号→攻撃特定→
     防衛)→結果までの正解ルートと、誤答時の follow_up 遷移・RESUME_FROM_FOLLOW_UP 復帰を確認
-- [x] **T014** カード配置インタラクション（依存: T011）
+- [x] **T014** カード配置インタラクション（依存: T011）〔**⚠️ superseded by #42 / Phase 4.5**〕
+  - **2026-09-10 廃止決定（#42・T018 プレイテスト）**: 解決パートは会話モード（選択肢方式）へ刷新され、カード配置ボード（dnd-kit）と `judgeCardSelection` は廃止する。本タスクの成果物は Phase 4.5（T031/T033）で置き換える。以下は履歴として残す。
   - dnd-kit で**タップ配置を第一操作**・ドラッグは補助（WCAG 2.5.1/2.5.7、plan §1）のカード組合せ UI
   - 完了条件: タップのみ・キーボードのみの両方でカード配置が完遂できる
   - **完了（2026-09-10）**: `src/ui/components/card-placement-board.tsx`(`src/ui/hooks/use-card-placement.ts`
@@ -207,9 +208,45 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 **チェックポイント③**: 縦スライス承認。これが量産の物差しになる
 
+- **達成（2026-09-10・#42）**: T018 プレイテストの結果、解決パートを**会話モード**へ刷新する方針が代表決定。縦スライスとしては承認されたが、量産の物差し（解決パートのUI・データ形式）が変わるため、量産前に **Phase 4.5** を挟む。
+
+---
+
+## Phase 4.5: 解決パートの会話モード刷新（#42）= 縦スライスの作り直し
+
+> T018 プレイテスト（2026-09-10）の代表フィードバックによる設計変更。詳細は spec §8（会話モード）・DESIGN.md「会話フレーム」・plan §5。
+> 本フェーズの各タスクは **#42 の PR（本ドキュメント改訂）が代表マージされた後**、実装 Issue に分解して起票する（`ready` は代表付与 → Sonnet 実装。委譲時「**スキーマ差分は commit 前に報告して停止**」を条件化）。
+> 確定仕様（#42・2026-09-10 代表決定）: 選択肢は問いごと2〜3択／問い単位で単一解・厳密一致／誤答は「その場合だと〜」で再挑戦し外すたび解説が深まる（教育的失敗を統合＝⑥失敗解説画面は廃止）／相談はマップ単位3回／手持ちカードは会話中いつでも無料閲覧／誤答1回・相談1回ごとに獲得XPを減算（下限あり）。
+
+- [ ] **T030** 解決スキーマの会話モード化（依存: T006）
+  - `src/core/model/scenario.ts` の `resolution` を「`cipher_stages`（維持）＋ `questions[]`」へ改訂。各 `question` = 問い文・`subject_tag`・`choices[]`（2〜3個。各 `text`／`is_correct`／誤答時 `reply`）・段階解説（外すたび深まる）・相談用詳細ヒント。旧 `attack_identification`／`countermeasure`（`required_card_ids`）は questions へ統合して削除。**`schema_version` 0.2.0 → 0.3.0**
+  - 完了条件: 新スキーマの zod 単体テスト（正常系・境界・不正 reject）。問いに正解の選択肢がちょうど1つ、の制約を含む
+- [ ] **T031** 選択肢判定エンジン（依存: T030）
+  - `src/core/judge/` に選択肢判定（問い単位で単一解・厳密一致）を追加し、`judgeCardSelection` を廃止（暗号判定・正規化は維持）
+  - 完了条件: 判定のテーブル駆動テストが通り、旧 `judgeCardSelection` の参照が消えている
+- [ ] **T032** ステートマシン改訂（依存: T030, T031）
+  - `src/core/scenario/state.ts` を「（暗号→）問い列を順に出題→全問正答でクリア」に改訂。誤答は選択肢を残したまま `reply`＋深まる解説を返す。相談カウンタ（マップ3回）を状態に持つ
+  - 完了条件: 出題順・誤答再挑戦・相談上限・クリアの単体テストが通る
+- [ ] **T033** 会話フレーム＋会話モードUI（依存: T011, T032。dnd-kit 削除）
+  - DESIGN.md「会話フレーム」（下部会話ウィンドウ・中央左右立ち絵・非発話側グレーアウト＋名札）を共通コンポーネント化。解決画面に選択肢ボタン（各48px・キーボード完遂）・相談ボタン（残数表示）・手持ちカードドロワー（無料閲覧）を載せる。`card-placement-board.tsx` と `@dnd-kit/*` 依存を削除
+  - 完了条件: キーボードのみで回答・相談・カード閲覧・クリアまで完遂できる結線テストが通る
+- [ ] **T034** XP減算・試行記録（依存: T032, T009）
+  - 誤答1回・相談1回ごとに獲得XPを減算（下限あり）。SaveData に解答試行・相談回数を記録し結果画面に反映。⑥失敗解説画面を廃止し会話内解説へ統合
+  - 完了条件: 減算ロジックと下限、SaveData 反映の単体テストが通る
+- [ ] **T035** S1・s0 を会話モードへ移植（依存: T030。関連: T015）
+  - `scenarios/s1-targeted-email-intrusion.yaml` を questions 形式へ書き換え（起点→初動の2問。教育的失敗＝電源断おとりを誤答 `reply`＋深まる解説へ移植）。`scenarios/s0-sample.yaml` も追随。データは本2本のみを同時移行（移行関数は持たない）
+  - 完了条件: 両 YAML が新スキーマの zod 検証を通過し、`npm run build:data` が成功する
+- [ ] **T036** 結線・E2E の更新（依存: T033, T034, T035。関連: T016, T017）
+  - `src/ui/screens/s1-play-flow.test.tsx`・`e2e/s1-playthrough.spec.ts` を会話モードへ更新（正解ルート＋誤答で深まる解説＋相談）。旧カード配置テスト（`card-placement-board.test.tsx` 等）を削除
+  - 完了条件: Vitest・Playwright E2E が CI で安定して通る
+
+**チェックポイント③'**: 会話モードで S1 を通しプレイでき、代表が量産可と再確認する
+
 ---
 
 ## Phase 5: マップ量産（plan §11-5）= プロダクション
+
+> **⚠️ 量産ゲート（#42）**: Phase 5 は **Phase 4.5（会話モードの schema・UI）が main にマージされるまで着手しない**。旧フォーマット（カード配置・`required_card_ids`）で書いたシナリオは全て書き直しになるため、量産は会話モードの schema 0.3.0 確定後に開始する。
 
 - [ ] **T019** S2 制作（依存: T018、**Issue #6**: フォーマット確定後に個別 Issue を切り出して進める）
 - [ ] **T020** S3 制作（依存: T019 と同条件）
@@ -262,11 +299,13 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 |---|---|---|---|
 | [#3](https://github.com/rokusoudo-product/crypto-riddle/issues/3) シナリオ記述フォーマット（zod/YAML） | closed（完了・PR #19、2026-08-07） | **T005・T006・T010** | 成果物: `schemas/scenario.schema.json`（暫定, T005で削除済み）・`scenarios/s0-sample.yaml`・`legal/laws_sample.yaml`・`scripts/validate_scenarios.py`（T010で削除済み）・`docs/scenario_schema.md` |
 | [#4](https://github.com/rokusoudo-product/crypto-riddle/issues/4) 用語カードマスタ＋習得機構 | closed（完了・PR #20、2026-08-07） | **T023**（T024 が後続） | 成果物: `schemas/term_card.schema.json`/`schemas/quiz_misuse.schema.json`（暫定, T005で削除済み）・`terms/terms_core.yaml`（45語）・`terms/quiz_misuse_sample.yaml`・`scripts/validate_terms.py`（T010で削除済み）・`docs/term_cards.md` |
-| [#5](https://github.com/rokusoudo-product/crypto-riddle/issues/5) シナリオS1完全版 | future | **T015**（T016〜T018 が後続） | #3 確定が前提。#14 の出典規則も前提 |
+| [#5](https://github.com/rokusoudo-product/crypto-riddle/issues/5) シナリオS1完全版 | closed（完了・PR #40、2026-09-10） | **T015・T016・T017**（T018 で会話モード刷新を決定） | 成果物: `scenarios/s1-targeted-email-intrusion.yaml`・S1 縦スライス。解決パートは #42（Phase 4.5・T035）で会話モードへ移植 |
 | [#6](https://github.com/rokusoudo-product/crypto-riddle/issues/6) S2-S8 バックログ | future | **T019〜T021** | フォーマット確定後に個別 Issue 切り出し。MVP は計4本 |
 | [#13](https://github.com/rokusoudo-product/crypto-riddle/issues/13) カラートークン AA 実測 | future | **T012** に合流 | 採用時は T012 の完了条件に AA 実測値の確定を含める |
 | [#14](https://github.com/rokusoudo-product/crypto-riddle/issues/14) IPA 過去問の出典表記規則 | future | **T015 の前提** | 採用時は T015 より先に完了させる |
 | [#22](https://github.com/rokusoudo-product/crypto-riddle/issues/22) 分野タグ（subject_tags）の値集合統一 | proposal（本 PR マージで closed 予定・`Closes #22`） | **T005**（zod 移行と同時実施） | 案2（7種に統一・`ネットワーク基盤`を正式採用）を採用。決定理由は `specs/001-mvp/spec.md` §9 に記載。値集合の正本は `src/core/model/tags.ts` |
+| [#42](https://github.com/rokusoudo-product/crypto-riddle/issues/42) 解決パートを会話モードに刷新 | future（本ドキュメント改訂 PR。マージ後に実装 Issue へ分解） | **T014 を supersede**・**Phase 4.5（T030〜T036）** | T018 プレイテスト由来。spec §8＝会話モード。実装 Issue は #42 マージ後に起票（`ready` は代表付与） |
+| [#41](https://github.com/rokusoudo-product/crypto-riddle/issues/41) タイトル CTA が実セーブ状態と未接続 | bug + question（代表回答待ち） | 別途（Phase 7 の a11y/仕上げ候補） | T018 プレイテスト由来。会話モードとは独立 |
 
 ## 依存関係の要約
 
@@ -275,7 +314,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   状態は解消されている。T005 の完了により T006・T010 も着手可能になり、**T007〜T009 も完了した
   （2026-09-10）ことで Phase 2 が完了し、チェックポイント②を達成した**
 - Phase 3（T011, T012, T014）は T001 のみに依存し、**Phase 2 と並行で進められる**
-- Phase 4 で Phase 2/3 が合流して縦スライス。**T018（代表プレイテスト）が量産の関門**
+- Phase 4 で Phase 2/3 が合流して縦スライス。T018（代表プレイテスト）で**会話モードへの刷新（#42）が決定**したため、**Phase 4.5（会話モード）を挟んでから量産（Phase 5）に入る**。Phase 5 は Phase 4.5 の main マージが関門
 - 自動実装（po-agent-daily-issue-check）に乗せる場合も、【代表】タスク（T004・T018・T029）は必ず代表操作で行う
 
 ## 実装戦略
