@@ -23,7 +23,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { SaveData } from '@/core/model'
 import type { SaveStorage } from '@/core/save'
 import { AppRoutes } from '@/ui/routes'
-import { resetGameStoreForTests } from '@/ui/store/game-store'
+import { resetGameStoreForTests, useGameStore } from '@/ui/store/game-store'
 import {
   CLEAR_XP_REWARD,
   CONSULT_XP_PENALTY,
@@ -228,4 +228,136 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       }
     })
   })
+})
+
+// Issue #57/T041: S1 に投入した実データの scenes(執務室／サーバ室)を、一覧ではなく
+// 背景シーンのホットスポット経由だけで探索できることを確認する(データ投入(#57/T040)と
+// 探索UI(#56/T038)の結線)。既存の「S1 通しプレイ」(上記 describe)は一覧側の「調査する」
+// ボタンのみを使うため、scenes 実データの結線はこのテストでしか確認できない。
+describe('S1「標的型メールからの侵入」背景シーン経由の探索(#57/T041)', () => {
+  let storage: InMemorySaveStorage
+
+  beforeEach(() => {
+    storage = new InMemorySaveStorage()
+    resetGameStoreForTests({ storage })
+  })
+
+  it(
+    '背景シーンのホットスポットのみで全9ポイントを調査でき、PCのdangerは教育的FBのみ' +
+      '(XP減算なし・ペナルティ無し)・電源を落とした後も操作継続できる(詰み防止・spec §8.4)',
+    async () => {
+      const user = userEvent.setup()
+      renderApp()
+
+      await user.click(screen.getByRole('link', { name: 'つづきから' }))
+      await user.click(await screen.findByRole('button', { name: 'マップを選ぶ' }))
+      await user.click(await screen.findByRole('button', { name: 'タップで進行' }))
+      expect(await screen.findByRole('heading', { name: '探索' })).toBeInTheDocument()
+
+      // 執務室／サーバ室の2シーンタブが表示される(既定は執務室)。
+      expect(screen.getByRole('tab', { name: '執務室' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('tab', { name: 'サーバ室' })).toBeInTheDocument()
+
+      // --- 執務室: PC(経理部 中野の端末。collect/danger/noopの3action=アクションシート) ---
+      const pcHotspot = screen.getByRole('button', { name: '経理部 中野の端末（PC）' })
+      await user.click(pcHotspot)
+      expect(
+        await screen.findByRole('group', { name: '経理部 中野の端末の操作' }),
+      ).toBeInTheDocument()
+
+      // dangerを先に選ぶ: 教育的フィードバックのみが表示され、シートは閉じない(詰み防止)。
+      // coreのprogressは参照レベルで完全に不変(=XP等への影響が一切無い)ことも確認する。
+      const progressBeforeDanger = useGameStore.getState().progress
+      await user.click(screen.getByRole('button', { name: '感染端末の電源を落とす' }))
+      expect(await screen.findByText(/揮発性メモリの証拠が消えてしまいます/)).toBeInTheDocument()
+      expect(screen.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeInTheDocument()
+      expect(useGameStore.getState().progress).toBe(progressBeforeDanger)
+
+      // 電源を落とした後も同じホットスポットを操作できる(詰み防止)。EDRログをcollectする。
+      await user.click(screen.getByRole('button', { name: 'EDRアラートを確認する' }))
+      await waitFor(() => {
+        expect(
+          screen.queryByRole('group', { name: '経理部 中野の端末の操作' }),
+        ).not.toBeInTheDocument()
+      })
+      expect(pcHotspot).toHaveAccessibleName('経理部 中野の端末（PC）・調査済み')
+
+      // --- 執務室: person(中野。単一action=即実行)。証言が会話フレーム(話者=橘固定)で表示される。 ---
+      await user.click(screen.getByRole('button', { name: '中野（人物）' }))
+      expect(await screen.findAllByText('橘')).not.toHaveLength(0)
+      expect(
+        screen.getByText(
+          '「月末で請求書処理が立て込んでいて、深く確認せずに開いてしまいました」と中野は証言。ファイルを開いた際にマクロ有効化の警告が出たが、「よくあることだと思い」有効にしたという。',
+        ),
+      ).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: '閉じる' }))
+
+      // --- 執務室: person(経理部長。単一action=即実行)。 ---
+      await user.click(screen.getByRole('button', { name: '経理部長（人物）' }))
+      expect(
+        await screen.findByText(
+          '経理部長は「今月は取引先の請求サイクルが集中する時期で、多少雑な件名のメールでも本物だと思い込みやすい状況だった」と説明。添付ファイルのマクロ実行に関する社内規程の周知は徹底されていなかったという。',
+        ),
+      ).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: '閉じる' }))
+
+      // --- 執務室: book(資料棚。collectを2件持つ=1件選ぶたびにシートが閉じるため、
+      //     2回に分けて開き直して両方collectする)。 ---
+      await user.click(screen.getByRole('button', { name: '資料棚（書籍）' }))
+      expect(await screen.findByRole('group', { name: '資料棚の操作' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'セキュリティ注意喚起情報を確認する' }))
+      await waitFor(() => {
+        expect(screen.queryByRole('group', { name: '資料棚の操作' })).not.toBeInTheDocument()
+      })
+      await user.click(screen.getByRole('button', { name: '資料棚（書籍）' }))
+      expect(await screen.findByRole('group', { name: '資料棚の操作' })).toBeInTheDocument()
+      await user.click(
+        screen.getByRole('button', { name: 'インシデント対応ガイドラインを確認する' }),
+      )
+      await waitFor(() => {
+        expect(screen.queryByRole('group', { name: '資料棚の操作' })).not.toBeInTheDocument()
+      })
+      expect(screen.getByRole('button', { name: '資料棚（書籍）・調査済み' })).toBeInTheDocument()
+
+      // --- サーバ室へシーンタブを切り替える。 ---
+      await user.click(screen.getByRole('tab', { name: 'サーバ室' }))
+      expect(screen.getByRole('tab', { name: 'サーバ室' })).toHaveAttribute('aria-selected', 'true')
+
+      // device(プロキシサーバ・メールサーバ。単一action=即実行)。
+      await user.click(screen.getByRole('button', { name: 'プロキシサーバ（機器）' }))
+      expect(
+        screen.getByRole('button', { name: 'プロキシサーバ（機器）・調査済み' }),
+      ).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'メールサーバ（機器）' }))
+      expect(
+        screen.getByRole('button', { name: 'メールサーバ（機器）・調査済み' }),
+      ).toBeInTheDocument()
+
+      // pc(解析用端末。単一action=即実行。dangerは無いのでシートを経由せずcollectのみ)。
+      await user.click(screen.getByRole('button', { name: '解析用端末（PC）' }))
+      expect(screen.getByRole('button', { name: '解析用端末（PC）・調査済み' })).toBeInTheDocument()
+
+      // person(情シス担当。単一action=即実行)。証言が会話フレームで表示される。
+      // ip-witness-itstaff には証言カード(is_dummy:true)のほか非ダミーの対策カード
+      // (card-countermeasure-isolate)も紐づいており、pickTestimonyCard は非ダミー優先の
+      // ためこちらの本文が表示される(src/ui/components/explore/scene-explorer.tsx)。
+      await user.click(screen.getByRole('button', { name: '情シス担当（人物）' }))
+      expect(
+        await screen.findByText(
+          '感染が疑われる端末をネットワークから論理的に隔離する(LANケーブル抜線・Wi-Fi無効化)。電源は落とさず、揮発性メモリとディスクの証拠を保全した後にIoCを抽出し、被害範囲を特定する。あわせて添付ファイルのマクロ自動実行を組織的に無効化し、標的型メールへの注意喚起を周知する。',
+        ),
+      ).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: '閉じる' }))
+
+      // 一覧側(常に併設)でも9/9件が調査済みとして共有されている(scenes・一覧は同じ状態を共有)。
+      expect(screen.getByText('9/9 件調査済み')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: '調査する' })).not.toBeInTheDocument()
+
+      // 背景シーン経由だけで「解決へ進む」が活性化し、解決パートへ遷移できる。
+      const enterResolution = screen.getByRole('button', { name: '解決へ進む' })
+      expect(enterResolution).toBeEnabled()
+      await user.click(enterResolution)
+      expect(await screen.findByRole('heading', { name: '解決' })).toBeInTheDocument()
+    },
+  )
 })

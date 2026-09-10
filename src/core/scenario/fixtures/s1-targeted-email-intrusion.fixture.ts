@@ -117,6 +117,130 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
       description: 'マルウェア感染時の初動対応の手順を確認する。',
     },
   ],
+  scenes: [
+    {
+      id: 'scene-office',
+      title: '執務室',
+      background: 'bg-s1-office',
+      hotspots: [
+        {
+          object_type: 'pc',
+          position: [0.4, 0.68],
+          label: '経理部 中野の端末',
+          actions: [
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-edr-alert',
+              label: 'EDRアラートを確認する',
+            },
+            {
+              kind: 'danger',
+              label: '感染端末の電源を落とす',
+              feedback:
+                '橘「ここで電源を落とすと、動作中のプロセスや通信先の情報が乗った揮発性メモリの証拠が消えてしまいます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全してください。」',
+            },
+            { kind: 'noop', label: '今は触らない' },
+          ],
+        },
+        {
+          object_type: 'person',
+          position: [0.47, 0.42],
+          label: '中野',
+          actions: [
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-witness-nakano',
+              label: '中野に話を聞く',
+            },
+          ],
+        },
+        {
+          object_type: 'person',
+          position: [0.87, 0.6],
+          label: '経理部長',
+          actions: [
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-witness-manager',
+              label: '経理部長に話を聞く',
+            },
+          ],
+        },
+        {
+          object_type: 'book',
+          position: [0.6, 0.16],
+          label: '資料棚',
+          actions: [
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-reference-advisory',
+              label: 'セキュリティ注意喚起情報を確認する',
+            },
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-reference-guideline',
+              label: 'インシデント対応ガイドラインを確認する',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: 'scene-server',
+      title: 'サーバ室',
+      background: 'bg-s1-server',
+      hotspots: [
+        {
+          object_type: 'device',
+          position: [0.18, 0.45],
+          label: 'プロキシサーバ',
+          actions: [
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-proxy-log',
+              label: 'プロキシログを確認する',
+            },
+          ],
+        },
+        {
+          object_type: 'device',
+          position: [0.82, 0.45],
+          label: 'メールサーバ',
+          actions: [
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-mail-log',
+              label: 'メールサーバのログを確認する',
+            },
+          ],
+        },
+        {
+          object_type: 'pc',
+          position: [0.5, 0.55],
+          label: '解析用端末',
+          actions: [
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-sandbox-analysis',
+              label: 'サンドボックスでの検体解析結果を確認する',
+            },
+          ],
+        },
+        {
+          object_type: 'person',
+          position: [0.5, 0.8],
+          label: '情シス担当',
+          actions: [
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-witness-itstaff',
+              label: '情シス担当に話を聞く',
+            },
+          ],
+        },
+      ],
+    },
+  ],
   cards: [
     {
       id: 'card-proxy-c2',
