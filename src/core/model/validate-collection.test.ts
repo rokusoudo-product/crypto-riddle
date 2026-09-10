@@ -15,7 +15,7 @@ import {
 
 function baseScenario(overrides: Partial<Scenario> = {}): Scenario {
   return {
-    schema_version: '0.3.0',
+    schema_version: '0.4.0',
     id: 's0-sample',
     title: 'サンプル',
     subject_tags: ['認証'],

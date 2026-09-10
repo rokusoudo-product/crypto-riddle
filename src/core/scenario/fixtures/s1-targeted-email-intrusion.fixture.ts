@@ -15,7 +15,7 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const s1TargetedEmailIntrusionFixture: Scenario = {
-  schema_version: '0.3.0',
+  schema_version: '0.4.0',
   id: 's1-targeted-email-intrusion',
   title: '標的型メールからの侵入',
   status: 'reviewed',

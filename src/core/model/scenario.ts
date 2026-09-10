@@ -5,8 +5,9 @@
 // （#22/#24 対応 PR 本文に理由を記載）。
 //
 // 単一シナリオ内で完結する参照整合性（card id 重複禁止・investigation_point_id の実在・
-// investigation_point に紐づく card の存在）は superRefine でここに集約し、
-// 旧 scripts/validate_scenarios.py の validate_scenario_semantics 相当を zod 側で担保する
+// investigation_point に紐づく card の存在・scenes 内の collect action と investigation_point の
+// 1対1対応）は superRefine でここに集約し、旧 scripts/validate_scenarios.py の
+// validate_scenario_semantics 相当を zod 側で担保する
 // （会話モード（#42/T030）移行後は「問いの正解がちょうど1つ」は questionChoicesSchema の refine 側）。
 // ファイル名と id の一致、legal_refs の実在（legal/*.yaml は別ファイルのため cross-file）等、
 // 複数ファイルにまたがる整合性チェックは src/core/model/validate-collection.ts に分離する。
@@ -22,7 +23,11 @@ import { uniqueArraySchema } from './util.ts'
 // 「会話の中で問いに2〜3択で答える会話モード」（resolution.questions[]）へ刷新した破壊的変更。
 // 旧 attack_identification/countermeasure/wrong_answer_follow_ups は questions[] へ統合して削除した。
 // 詳細は spec.md §8・docs/scenario_schema.md §2.4。
-export const scenarioSchemaVersionSchema = z.literal('0.3.0')
+// 0.4.0（T037, 2026-09-10, #52/#55）: 探索を「背景シーン＋クリック可能オブジェクト」にする省略可能な
+// scenes[] を追加。investigation_points(カードの出所・3系統)は正のまま維持し、scenes は表示層として
+// 追加しただけの後方互換な拡張(省略時は一覧表示にフォールバック)。詳細は spec.md §7.1・
+// docs/scenario_schema.md §2.5。
+export const scenarioSchemaVersionSchema = z.literal('0.4.0')
 
 /** マップID。ファイル名(拡張子除く)と一致させる（実在チェックは validate-collection.ts）。 */
 export const scenarioIdSchema = z.string().regex(/^[a-z][a-z0-9_-]*$/)
@@ -116,6 +121,74 @@ export const cardSchema = z
   })
   .strict()
 export type Card = z.infer<typeof cardSchema>
+
+// 探索の背景シーン(#52・T037、docs/scenario_schema.md §2.5)。省略可能な表示層。
+// investigation_points(カードの出所の正)は変えず、scenes は「背景アセット＋クリック可能な
+// ホットスポット」で探索④の見せ方を差し替えるだけの拡張。省略時は一覧表示にフォールバックする。
+export const sceneIdSchema = slugIdSchema
+
+/** ホットスポットの対象種別(spec §7.1・DESIGN.md「探索シーン」節でこの4種に固定)。 */
+export const hotspotObjectTypeSchema = z.enum(['pc', 'person', 'book', 'device'])
+export type HotspotObjectType = z.infer<typeof hotspotObjectTypeSchema>
+
+/** 背景画像に対する相対座標(0〜1)。[x, y] の2要素タプル。 */
+export const hotspotPositionSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])
+export type HotspotPosition = z.infer<typeof hotspotPositionSchema>
+
+// ホットスポットのアクションは kind を判別子とする discriminated union にする(docs/scenario_schema.md §2.5)。
+// - collect: investigation_point_id を参照してカードを獲得する(1オブジェクトが複数ポイントを
+//   束ねられる。hotspot→point は 1:N。例: 1台のPCにメールログとEDRの2点)。
+// - danger: 電源を落とす等の危険な選択肢。feedback は教育的な台詞のみを返し、ペナルティなし・
+//   操作継続可(詰み防止, spec §8.4)。
+// - noop: 何も起きない選択肢。
+const collectHotspotActionSchema = z
+  .object({
+    kind: z.literal('collect'),
+    investigation_point_id: investigationPointIdSchema,
+    label: z.string().min(1),
+  })
+  .strict()
+const dangerHotspotActionSchema = z
+  .object({
+    kind: z.literal('danger'),
+    label: z.string().min(1),
+    feedback: z.string().min(1),
+  })
+  .strict()
+const noopHotspotActionSchema = z
+  .object({
+    kind: z.literal('noop'),
+    label: z.string().min(1),
+  })
+  .strict()
+export const hotspotActionSchema = z.discriminatedUnion('kind', [
+  collectHotspotActionSchema,
+  dangerHotspotActionSchema,
+  noopHotspotActionSchema,
+])
+export type HotspotAction = z.infer<typeof hotspotActionSchema>
+
+export const sceneHotspotSchema = z
+  .object({
+    object_type: hotspotObjectTypeSchema,
+    position: hotspotPositionSchema,
+    label: z.string().min(1),
+    actions: z.array(hotspotActionSchema).min(1),
+  })
+  .strict()
+export type SceneHotspot = z.infer<typeof sceneHotspotSchema>
+
+export const sceneSchema = z
+  .object({
+    id: sceneIdSchema,
+    title: z.string().min(1),
+    // 背景アセットID(DESIGN.md「アセット」節)。image_agent 自作の16:9背景を指す。YAML に
+    // パスを直書きしない(docs/scenario_schema.md §2.5)ため、単なる文字列IDとして扱う。
+    background: z.string().min(1),
+    hotspots: z.array(sceneHotspotSchema).min(1),
+  })
+  .strict()
+export type Scene = z.infer<typeof sceneSchema>
 
 // 暗号解読ミニゲーム1段分。MVP は caesar(シーザー暗号)の1種のみ(#3 代表回答)。
 // 判別可能 union にしておくことで、将来 base64/xor/hash_match 等を追加する際は
@@ -225,6 +298,9 @@ const scenarioObjectSchema = z
     intro: introSchema,
     investigation_points: z.array(investigationPointSchema).min(1),
     cards: z.array(cardSchema).min(1),
+    // 探索の背景シーン(#52・T037)。省略可能な表示層。省略時は一覧表示にフォールバックし、
+    // superRefine の scenes 整合性チェックも行わない(docs/scenario_schema.md §2.5)。
+    scenes: z.array(sceneSchema).optional(),
     resolution: resolutionSchema,
   })
   .strict()
@@ -290,6 +366,52 @@ export const scenarioSchema = scenarioObjectSchema.superRefine((data, ctx) => {
   // (#42/T030)で選択肢が自由記述(questionChoiceSchema)になったことに伴い不要になった。
   // 「正解の選択肢がちょうど1つ」の検証は questionChoicesSchema の refine に移した
   // (docs/scenario_schema.md §7.1 の4/5・§2.4 参照)。
+
+  // scenes(#52・T037、docs/scenario_schema.md §2.5)の整合性チェック。scenes 省略時(一覧表示
+  // フォールバック)は行わない。
+  if (data.scenes) {
+    const collectCountByPointId = new Map<string, number>()
+    for (const pointId of pointIds) collectCountByPointId.set(pointId, 0)
+
+    data.scenes.forEach((scene, sceneIndex) => {
+      scene.hotspots.forEach((hotspot, hotspotIndex) => {
+        hotspot.actions.forEach((action, actionIndex) => {
+          if (action.kind !== 'collect') return
+          if (!pointIds.has(action.investigation_point_id)) {
+            ctx.addIssue({
+              code: 'custom',
+              message: `scene '${scene.id}' の collect action が参照する investigation_point_id '${action.investigation_point_id}' が investigation_points に存在しません。`,
+              path: [
+                'scenes',
+                sceneIndex,
+                'hotspots',
+                hotspotIndex,
+                'actions',
+                actionIndex,
+                'investigation_point_id',
+              ],
+            })
+            return
+          }
+          collectCountByPointId.set(
+            action.investigation_point_id,
+            (collectCountByPointId.get(action.investigation_point_id) ?? 0) + 1,
+          )
+        })
+      })
+    })
+
+    data.investigation_points.forEach((point, index) => {
+      const count = collectCountByPointId.get(point.id) ?? 0
+      if (count !== 1) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `investigation_point '${point.id}' は scenes 内の collect action からちょうど1回参照される必要がありますが、${count}回参照されています。`,
+          path: ['investigation_points', index],
+        })
+      }
+    })
+  }
 })
 
 export type Scenario = z.infer<typeof scenarioSchema>

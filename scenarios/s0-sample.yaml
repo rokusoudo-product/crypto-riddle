@@ -9,7 +9,7 @@
 #   イラスト用の創作であり、代表監修前の制作素材としては扱わないこと。
 # - src/core/model/scenario.ts (zod, T005) に準拠する。`npm run build:data` で検証できる。
 
-schema_version: "0.3.0"
+schema_version: "0.4.0"
 id: s0-sample
 title: アルファテック社 顧客データ流出事件(スキーマサンプル)
 status: sample
