@@ -5,8 +5,8 @@
 // フィクスチャファイルのコメント参照。要約: scripts/build-data.ts の runBuild を src/core/ の
 // テストから import すると Node 専用コードが tsconfig.app.json のプログラムに取り込まれ
 // `npm run typecheck` が壊れるため、内容を写した純粋 TypeScript リテラルを使う)を使い、
-// 導入→探索(カード獲得)→解決(暗号解読→攻撃特定→防衛策、判定)→クリア→セーブ→読込復元
-// を一周させる。UI(src/ui/)は一切使わない。
+// 導入→探索(カード獲得)→解決(暗号解読→会話モードの問い列、判定)→クリア→セーブ→読込復元
+// を一周させる(#42/T032 で会話モードへ改訂)。UI(src/ui/)は一切使わない。
 import { describe, expect, it } from 'vitest'
 
 import { judgeCipherStage } from './judge/index.ts'
@@ -48,35 +48,33 @@ describe('チェックポイント②: シナリオを読み込み→判定→�
     const [cipherStage] = scenario.resolution.cipher_stages
     expect(judgeCipherStage(cipherStage, cipherStage.plaintext)).toBe(true)
 
-    // まず誤答してフォロー分岐(失敗解説)を経由し、「初動をやり直す」で復帰できることも
-    // ここで一周させて確認する(T007 完了条件の誤答フォロー分岐が実データでも動くことの確認)。
+    // まず誤答しても選択肢(この場合は入力欄)は残り、cipher ステージに留まったまま
+    // 再挑戦できることをここで一周させて確認する(会話モード, #42/T032)。
     const wrongCipher = scenarioReducer(scenario, state, {
       type: 'SUBMIT_CIPHER_ANSWER',
       answer: 'これは不正解です',
     })
-    expect(wrongCipher.part).toBe('follow_up')
-    expect(wrongCipher.pendingFollowUp?.trigger).toBe('cipher')
-    state = scenarioReducer(scenario, wrongCipher, { type: 'RESUME_FROM_FOLLOW_UP' })
-    expect(state.resolutionStage).toBe('cipher')
+    expect(wrongCipher.part).toBe('resolution')
+    expect(wrongCipher.resolutionStage).toBe('cipher')
+    expect(wrongCipher.lastAnswerFeedback?.correct).toBe(false)
 
-    state = scenarioReducer(scenario, state, {
+    state = scenarioReducer(scenario, wrongCipher, {
       type: 'SUBMIT_CIPHER_ANSWER',
       answer: cipherStage.plaintext,
     })
-    expect(state.resolutionStage).toBe('attack_identification')
+    expect(state.resolutionStage).toBe('question')
+    expect(state.questionIndex).toBe(0)
 
-    // --- 解決: 攻撃手段の特定 ---
-    state = scenarioReducer(scenario, state, {
-      type: 'SUBMIT_ATTACK_IDENTIFICATION',
-      cardIds: scenario.resolution.attack_identification.required_card_ids,
-    })
-    expect(state.resolutionStage).toBe('countermeasure')
-
-    // --- 解決: 防衛策の選択 ---
-    state = scenarioReducer(scenario, state, {
-      type: 'SUBMIT_COUNTERMEASURE',
-      cardIds: scenario.resolution.countermeasure.required_card_ids,
-    })
+    // --- 解決: 会話モードの問い列に順に正答する(#42/T032) ---
+    for (let i = 0; i < scenario.resolution.questions.length; i++) {
+      const question = scenario.resolution.questions[i]
+      const correctIndex = question.choices.findIndex((c) => c.is_correct)
+      expect(correctIndex).toBeGreaterThanOrEqual(0)
+      state = scenarioReducer(scenario, state, {
+        type: 'SUBMIT_QUESTION_ANSWER',
+        choiceIndex: correctIndex,
+      })
+    }
     expect(state.part).toBe('clear')
 
     // --- セーブ ---

@@ -1,12 +1,13 @@
-// src/core/judge — 単一解・厳密一致判定＋正規化（T008、spec §8.2、plan.md §3）。
+// src/core/judge — 単一解・厳密一致判定＋正規化（T008/T031、spec §8.2、plan.md §3）。
 //
-// spec §8.2 決定「MVP は単一解・厳密一致」に対応する2種類の判定を提供する:
+// spec §8.2 決定「MVP は単一解・厳密一致」に対応する判定を提供する:
 //   1. judgeTextAnswer: 文字列回答(暗号解読の答え等)。normalizeAnswer で正規化してから比較する。
-//   2. judgeCardSelection: カードID照合(解決パートのスロット判定＝攻撃特定・防衛策選択)。
-//      正解カードID集合と選択カードID集合が完全一致(過不足なし)する場合のみ正解とする。
+//   2. judgeQuestionChoice: 会話モード(#42/T030)の問い単位の選択肢判定。
+//      旧 judgeCardSelection(カードID集合の完全一致判定)は required_card_ids 方式の廃止に伴い削除した
+//      (#42/T031。選択肢が自由記述の questions[].choices になったため、カードID照合は不要)。
 //
 // core/ は React および src/ui/ を import してはならない（plan.md §2、advisor 承認条件）。
-import type { CipherStage } from '../model/index.ts'
+import type { CipherStage, Question, QuestionChoice } from '../model/index.ts'
 
 import { normalizeAnswer } from './normalize.ts'
 
@@ -16,22 +17,31 @@ export { normalizeAnswer } from './normalize.ts'
 
 /**
  * 文字列回答の厳密一致判定(正規化後)。暗号解読の答え・攻撃名の自由記述回答等に使う。
- * カードID照合には judgeCardSelection を使うこと(意味が異なるため関数を分ける)。
  */
 export function judgeTextAnswer(submitted: string, expected: string): boolean {
   return normalizeAnswer(submitted) === normalizeAnswer(expected)
 }
 
+export interface QuestionChoiceJudgement {
+  /** 選択された choice が正解(is_correct: true)だったか。 */
+  correct: boolean
+  /** 選択された choice そのもの(reply 等の表示に使う)。 */
+  choice: QuestionChoice
+}
+
 /**
- * カードID選択の厳密一致判定(spec §8.2)。順序を問わず、過不足のない完全一致のみ正解とする
- * (部分点・複数正解ルートは見送り、#7 代表決定)。カードIDは正規化して比較する(表記ゆれ対策)。
+ * 会話モード(#42/T030)の問い単位判定(spec §8.2「問い単位で単一解・厳密一致」)。
+ * `choiceIndex` は `question.choices` のインデックス。範囲外は不正な入力として例外を投げる
+ * (呼び出し側の src/core/scenario/state.ts が事前に範囲チェックしてから呼ぶ想定)。
  */
-export function judgeCardSelection(submittedCardIds: string[], requiredCardIds: string[]): boolean {
-  const normalize = (ids: string[]) => [...new Set(ids.map((id) => normalizeAnswer(id)))].sort()
-  const submitted = normalize(submittedCardIds)
-  const required = normalize(requiredCardIds)
-  if (submitted.length !== required.length) return false
-  return submitted.every((id, index) => id === required[index])
+export function judgeQuestionChoice(question: Question, choiceIndex: number): QuestionChoiceJudgement {
+  const choice = question.choices[choiceIndex]
+  if (!choice) {
+    throw new Error(
+      `question '${question.id}' に choiceIndex=${choiceIndex} の選択肢がありません(choices.length=${question.choices.length})。`,
+    )
+  }
+  return { correct: choice.is_correct, choice }
 }
 
 /**

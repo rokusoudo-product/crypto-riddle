@@ -31,7 +31,6 @@ import {
   quizMisuseFileSchema,
   scenarioSchema,
   termsFileSchema,
-  warnScenariosMissingCountermeasureDummy,
   type LawEntry,
   type MisuseQuizItem,
   type NamedFile,
@@ -131,11 +130,8 @@ export async function runBuild(rootDir: string = REPO_ROOT): Promise<BuildResult
   }
   errors.push(...checkScenarioFilenames(scenarioEntries))
   errors.push(...checkScenarioLegalRefs(scenarioEntries, knownLawIds))
-  warnings.push(
-    ...warnScenariosMissingCountermeasureDummy(scenarioEntries).map(
-      (f) => `${f}: type='対策' のダミーカードが見つかりません(spec §8.3 の目安。エラーにはしない)。`,
-    ),
-  )
+  // 旧 warnScenariosMissingCountermeasureDummy(type='対策' のダミーカード有無の警告)は
+  // required_card_ids 方式の廃止(#42/T030・会話モードへの刷新)に伴い削除した(代表承認済み)。
 
   // --- terms/*.yaml（quiz を含まないファイル） ---
   const termFilePaths = (await listYamlFiles(path.join(rootDir, 'terms'))).filter(

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import type { CipherStage } from '../model/index.ts'
+import type { CipherStage, Question } from '../model/index.ts'
 
-import { judgeCardSelection, judgeCipherStage, judgeTextAnswer } from './index.ts'
+import { judgeCipherStage, judgeQuestionChoice, judgeTextAnswer } from './index.ts'
 
 describe('judgeTextAnswer', () => {
   it.each([
@@ -20,18 +20,48 @@ describe('judgeTextAnswer', () => {
   })
 })
 
-describe('judgeCardSelection', () => {
-  it.each([
-    // [説明, 選択カードID, 正解カードID集合, 期待値]
-    ['完全一致(順序違い)', ['b', 'a'], ['a', 'b'], true],
-    ['過不足なし', ['a', 'b', 'c'], ['a', 'b', 'c'], true],
-    ['不足があると不正解', ['a'], ['a', 'b'], false],
-    ['余分があると不正解(ダミーカード混入)', ['a', 'b', 'dummy'], ['a', 'b'], false],
-    ['完全に異なる集合は不正解', ['x', 'y'], ['a', 'b'], false],
-    ['重複を含む選択は重複排除してから比較する', ['a', 'a', 'b'], ['a', 'b'], true],
-    ['空の正解に対し空選択は正解(境界)', [], [], true],
-  ])('%s', (_label, submitted, required, want) => {
-    expect(judgeCardSelection(submitted, required)).toBe(want)
+describe('judgeQuestionChoice', () => {
+  function question(overrides: Partial<Question> = {}): Question {
+    return {
+      id: 'q-entry-point',
+      subject_tag: '攻撃手法',
+      speaker: '霧島',
+      prompt: 'この攻撃、どこから入られたと見る？',
+      choices: [
+        { text: '取引先を装ったメールの添付ファイル', is_correct: true },
+        {
+          text: '公開サーバーの脆弱性を突かれた',
+          is_correct: false,
+          reply: 'その場合だと、境界の通信記録に外→内の不審なアクセスが残るはずだ。',
+        },
+        {
+          text: 'USBメモリの持ち込み',
+          is_correct: false,
+          reply: 'その線なら入退室ログか資産管理に痕跡が出る。',
+        },
+      ],
+      consult_hint: '手元の手掛かりを分野で整理して提示',
+      ...overrides,
+    }
+  }
+
+  it('正解の選択肢を選ぶと correct: true とその choice を返す', () => {
+    const q = question()
+    const result = judgeQuestionChoice(q, 0)
+    expect(result.correct).toBe(true)
+    expect(result.choice).toEqual(q.choices[0])
+  })
+
+  it('誤答の選択肢を選ぶと correct: false と reply 付きの choice を返す', () => {
+    const q = question()
+    const result = judgeQuestionChoice(q, 1)
+    expect(result.correct).toBe(false)
+    expect(result.choice).toEqual(q.choices[1])
+  })
+
+  it('範囲外の choiceIndex は例外を投げる', () => {
+    const q = question()
+    expect(() => judgeQuestionChoice(q, 99)).toThrow()
   })
 })
 

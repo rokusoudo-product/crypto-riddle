@@ -11,8 +11,6 @@ export function routeForProgress(progress: ScenarioProgressState): string {
       return '/explore'
     case 'resolution':
       return '/resolve'
-    case 'follow_up':
-      return '/resolve/fail'
     case 'clear':
       return '/result'
     default: {

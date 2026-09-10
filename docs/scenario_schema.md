@@ -13,7 +13,7 @@ related:
   - scripts/build-data.ts（YAML→JSON ビルドパイプライン。T010）
 status: reviewed
 created: 2026-08-07
-updated: 2026-09-10
+updated: 2026-09-10（#44・T030 実装反映）
 ---
 
 # crypto-riddle — シナリオ記述フォーマット
@@ -21,12 +21,12 @@ updated: 2026-09-10
 1マップ(=1インシデント事件)を、コード直書きではなく**データとして追加できる**ようにするための
 YAML スキーマの説明。Issue #3 に対応する。
 
-> **⚠️ 2026-09-10 会話モードへ移行中（#42・T018 プレイテスト反映）**: 解決パート（`resolution`）を、カード配置＋
-> `required_card_ids` 方式から、**会話の中で問いに2〜3択で答える「会話モード」**（`resolution.questions[]`）へ刷新する。
-> `schema_version` は **0.2.0 → 0.3.0**。**スキーマ本体（zod）の改訂は tasks.md Phase 4.5 の T030 で実施**し、本節の
-> 該当箇所（§2 の `resolution` 行・§2.4・§7.1 の 4/5）はその目標形を記述している。**T030 マージ前の現行コードは
-> まだ `required_card_ids` 方式**である点に注意（本ドキュメント改訂 PR〔#42〕はドキュメント先行）。会話モードの
-> 仕様の正本は spec §8、画面は DESIGN.md「会話フレーム」節。
+> **2026-09-10（#44）: 会話モードの core 実装が完了**。解決パート（`resolution`）は、カード配置＋
+> `required_card_ids` 方式から、**会話の中で問いに2〜3択で答える「会話モード」**（`resolution.questions[]`）へ
+> 刷新済み（`schema_version` は `0.2.0` → `0.3.0`）。zod スキーマ（T030）・判定エンジン（T031）・
+> ステートマシン（T032）は `src/core/` に実装済み。**残っているのは会話モードUI（T033、#45）とデータの
+> 本格移行（T035、#46。S1/s0 は #44 で暫定機械移植のみ済み）**。会話モードの仕様の正本は spec §8、
+> 画面は DESIGN.md「会話フレーム」節。
 
 ## 0. 位置づけ（正本は何か）
 
@@ -67,7 +67,7 @@ scripts/
 
 | フィールド | spec 対応 | 説明 |
 |---|---|---|
-| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.2.0"`。**会話モード（#42・T030）で `"0.3.0"` に更新予定** |
+| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.3.0"`（会話モード、#42・T030） |
 | `id` | - | マップID。**ファイル名(拡張子除く)と一致必須**(`validate-collection.ts` の `checkScenarioFilenames` がチェック) |
 | `title` | §4 | マップタイトル(事件名) |
 | `status` | - | `draft`/`reviewed`/`published`/`sample`。省略時 `draft` |
@@ -88,10 +88,13 @@ spec §7 / DESIGN.md に準拠し、次の7種のみを許容する（`src/core/
 
 `証言` / `ログ` / `通信記録` / `外部情報` / `暗号文` / `鍵` / `対策`
 
-- `対策` タイプのカードは解決パート③(防衛策選択)の選択肢そのものとして使う。攻撃特定用のカードと
-  防衛策用のカードを別リストに分けず、**`cards` 1本にまとめて `type` で区別する**設計にした
-  (spec §7 で「対策カード（解決用）」がカード種別の1つに含まれているため)。
+- 攻撃特定用のカードと防衛策用のカードを別リストに分けず、**`cards` 1本にまとめて `type` で区別する**
+  設計にした(spec §7 で「対策カード（解決用）」がカード種別の1つに含まれているため)。
 - ダミーカードは `is_dummy: true` で表現する。カードごとの属性であり、種別を問わず付与できる。
+- **会話モード（#42/T030）移行後**: `対策` タイプのカードを含め、`cards` は探索で集めた**判断材料
+  （会話中いつでも無料閲覧できるカードドロワー）**という位置づけになり、解決パートの選択肢そのもの
+  ではなくなった。解決パートの選択肢は `resolution.questions[].choices[].text`（自由記述）であり、
+  カードを直接答えとして選ばせない（§2.4）。
 
 ### 2.2 調査の3系統
 
@@ -103,7 +106,7 @@ spec §7 の「①ログを見る ②人に聞く ③文献を引く」を `inve
   これは Issue #3 の代表回答「まずは1種ずつ。複数種・複数段の汎用表現は後回し」を反映したもの。
   **0個（暗号なし）も許容する**（T015, Issue #5 代表回答: 入門シナリオ S1 は初動対応中心で暗号を含めない）。
   0個の場合、`src/core/scenario/state.ts` の `ENTER_RESOLUTION` は暗号ステージを飛ばし、探索完了から
-  直接 `attack_identification` ステージへ進む。
+  直接 `questions[0]`（会話モードの1問目）へ進む。
 - 複数段（例: 古典暗号で得た文字列を鍵に別処理→ハッシュ照合、等）が必要になったら、
   **配列に要素を増やすだけ**で対応できるよう設計してある(=拡張時にスキーマの形を壊さない)。
   `.length(1)` の制約を外すだけで良い想定。
@@ -114,20 +117,21 @@ spec §7 の「①ログを見る ②人に聞く ③文献を引く」を `inve
   「`method` を enum にせず自由記述で拡張余地を残す」という方針を、zod では型安全な判別可能 union で
   代替している）。
 
-### 2.4 会話モードの問い（`resolution.questions[]`）〔#42・T030 で実装〕
+### 2.4 会話モードの問い（`resolution.questions[]`）〔#42・T030 で実装済み〕
 
-解決パートは、旧「カード配置＋`required_card_ids`」から、**会話の中で問いに答える会話モード**へ刷新する（spec §8）。
+解決パートは、旧「カード配置＋`required_card_ids`」から、**会話の中で問いに答える会話モード**へ刷新した（spec §8）。
 
-- `resolution.questions[]` は**問いを出題順に並べた配列**。当面は「攻撃の起点 → 初動対応」の**2問構成**（spec §8.5）。
-- 各 `question` の目標フィールド構成:
+- `resolution.questions[]` は**問いを出題順に並べた配列**（最低1問。`.min(1)`）。当面は「攻撃の起点 → 初動対応」の
+  **2問構成**（spec §8.5）を想定するが、スキーマ上の上限は設けていない。
+- 各 `question` の実装済みフィールド構成:
 
 ```yaml
 resolution:
   cipher_stages: []          # 暗号（維持）。S1 は 0 件
   questions:
     - id: q-entry-point
-      subject_tag: 攻撃手法    # この問いの分野。解説役が決まる（技術系→霧島／法制度→橘。characters.md）
-      speaker: kirishima       # 出題キャラ（省略時は subject_tag から決定してよい）
+      subject_tag: 攻撃手法    # この問いの分野（src/core/model/tags.ts の SUBJECT_TAGS）
+      speaker: 霧島            # 出題キャラ（必須。src/core/model/common.ts の characterSchema）
       prompt: この攻撃、どこから入られたと見る？   # 問い（キャラの台詞）
       choices:                 # 2〜3個。判断は2択、知識を要する候補は3択（#42）
         - text: 取引先を装ったメールの添付ファイル
@@ -140,14 +144,22 @@ resolution:
           reply: その線なら入退室ログか資産管理に痕跡が出る。今回はどちらも異常なしだ。
       explanations:            # 外すたびに深まる段階解説（教育的失敗の統合。任意・多段）
         - 一次情報（ログ）と証言のどちらを裏取りに使えるかを考えてみよう。
-      consult_hint: 手元の手掛かり（メールゲートウェイ/EDR/証言）を分野で整理して提示  # 相談時の詳細ヒント
+      consult_hint: 手元の手掛かり（メールゲートウェイ/EDR/証言）を分野で整理して提示  # 相談時の詳細ヒント（必須）
 ```
 
-- **判定（spec §8.2 維持）**: **問い単位で単一解・厳密一致**。`choices[].is_correct: true` は**各問いにちょうど1つ**。部分点・複数正解ルートは持たない。
-- **誤答肢**: `is_correct: false` の選択肢に、キャラが理由を添えて返す `reply`（「その場合だと〜」）を持たせる。誤答しても選択肢は残り再挑戦でき、`explanations` を段階的に見せて解説を深める。
+- `speaker` は必須（省略時に `subject_tag` から自動導出する案は T030 で見送り、明示指定に確定した）。
+- `is_correct: true` の選択肢は `reply` を省略できる（正解を選んだ際の一言として任意で使える）。
+  `is_correct: false` の選択肢は `reply` が必須（誤答フォローの原文になるため）。zod の discriminated union
+  （`questionChoiceSchema`、`src/core/model/scenario.ts`）でこの非対称性を型で強制している。
+- **判定（spec §8.2 維持）**: **問い単位で単一解・厳密一致**。`choices[].is_correct: true` は**各問いにちょうど1つ**
+  （`questionChoicesSchema` の `.refine` で強制。§7.1 参照）。部分点・複数正解ルートは持たない。
+  判定関数は `src/core/judge/index.ts` の `judgeQuestionChoice`（T031）。
+- **誤答肢**: `is_correct: false` の選択肢に、キャラが理由を添えて返す `reply`（「その場合だと〜」）を持たせる。誤答しても選択肢は残り再挑戦でき、`explanations` を段階的に見せて解説を深める
+  （`src/core/scenario/state.ts` の `scenarioReducer`。誤答回数ごとに `explanations[min(誤答回数, len-1)]` を選ぶ。T032）。
 - **カードとの関係**: 探索で集めた `cards` は会話中いつでも無料閲覧できる判断材料（カードドロワー）。`is_dummy: true` のカードは引き続き「もっともらしい引っかけ」を担う。会話モードでは**カードを直接答えとして選ばせない**（答えは選択肢テキスト）。
-- **相談**: `consult_hint`（または集めたカードからの自動整理）を、マップ単位3回まで提示する（spec §8.4）。
-- 旧 `attack_identification` / `countermeasure`（`required_card_ids` 方式）は廃止し、この `questions` に統合する（防衛策の問いは最後の `question`。`subject_tag` は法制度/インシデント対応など）。
+- **相談**: `consult_hint`（または集めたカードからの自動整理）を、マップ単位3回まで提示する（spec §8.4。上限値
+  `MAX_CONSULTS=3` は `src/core/scenario/state.ts` の core 定数として持ち、zod スキーマには持たせない）。
+- 旧 `attack_identification` / `countermeasure`（`required_card_ids` 方式）は廃止し、この `questions` に統合した（防衛策の問いは最後の `question`。`subject_tag` は法制度/インシデント対応など）。
 
 ## 3. 出典表記（`references`）
 
@@ -213,8 +225,13 @@ T005/T010（2026-09-09）により、旧 JSON Schema + Python(pyyaml/jsonschema)
   1. `cards[].id` / `investigation_points[].id` の重複禁止
   2. `cards[].investigation_point_id` が実在する `investigation_points[].id` を指しているか
   3. 各 `investigation_points` に紐づく `card` が最低1件あるか
-  4. `attack_identification.required_card_ids` が実在し、`is_dummy: true` を含まないか〔**#42/T030 で会話モードへ移行**: 各 `questions[]` に正解の選択肢がちょうど1つ、の検証へ置き換え〕
-  5. `countermeasure.required_card_ids` が実在し、`type: 対策` かつ `is_dummy: false` か〔**#42/T030 で移行**: 防衛の問いも `questions[]` の一つとして 4 と同じ検証で担保〕
+
+  旧4「`attack_identification.required_card_ids` が実在し `is_dummy: true` を含まないか」・
+  旧5「`countermeasure.required_card_ids` が実在し `type: 対策` かつ `is_dummy: false` か」は、
+  会話モード（#42/T030）で選択肢が自由記述（`questionChoiceSchema`）になったことに伴い不要になり削除した。
+  「各 `questions[]` に正解(`is_correct: true`)の選択肢がちょうど1つ」の検証は、`superRefine` ではなく
+  `questionChoicesSchema` の `.refine` に実装している（§2.4）。カードの実在チェックが不要になったのは、
+  解決パートの選択肢がもはやカードID参照ではないため。
 
 ### 7.2 複数ファイルにまたがる参照整合性（`src/core/model/validate-collection.ts`）
 
@@ -224,9 +241,10 @@ T005/T010（2026-09-09）により、旧 JSON Schema + Python(pyyaml/jsonschema)
 
 1. `checkScenarioFilenames`: ファイル名(拡張子除く)とシナリオ `id` の一致
 2. `checkScenarioLegalRefs`: `resolution.legal_refs` が `legal/*.yaml` 内の `id` として解決できるか
-3. `warnScenariosMissingCountermeasureDummy`:（警告のみ）`type: 対策` のダミーカードが1件も無い場合に
-   注意喚起（spec §8.3「本質的でない対策を誤答肢に」を満たしているかの目安。エラーにはしない＝
-   防衛策の誤答肢を将来的にカード以外の手段で表現する可能性を残すため）
+
+旧 `warnScenariosMissingCountermeasureDummy`（警告のみ。`type: 対策` のダミーカードが1件も無い場合の
+注意喚起）は、防衛策の選択肢がカード参照ではなく自由記述になった（会話モード、#42/T030）ことに伴い
+不要になり削除した（`scripts/build-data.ts` からの呼び出しも削除済み）。
 
 ### 7.3 実行方法
 
@@ -251,4 +269,9 @@ Vitest テストがある）。
 - 暗号を複数段にする場合の `cipher_stages` の `.max(1)` 制約解除、および各段の入出力の繋ぎ方
   （前段の平文を次段の鍵にする等）は、複数段化が実際に必要になった時点で設計する（#3 代表回答により後回し）。
 - シナリオ側 `related_terms` の実在チェックは #4 のマスタ整備後の追加候補として残る（§6）。
-- **会話モード（#42）の細部**: `questions[]` の各フィールド名・`explanations` の段数上限・`consult_hint` を明示持ちにするか集めたカードから自動生成するか・`speaker` を必須にするか（`subject_tag` から導出するか）は、**T030 の zod 改訂時に確定**する（本節 §2.4 は目標形）。
+- ~~**会話モード（#42）の細部**: `questions[]` の各フィールド名・`explanations` の段数上限・`consult_hint` を
+  明示持ちにするか集めたカードから自動生成するか・`speaker` を必須にするか（`subject_tag` から導出するか）は、
+  T030 の zod 改訂時に確定する。~~ →
+  **解決済み（#44/T030, 2026-09-10）**: `speaker` は必須、`consult_hint` は明示必須フィールド、
+  `explanations` の段数上限は設けず配列の末尾でクランプする実装とした（§2.4 参照）。
+- **残タスク**: 会話モードUI（T033、#45）と、S1・s0 の本格移行（T035、#46。#44 では暫定機械移植のみ）。

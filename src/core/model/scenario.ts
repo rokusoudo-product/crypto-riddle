@@ -5,8 +5,9 @@
 // （#22/#24 対応 PR 本文に理由を記載）。
 //
 // 単一シナリオ内で完結する参照整合性（card id 重複禁止・investigation_point_id の実在・
-// required_card_ids の実在とダミー/種別チェック）は superRefine でここに集約し、
-// 旧 scripts/validate_scenarios.py の validate_scenario_semantics 相当を zod 側で担保する。
+// investigation_point に紐づく card の存在）は superRefine でここに集約し、
+// 旧 scripts/validate_scenarios.py の validate_scenario_semantics 相当を zod 側で担保する
+// （会話モード（#42/T030）移行後は「問いの正解がちょうど1つ」は questionChoicesSchema の refine 側）。
 // ファイル名と id の一致、legal_refs の実在（legal/*.yaml は別ファイルのため cross-file）等、
 // 複数ファイルにまたがる整合性チェックは src/core/model/validate-collection.ts に分離する。
 //
@@ -17,11 +18,11 @@ import { characterSchema, dialogueLineSchema, legalRefIdSchema, termIdSchema } f
 import { subjectTagSchema } from './tags.ts'
 import { uniqueArraySchema } from './util.ts'
 
-// 0.2.0（T015, 2026-09-10）: source(単一・必須オブジェクト) を references(配列・省略可) へ置き換えた
-// 破壊的変更のため semver を上げた（docs/scenario_schema.md §3 の方針）。旧 0.1.0 データ（s0-sample 等）は
-// 本 PR で 0.2.0 形式へ合わせて更新済み（旧形式からの自動マイグレーションは持たない。本番セーブデータではなく
-// オーサリング用シナリオデータのため、実体のあるシナリオが少ないうちに移行するのが妥当と判断した）。
-export const scenarioSchemaVersionSchema = z.literal('0.2.0')
+// 0.3.0（T030, 2026-09-10, #42/#44）: 解決パート(resolution)を「カード配置＋required_card_ids」方式から
+// 「会話の中で問いに2〜3択で答える会話モード」（resolution.questions[]）へ刷新した破壊的変更。
+// 旧 attack_identification/countermeasure/wrong_answer_follow_ups は questions[] へ統合して削除した。
+// 詳細は spec.md §8・docs/scenario_schema.md §2.4。
+export const scenarioSchemaVersionSchema = z.literal('0.3.0')
 
 /** マップID。ファイル名(拡張子除く)と一致させる（実在チェックは validate-collection.ts）。 */
 export const scenarioIdSchema = z.string().regex(/^[a-z][a-z0-9_-]*$/)
@@ -137,45 +138,71 @@ const caesarCipherStageSchema = z
 export const cipherStageSchema = z.discriminatedUnion('method', [caesarCipherStageSchema])
 export type CipherStage = z.infer<typeof cipherStageSchema>
 
-export const attackIdentificationSchema = z
+/** 会話モードの問いID(#42/T030、docs/scenario_schema.md §2.4)。 */
+export const questionIdSchema = slugIdSchema
+
+// 選択肢は is_correct を判別子とする discriminated union にし、正解には任意で選んだ際の一言(reply)を、
+// 誤答には理由を添えた返し(reply、「その場合だと〜」spec §8.2)を必須で持たせる。
+const correctChoiceSchema = z
   .object({
-    required_card_ids: uniqueArraySchema(cardIdSchema, { minItems: 1 }),
-    attack_name: z.string().min(1),
-    attack_description: z.string().min(1),
+    text: z.string().min(1),
+    is_correct: z.literal(true),
+    reply: z.string().min(1).optional(),
   })
   .strict()
-export type AttackIdentification = z.infer<typeof attackIdentificationSchema>
-
-export const countermeasureSchema = z
+const wrongChoiceSchema = z
   .object({
-    required_card_ids: uniqueArraySchema(cardIdSchema, { minItems: 1 }),
-    summary: z.string().min(1),
+    text: z.string().min(1),
+    is_correct: z.literal(false),
+    reply: z.string().min(1),
   })
   .strict()
-export type Countermeasure = z.infer<typeof countermeasureSchema>
+export const questionChoiceSchema = z.discriminatedUnion('is_correct', [
+  correctChoiceSchema,
+  wrongChoiceSchema,
+])
+export type QuestionChoice = z.infer<typeof questionChoiceSchema>
 
-export const followUpTriggerSchema = z.enum(['cipher', 'attack_identification', 'countermeasure'])
+// spec §8.2「判断は2択、知識を要する候補は3択」。正解の選択肢はちょうど1つ(#7 維持・単一解厳密一致)。
+export const questionChoicesSchema = z
+  .array(questionChoiceSchema)
+  .min(2)
+  .max(3)
+  .refine((choices) => choices.filter((c) => c.is_correct).length === 1, {
+    message: '選択肢は正解(is_correct: true)がちょうど1つである必要があります。',
+  })
 
-export const followUpSchema = z
+export const questionSchema = z
   .object({
-    trigger: followUpTriggerSchema,
-    character: characterSchema,
-    line: z.string().min(1),
+    id: questionIdSchema,
+    subject_tag: subjectTagSchema,
+    speaker: characterSchema,
+    prompt: z.string().min(1),
+    choices: questionChoicesSchema,
+    // 外すたびに深まる段階解説(教育的失敗の会話内統合)。任意・多段。
+    explanations: z.array(z.string().min(1)).optional(),
+    // 相談(コストあり、マップ単位3回まで。spec §8.4)で提示する詳細ヒント。
+    consult_hint: z.string().min(1),
   })
   .strict()
-export type FollowUp = z.infer<typeof followUpSchema>
+export type Question = z.infer<typeof questionSchema>
 
 export const resolutionSchema = z
   .object({
     // MVP は最大1要素(#3 代表回答)。0件は「暗号なし」の入門シナリオ(S1, Issue #5 代表回答)を許容するため
     // T015 で length(1) から max(1) に緩めた。複数段拡張は max(1) 制約を外すだけで対応できる設計
     // （旧 JSON Schema の minItems/maxItems=1 を引き継いだ制約を、0件許容のぶんだけ緩和したもの）。
-    // 0件のときは resolution パートで暗号ステージを飛ばし、探索完了から直接 attack_identification へ進む
+    // 0件のときは resolution パートで暗号ステージを飛ばし、探索完了から直接 questions[0] へ進む
     // （src/core/scenario/state.ts の ENTER_RESOLUTION 参照）。
     cipher_stages: z.array(cipherStageSchema).max(1),
-    attack_identification: attackIdentificationSchema,
-    countermeasure: countermeasureSchema,
-    wrong_answer_follow_ups: z.array(followUpSchema).min(1),
+    // 会話モード(#42/T030)の問い列。出題順の配列。旧 attack_identification/countermeasure/
+    // wrong_answer_follow_ups(required_card_ids 方式)はここへ統合した(docs/scenario_schema.md §2.4)。
+    questions: z
+      .array(questionSchema)
+      .min(1)
+      .refine((qs) => new Set(qs.map((q) => q.id)).size === qs.length, {
+        message: 'questions の id が重複しています。',
+      }),
     clear_explanation: z.array(dialogueLineSchema).min(1),
     legal_refs: uniqueArraySchema(legalRefIdSchema).optional(),
   })
@@ -258,56 +285,11 @@ export const scenarioSchema = scenarioObjectSchema.superRefine((data, ctx) => {
     }
   })
 
-  data.resolution.attack_identification.required_card_ids.forEach((cid, index) => {
-    const card = cardIds.get(cid)
-    if (!card) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `attack_identification.required_card_ids の '${cid}' が cards に存在しません。`,
-        path: ['resolution', 'attack_identification', 'required_card_ids', index],
-      })
-    } else if (card.is_dummy) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `attack_identification.required_card_ids の '${cid}' はダミーカードです(is_dummy=true)。`,
-        path: ['resolution', 'attack_identification', 'required_card_ids', index],
-      })
-    }
-  })
-
-  data.resolution.countermeasure.required_card_ids.forEach((cid, index) => {
-    const card = cardIds.get(cid)
-    if (!card) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `countermeasure.required_card_ids の '${cid}' が cards に存在しません。`,
-        path: ['resolution', 'countermeasure', 'required_card_ids', index],
-      })
-      return
-    }
-    if (card.is_dummy) {
-      ctx.addIssue({
-        code: 'custom',
-        message: `countermeasure.required_card_ids の '${cid}' はダミーカードです(is_dummy=true)。`,
-        path: ['resolution', 'countermeasure', 'required_card_ids', index],
-      })
-    }
-    if (card.type !== '対策') {
-      ctx.addIssue({
-        code: 'custom',
-        message: `countermeasure.required_card_ids の '${cid}' は type='対策' ではありません(実際: ${card.type})。`,
-        path: ['resolution', 'countermeasure', 'required_card_ids', index],
-      })
-    }
-  })
+  // 旧「4. attack_identification.required_card_ids の実在・非ダミー確認」「5. countermeasure.
+  // required_card_ids の実在・非ダミー・type='対策' 確認」(required_card_ids 方式)は、会話モード
+  // (#42/T030)で選択肢が自由記述(questionChoiceSchema)になったことに伴い不要になった。
+  // 「正解の選択肢がちょうど1つ」の検証は questionChoicesSchema の refine に移した
+  // (docs/scenario_schema.md §7.1 の4/5・§2.4 参照)。
 })
 
 export type Scenario = z.infer<typeof scenarioSchema>
-
-/**
- * spec §8.3「本質的でない対策を誤答肢に」を満たしているかの目安（警告のみ、旧スクリプトと同様
- * エラーにはしない）。type='対策' のダミーカードが1件も無い場合に true を返す。
- */
-export function hasNoDummyCountermeasure(scenario: Scenario): boolean {
-  return !scenario.cards.some((card) => card.type === '対策' && card.is_dummy)
-}

@@ -96,7 +96,11 @@ async function submitCorrectAttackIdentification(
   await user.click(screen.getByRole('button', { name: '攻撃手段を特定する' }))
 }
 
-describe('S1「標的型メールからの侵入」通しプレイ(T016)', () => {
+// 2026-09-10(#42/#44): 解決パートがカード配置(required_card_ids方式)から会話モード
+// (questions[]・選択肢ボタン)へ刷新されたため、本ファイルが前提とするカード配置UI・
+// follow_up(失敗解説)画面への遷移は core のステートマシンから撤去された。
+// 本PRのスコープは core(T030-032)のため、結線テストの会話モードへの更新は #45(T036)で行う。
+describe.skip('S1「標的型メールからの侵入」通しプレイ(T016) — #45(T036)で会話モードへ更新', () => {
   let storage: InMemorySaveStorage
 
   beforeEach(() => {

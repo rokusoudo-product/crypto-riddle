@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-10 (#42 会話モード刷新: T014 superseded・Phase 4.5 追加)
+updated: 2026-09-10 (#44: T030/T031/T032 core実装完了)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -218,15 +218,31 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 > 本フェーズの各タスクは **#42 の PR（本ドキュメント改訂）が代表マージされた後**、実装 Issue に分解して起票する（`ready` は代表付与 → Sonnet 実装。委譲時「**スキーマ差分は commit 前に報告して停止**」を条件化）。
 > 確定仕様（#42・2026-09-10 代表決定）: 選択肢は問いごと2〜3択／問い単位で単一解・厳密一致／誤答は「その場合だと〜」で再挑戦し外すたび解説が深まる（教育的失敗を統合＝⑥失敗解説画面は廃止）／相談はマップ単位3回／手持ちカードは会話中いつでも無料閲覧／誤答1回・相談1回ごとに獲得XPを減算（下限あり）。
 
-- [ ] **T030** 解決スキーマの会話モード化（依存: T006）
+- [x] **T030** 解決スキーマの会話モード化（依存: T006）
   - `src/core/model/scenario.ts` の `resolution` を「`cipher_stages`（維持）＋ `questions[]`」へ改訂。各 `question` = 問い文・`subject_tag`・`choices[]`（2〜3個。各 `text`／`is_correct`／誤答時 `reply`）・段階解説（外すたび深まる）・相談用詳細ヒント。旧 `attack_identification`／`countermeasure`（`required_card_ids`）は questions へ統合して削除。**`schema_version` 0.2.0 → 0.3.0**
   - 完了条件: 新スキーマの zod 単体テスト（正常系・境界・不正 reject）。問いに正解の選択肢がちょうど1つ、の制約を含む
-- [ ] **T031** 選択肢判定エンジン（依存: T030）
+  - **完了（2026-09-10, #44）**: `questionChoiceSchema`（`is_correct` を判別子とする discriminated
+    union、誤答は `reply` 必須・正解は任意）・`questionChoicesSchema`（2〜3個、正解ちょうど1つを refine
+    で強制）・`questionSchema`（`speaker` 必須、`consult_hint` 必須、`explanations` は任意配列）を実装。
+    旧 `attackIdentificationSchema`/`countermeasureSchema`/`followUpTriggerSchema`/`followUpSchema`/
+    `FollowUp` 型と、その専用検証だった `superRefine` の旧4/5、`hasNoDummyCountermeasure`・
+    `warnScenariosMissingCountermeasureDummy`（対策ダミー有無の警告。呼び出し元 `scripts/build-data.ts`
+    含め削除）は撤去
+- [x] **T031** 選択肢判定エンジン（依存: T030）
   - `src/core/judge/` に選択肢判定（問い単位で単一解・厳密一致）を追加し、`judgeCardSelection` を廃止（暗号判定・正規化は維持）
   - 完了条件: 判定のテーブル駆動テストが通り、旧 `judgeCardSelection` の参照が消えている
-- [ ] **T032** ステートマシン改訂（依存: T030, T031）
+  - **完了（2026-09-10, #44）**: `judgeQuestionChoice(question, choiceIndex)` を実装（範囲外
+    `choiceIndex` は例外）。`judgeCardSelection` は削除
+- [x] **T032** ステートマシン改訂（依存: T030, T031）
   - `src/core/scenario/state.ts` を「（暗号→）問い列を順に出題→全問正答でクリア」に改訂。誤答は選択肢を残したまま `reply`＋深まる解説を返す。相談カウンタ（マップ3回）を状態に持つ
   - 完了条件: 出題順・誤答再挑戦・相談上限・クリアの単体テストが通る
+  - **完了（2026-09-10, #44）**: `ScenarioPart` から `follow_up` を、状態から `pendingFollowUp`/
+    `resumeStage` を撤去（誤答しても選択肢の残る会話モードでは独立画面へ遷移しないため）。代わりに
+    `questionIndex`・`wrongAttemptsByQuestionId`（explanations の深さ制御）・`consultsUsed`
+    （`MAX_CONSULTS=3`、core 定数）・`lastAnswerFeedback`（`{correct, reply, explanation}`、core内部の
+    表示用一時状態。zod スキーマには持たせない）を追加。暗号誤答は cipher ステージに留まり
+    `lastAnswerFeedback` のみ更新（reply/explanation は無し、自由記述回答のため）。
+    XP減算そのものは #45（T034）の範囲
 - [ ] **T033** 会話フレーム＋会話モードUI（依存: T011, T032。dnd-kit 削除）
   - DESIGN.md「会話フレーム」（下部会話ウィンドウ・中央左右立ち絵・非発話側グレーアウト＋名札）を共通コンポーネント化。解決画面に選択肢ボタン（各48px・キーボード完遂）・相談ボタン（残数表示）・手持ちカードドロワー（無料閲覧）を載せる。`card-placement-board.tsx` と `@dnd-kit/*` 依存を削除
   - 完了条件: キーボードのみで回答・相談・カード閲覧・クリアまで完遂できる結線テストが通る
@@ -304,7 +320,8 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#13](https://github.com/rokusoudo-product/crypto-riddle/issues/13) カラートークン AA 実測 | future | **T012** に合流 | 採用時は T012 の完了条件に AA 実測値の確定を含める |
 | [#14](https://github.com/rokusoudo-product/crypto-riddle/issues/14) IPA 過去問の出典表記規則 | future | **T015 の前提** | 採用時は T015 より先に完了させる |
 | [#22](https://github.com/rokusoudo-product/crypto-riddle/issues/22) 分野タグ（subject_tags）の値集合統一 | proposal（本 PR マージで closed 予定・`Closes #22`） | **T005**（zod 移行と同時実施） | 案2（7種に統一・`ネットワーク基盤`を正式採用）を採用。決定理由は `specs/001-mvp/spec.md` §9 に記載。値集合の正本は `src/core/model/tags.ts` |
-| [#42](https://github.com/rokusoudo-product/crypto-riddle/issues/42) 解決パートを会話モードに刷新 | future（本ドキュメント改訂 PR。マージ後に実装 Issue へ分解） | **T014 を supersede**・**Phase 4.5（T030〜T036）** | T018 プレイテスト由来。spec §8＝会話モード。実装 Issue は #42 マージ後に起票（`ready` は代表付与） |
+| [#42](https://github.com/rokusoudo-product/crypto-riddle/issues/42) 解決パートを会話モードに刷新 | closed（ドキュメント改訂 PR マージ済み） | **T014 を supersede**・**Phase 4.5（T030〜T036）** | T018 プレイテスト由来。spec §8＝会話モード。実装は #44（T030〜T032, core）で着手済み。残りは #45（T033/T034, UI）・#46（T035/T036, データ・結線） |
+| [#44](https://github.com/rokusoudo-product/crypto-riddle/issues/44) 会話モード core 実装 | 実装中（本PR） | **T030・T031・T032** | zod スキーマ・判定エンジン・ステートマシンを会話モードへ改訂。S1/s0 は暫定機械移植のみ（本格移行は #46）。UI(resolve/result/fail-screen等)は型エラー解消の最小限に留めた（#45） |
 | [#41](https://github.com/rokusoudo-product/crypto-riddle/issues/41) タイトル CTA が実セーブ状態と未接続 | bug + question（代表回答待ち） | 別途（Phase 7 の a11y/仕上げ候補） | T018 プレイテスト由来。会話モードとは独立 |
 
 ## 依存関係の要約
