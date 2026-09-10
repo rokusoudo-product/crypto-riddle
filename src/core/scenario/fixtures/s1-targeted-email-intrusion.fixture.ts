@@ -125,7 +125,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
       hotspots: [
         {
           object_type: 'pc',
-          position: [0.28, 0.62],
+          position: [0.4, 0.68],
           label: '経理部 中野の端末',
           actions: [
             {
@@ -144,7 +144,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.42, 0.48],
+          position: [0.47, 0.42],
           label: '中野',
           actions: [
             {
@@ -156,7 +156,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.75, 0.45],
+          position: [0.87, 0.6],
           label: '経理部長',
           actions: [
             {
@@ -168,7 +168,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'book',
-          position: [0.12, 0.28],
+          position: [0.6, 0.16],
           label: '資料棚',
           actions: [
             {

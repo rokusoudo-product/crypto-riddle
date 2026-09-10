@@ -113,13 +113,17 @@ investigation_points:
 # 「電源を落とすと揮発性メモリの証拠が消える」という学びと整合させる(feedbackのみ・
 # ペナルティ無し・操作継続可=詰み防止, spec §8.4)。人物ホットスポットの証言表示は
 # UI側で話者を橘に固定する(scene-explorer.tsx。coreスキーマに話者フィールドは無い)。
+# position(相対座標)は生成済み背景 assets/backgrounds/bg-s1-*.png を実際に目視して配置した
+# (机上のノートPC・座っている社員・書棚・サーバラック・中央奥の運用端末に重なるよう調整。
+# executive室に描かれた人物は1名のみのため、経理部長ホットスポットは特定の家具に重ねず、
+# ドア/キャビネット側の余白に置いている)。
 scenes:
   - id: scene-office
     title: 執務室
     background: bg-s1-office
     hotspots:
       - object_type: pc
-        position: [0.28, 0.62]
+        position: [0.4, 0.68]
         label: 経理部 中野の端末
         actions:
           - kind: collect
@@ -131,21 +135,21 @@ scenes:
           - kind: noop
             label: 今は触らない
       - object_type: person
-        position: [0.42, 0.48]
+        position: [0.47, 0.42]
         label: 中野
         actions:
           - kind: collect
             investigation_point_id: ip-witness-nakano
             label: 中野に話を聞く
       - object_type: person
-        position: [0.75, 0.45]
+        position: [0.87, 0.6]
         label: 経理部長
         actions:
           - kind: collect
             investigation_point_id: ip-witness-manager
             label: 経理部長に話を聞く
       - object_type: book
-        position: [0.12, 0.28]
+        position: [0.6, 0.16]
         label: 資料棚
         actions:
           - kind: collect
