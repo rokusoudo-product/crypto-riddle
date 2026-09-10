@@ -105,15 +105,15 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       expect(screen.getAllByText('霧島').length).toBeGreaterThanOrEqual(2)
       expect(screen.getByText('この侵入、どこから入られたと見る？')).toBeInTheDocument()
 
-      // --- q-entry-point: キーボードで誤答を選ぶ(choices[1] = ウイルス対策ソフト〜) ---
+      // --- q-entry-point: キーボードで誤答を選ぶ(choices[1] = 公開サーバーの脆弱性〜) ---
       await user.tab() // choice[0](正解)
       await user.tab() // choice[1](誤答)
-      expect(document.activeElement).toHaveTextContent('ウイルス対策ソフトの定義ファイル更新エラー')
+      expect(document.activeElement).toHaveTextContent('公開サーバーの脆弱性を突かれた侵入')
       await user.keyboard('{Enter}')
 
       // 誤答フォロー: 選択肢は残ったまま reply + 段階解説が表示される(aria-live, role=alertではない)。
       expect(
-        await screen.findByText(/怪しく見えるものと、この侵入を直接裏付けるものは別だ/),
+        await screen.findByText(/その場合は境界の通信記録に外から内への不審なアクセスが残るはずだ/),
       ).toBeInTheDocument()
       expect(
         screen.getByText(/「怪しく見える」ことと「今回の侵入を裏付ける証拠であること」は違う/),
