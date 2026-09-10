@@ -4,7 +4,7 @@ doc: plan.md (TDD 相当 / 実装計画)
 feature: 001-mvp
 status: approved          # 承認ゲート② 通過（2026-07-29 PR #11 マージ＝代表承認。記録の追随は #12 代表回答 2026-08-02 に基づく）
 created: 2026-07-29
-updated: 2026-09-10            # 会話モード（#42・schema 0.3.0）＋探索を背景シーン化（#52・scenes 追加・schema 0.4.0）
+updated: 2026-09-11            # 探索を会話フレーム化（#52 Phase 4.7・collect line/speaker・schema 0.5.0・タイプライター）
 spec: specs/001-mvp/spec.md
 gate: "② 通過（2026-07-29） → tasks 工程完了。実装順序は specs/001-mvp/tasks.md"
 advisor: "2026-07-29 相談済み・条件付き承認（条件3点は §2/§6/§7 に反映済み）"
@@ -76,6 +76,7 @@ scenarios/*.yaml → (build) zod 検証 → src/data/*.json → アプリが imp
 - **Scenario**: id / title / 分野タグ / 難易度 / 想定時間 / 出典 / parts(導入・探索・解決) / `investigation_points` / cards / `scenes`（探索の表示層・省略可）/ resolution（**会話モード**: 暗号ステージ＋**問い列 questions**）
   - **resolution（#42 で刷新）**: `cipher_stages`（維持・S1 は0件）＋ `questions[]`（各問い = 問い文・分野タグ・**2〜3択の選択肢**〔各選択肢に正誤と誤答時の返答〕・段階的に深まる解説・相談用の詳細ヒント）。旧 `attack_identification` / `countermeasure`（`required_card_ids` 方式）は questions へ統合。**schema_version 0.2.0 → 0.3.0**。問いの分野タグで解説役が決まる（技術→霧島／法務→橘。`docs/characters.md`）
   - **scenes（#52 で追加・探索の背景シーン表示層）**: `investigation_points`（カードの出所・3系統）は**正のまま維持**し、表示層として**省略可能な `scenes[]`**（背景アセットID・複数シーン切替・`hotspots[]`〔オブジェクト種別 PC/人物/書籍/機器・相対座標・ラベル・`actions[]`〕）を追加。`actions[]` は `collect`（`investigation_point_id` を参照してカード獲得）／`danger`（電源を落とす等＝教育的フィードバックのみ・ペナルティなし）／`noop`。1オブジェクトが複数ポイントを束ねられる（hotspot→point は 1:N）。**`scenes` 省略時は一覧表示にフォールバック**（背景なしでも成立）。整合性チェック＝各 `investigation_point` がちょうど1つの collect action から参照される。**schema_version 0.3.0 → 0.4.0**。背景は 16:9・image_agent 自作（DESIGN.md「探索シーン」節）
+  - **探索の会話フレーム化（#52 Phase 4.7・T018'' 反映）**: 調査結果（人物証言・PC のログ・書籍の文献）を解決と同じ会話フレームで台詞提示する。そのため `collect` アクションに**省略可能な `line`（台詞）と `speaker`**（`danger` の `feedback` と対称）を追加し、省略時は既定の導入文＋カード本文にフォールバック。既定話者は3系統から導出（ログ→霧島／証言→橘／文献→橘）。**schema_version 0.4.0 → 0.5.0**（既存 YAML の版数追随は T037 と同手順）。会話フレーム共通で**タイプライター表示**（スキップ可・reduced-motion 即全文・支援技術には全文提供）を導入。ホットスポットは通常不可視でホバー/フォーカス時に□マーカー（`aria-label` 保持・一覧フォールバック維持）。旧「非ダミー先頭を証言として読む」経路が消えるため **#62 を吸収**
 - **Card**: id / 種別（証言・ログ・通信記録・外部情報・暗号文・鍵・対策）/ 出所（人物・機器）/ 本文 / ダミーフラグ / 用語カード参照（探索で収集。会話モードのカードドロワーで閲覧）
 - **TermCard**（#4）: id / 用語 / 読み / 定義 / 分野タグ / 関連用語 / 出典
 - **SaveData**: version / クリア状況 / 獲得カード / 分野習熟 / XP / 設定 ＋ **会話モードの解答試行・相談使用回数**（XP 減算の算定と結果表示に使用。追加フィールドの後方互換／`version` 更新要否は実装 Issue で判断）
