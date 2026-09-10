@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-10 (#46: T035/T036 完了・Phase 4.5 完了)
+updated: 2026-09-10 (#52 探索背景シーン化: Phase 4.6〔T037-T041〕追加・量産ゲート更新)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -304,11 +304,39 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 **チェックポイント③'**: 会話モードで S1 を通しプレイでき、代表が量産可と再確認する
 
+- **達成（2026-09-10・#42）**: 会話モードで S1 を通しプレイ可能に。代表の再プレイで「良くなった」と確認。ただし探索パートの改善（背景シーン化・#52）を量産前に挟むため、次は **Phase 4.6**。
+
+---
+
+## Phase 4.6: 探索の背景シーン化（#52）= 探索パートの刷新
+
+> T018 プレイテスト（2026-09-10）代表フィードバック。探索④を「背景シーン＋クリック可能オブジェクト（PC=ログ／人物=証言／書籍=文献）」方式へ。詳細は spec §7.1・DESIGN.md「探索シーン」節・plan §5（`scenes`）。
+> 本フェーズの各タスクは **#52 の PR（本ドキュメント改訂）が代表マージされた後**、実装 Issue に分解して起票する（`ready` は代表付与 → Sonnet 実装。委譲条件「**スキーマ差分は commit 前に報告して停止**」を維持）。
+> 確定仕様（#52・2026-09-10 代表決定）: 背景＋ホットスポット／PCで危険操作も出す（電源後もPC操作可・XP減算なし＝spec §8.4）／場所ごと複数背景（S1=2シーン）／背景は image_agent 自作（16:9・アニメ調で立ち絵と統一・検索画像は流用しない）／モバイル縦はレターボックス＋横パン／背景に依存しない一覧フォールバック（キーボード完遂）。
+
+- [ ] **T037** 探索スキーマ拡張（依存: T006）
+  - `src/core/model/scenario.ts` に**省略可能な `scenes[]`**（背景アセットID・複数シーン・`hotspots[]`〔種別 PC/人物/書籍/機器・相対座標・ラベル・`actions[]`〕・`actions[]` は `collect`〔`investigation_point_id` 参照〕/`danger`/`noop`）を追加。`investigation_points` は維持。**schema_version 0.3.0 → 0.4.0**。整合性チェック=各 investigation_point がちょうど1つの collect action から参照される（`scenes` 省略時はチェックしない＝一覧フォールバック）
+  - 完了条件: zod 単体テスト（正常系・境界・不正 reject・省略時フォールバック）が通る
+- [ ] **T038** 探索UI（背景シーン＋ホットスポット）（依存: T011, T037, T033）
+  - 背景シーン＋シーンタブ＋ホットスポット（実 `<button>` 48px+・ラベル・フォーカス可視）＋PC操作アクションシート（ログ取得／電源を落とす〔教育的FBのみ・減算なし・操作継続可〕／今は触らない）＋**一覧フォールバック**（キーボード完遂）。人物の証言は**会話フレーム**で表示（#50 の探索④部分を統合）。16:9 をモバイル縦でレターボックス＋横パン
+  - 完了条件: 背景・一覧の両方で、キーボードのみで全ポイント調査→解決へ進める結線テストが通る
+- [ ] **T039** S1 探索背景の生成（依存: #52 PR マージ、IMAGE_WORKFLOW）
+  - S1 の2背景（執務室／サーバ室＝`bg-s1-office`/`bg-s1-server`）を IMAGE_WORKFLOW の承認ゲート（アセット定義＋プロンプト提示→代表承認→image_agent 生成）で用意。16:9・アニメ調で立ち絵と統一。生成物パス・プロンプトを DESIGN.md アセット節に追記
+  - 完了条件: 2背景が確定し DESIGN.md に記録、`assets/` に配置
+- [ ] **T040** S1・s0 に scenes データを追加（依存: T037）
+  - `scenarios/s1-targeted-email-intrusion.yaml`（執務室／サーバ室の2シーン・PC/人物/書籍のホットスポット・既存 `investigation_points` への collect 参照・PCの danger アクション）と `scenarios/s0-sample.yaml`（サンプルとして最小のシーン）＋各 fixture を追加
+  - 完了条件: 両 YAML が 0.4.0 検証を通過し `npm run build:data` 成功
+- [ ] **T041** 結線・E2E 更新（依存: T038, T040）
+  - 探索の結線テスト（背景／一覧の両経路・PC操作・危険操作の教育的FB・詰み防止）と Playwright e2e を更新
+  - 完了条件: Vitest・Playwright E2E が CI で安定して通る
+
+**チェックポイント③''**: 背景シーンで S1 探索→解決を通しプレイでき、代表が量産可と確認する
+
 ---
 
 ## Phase 5: マップ量産（plan §11-5）= プロダクション
 
-> **⚠️ 量産ゲート（#42）**: Phase 5 は **Phase 4.5（会話モードの schema・UI）が main にマージされるまで着手しない**。旧フォーマット（カード配置・`required_card_ids`）で書いたシナリオは全て書き直しになるため、量産は会話モードの schema 0.3.0 確定後に開始する。
+> **⚠️ 量産ゲート（#42・#52）**: Phase 5 は **Phase 4.5（会話モード）と Phase 4.6（探索の背景シーン化）が main にマージされるまで着手しない**。旧フォーマットで書いたシナリオ（`required_card_ids`／背景なし）は全て書き直しになるため、量産は会話モード schema 0.3.0＋探索 scenes 0.4.0 の確定後に開始する。各量産マップには**背景2〜3枚（IMAGE_WORKFLOW）**を各制作 Issue に含める。
 
 - [ ] **T019** S2 制作（依存: T018、**Issue #6**: フォーマット確定後に個別 Issue を切り出して進める）
 - [ ] **T020** S3 制作（依存: T019 と同条件）
@@ -368,8 +396,13 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#22](https://github.com/rokusoudo-product/crypto-riddle/issues/22) 分野タグ（subject_tags）の値集合統一 | proposal（本 PR マージで closed 予定・`Closes #22`） | **T005**（zod 移行と同時実施） | 案2（7種に統一・`ネットワーク基盤`を正式採用）を採用。決定理由は `specs/001-mvp/spec.md` §9 に記載。値集合の正本は `src/core/model/tags.ts` |
 | [#42](https://github.com/rokusoudo-product/crypto-riddle/issues/42) 解決パートを会話モードに刷新 | closed（ドキュメント改訂 PR マージ済み） | **T014 を supersede**・**Phase 4.5（T030〜T036）** | T018 プレイテスト由来。spec §8＝会話モード。実装は #44（T030〜T032, core）・#45（T033/T034, UI）で完了済み。#46（T035/T036, データ本執筆・結線）も実装完了（本PR、代表マージ待ち）でPhase 4.5が完了する |
 | [#44](https://github.com/rokusoudo-product/crypto-riddle/issues/44) 会話モード core 実装 | closed（完了） | **T030・T031・T032** | zod スキーマ・判定エンジン・ステートマシンを会話モードへ改訂。S1/s0 は暫定機械移植のみ（本格移行は #46）。UI(resolve/result/fail-screen等)は型エラー解消の最小限に留めた（#45） |
-| [#46](https://github.com/rokusoudo-product/crypto-riddle/issues/46) 会話モード データ本執筆・結線・E2E | 実装完了（本PR、代表マージ待ち） | **T035・T036** | S1 q-entry-point の誤答肢 reply を具体的なカード裏付き文へ本執筆し、explanations を多段化。s0-sample も形式を追随。`e2e/s1-playthrough.spec.ts` を会話モードUI向けに書き直し `describe.skip` 解除。マージで Phase 4.5 完了（チェックポイント③'） |
-| [#41](https://github.com/rokusoudo-product/crypto-riddle/issues/41) タイトル CTA が実セーブ状態と未接続 | bug + question（代表回答待ち） | 別途（Phase 7 の a11y/仕上げ候補） | T018 プレイテスト由来。会話モードとは独立 |
+| [#45](https://github.com/rokusoudo-product/crypto-riddle/issues/45) 会話フレーム＋会話モードUI＋XP減算 | closed（完了・PR #48） | **T033・T034** | 会話フレーム/カードドロワー新設・dnd-kit 削除・⑥失敗解説廃止・XP減算 |
+| [#46](https://github.com/rokusoudo-product/crypto-riddle/issues/46) 会話モード データ本執筆・結線・E2E | closed（完了・PR #49） | **T035・T036** | S1 誤答肢 reply 本執筆・explanations 多段化・e2e 会話モード化。**Phase 4.5 完了** |
+| [#52](https://github.com/rokusoudo-product/crypto-riddle/issues/52) 探索を背景シーン＋クリック可能オブジェクトにする | future（本ドキュメント改訂 PR。マージ後に実装 Issue へ分解） | **Phase 4.6（T037〜T041）** | T018 プレイテスト由来。spec §7.1＝探索背景シーン化。背景は image_agent 自作（IMAGE_WORKFLOW）。#50 の探索④部分を統合 |
+| [#41](https://github.com/rokusoudo-product/crypto-riddle/issues/41) タイトル CTA が実セーブ状態と未接続 | bug（`ready`・優先度 Phase 7） | 別途（Phase 7 の a11y/仕上げ候補） | T018 由来。回答済み（つづきから=中断再開／出し分け実装／Phase7）。会話モードとは独立 |
+| [#50](https://github.com/rokusoudo-product/crypto-riddle/issues/50) 会話フレームを③導入・④探索にも適用 | フォロー（探索④分は #52 に統合。残=③導入） | 別途 | 会話モード刷新の残作業 |
+| [#51](https://github.com/rokusoudo-product/crypto-riddle/issues/51) 暗号ステージ誤答のXP減算の要否 | フォロー（spec §8.4 で決定→反映） | T022 と連動 | 現行 S1 は暗号なしで実害なし |
+| [#53](https://github.com/rokusoudo-product/crypto-riddle/issues/53) 選択肢を南京錠でロック | future（MVP外） | 別途 | ヒント未収集で選択肢ロック。#52 と関連 |
 
 ## 依存関係の要約
 
@@ -378,7 +411,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   状態は解消されている。T005 の完了により T006・T010 も着手可能になり、**T007〜T009 も完了した
   （2026-09-10）ことで Phase 2 が完了し、チェックポイント②を達成した**
 - Phase 3（T011, T012, T014）は T001 のみに依存し、**Phase 2 と並行で進められる**
-- Phase 4 で Phase 2/3 が合流して縦スライス。T018（代表プレイテスト）で**会話モードへの刷新（#42）が決定**したため、**Phase 4.5（会話モード）を挟んでから量産（Phase 5）に入る**。Phase 5 は Phase 4.5 の main マージが関門
+- Phase 4 で Phase 2/3 が合流して縦スライス。T018（代表プレイテスト）で**会話モードへの刷新（#42）＋探索の背景シーン化（#52）が決定**したため、**Phase 4.5（会話モード・完了）→ Phase 4.6（探索背景シーン化）を挟んでから量産（Phase 5）に入る**。Phase 5 は Phase 4.5＋4.6 の main マージが関門
 - 自動実装（po-agent-daily-issue-check）に乗せる場合も、【代表】タスク（T004・T018・T029）は必ず代表操作で行う
 
 ## 実装戦略
