@@ -280,9 +280,23 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
     resetGameStoreForTests({ storage })
   })
 
+  /**
+   * 調査結果の会話フレーム(#52 Phase4.7/#66・T044)を、指定した台詞(line)でスキップして
+   * 閉じる共通手順。台詞そのものがタイプライターのスキップボタンのaccessible nameになる
+   * (#64/T042)ため、それをタップしてから「閉じる」を押す。
+   */
+  async function skipCollectResultAndClose(
+    user: ReturnType<typeof userEvent.setup>,
+    line: string,
+  ): Promise<void> {
+    expect(await screen.findByText(line)).toBeInTheDocument()
+    await skipTypewriterByClick(user, line)
+    await user.click(screen.getByRole('button', { name: '閉じる' }))
+  }
+
   it(
-    '背景シーンのホットスポットのみで全9ポイントを調査でき、PCのdangerは教育的FBのみ' +
-      '(XP減算なし・ペナルティ無し)・電源を落とした後も操作継続できる(詰み防止・spec §8.4)',
+    '背景シーンのホットスポットのみで全9ポイントを調査でき、調査結果が会話フレームで台詞提示され' +
+      '(#66)、PCのdangerは教育的FBのみ(XP減算なし・ペナルティ無し)・電源を落とした後も操作継続できる(詰み防止・spec §8.4)',
     async () => {
       const user = userEvent.setup()
       renderApp()
@@ -311,43 +325,46 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       expect(screen.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeInTheDocument()
       expect(useGameStore.getState().progress).toBe(progressBeforeDanger)
 
-      // 電源を落とした後も同じホットスポットを操作できる(詰み防止)。EDRログをcollectする。
+      // 電源を落とした後も同じホットスポットを操作できる(詰み防止)。EDRログをcollectすると、
+      // シートは閉じ、調査結果が会話フレームで台詞提示される(#66/T044、話者=霧島=ログ系の既定)。
       await user.click(screen.getByRole('button', { name: 'EDRアラートを確認する' }))
       await waitFor(() => {
         expect(
           screen.queryByRole('group', { name: '経理部 中野の端末の操作' }),
         ).not.toBeInTheDocument()
       })
+      expect(await screen.findAllByText('霧島')).not.toHaveLength(0)
+      const edrLine =
+        '中野の端末でExcelのマクロ実行に続いて、見慣れないPowerShellプロセスが起動した記録がある。侵入の起点はここだろう。'
+      await skipCollectResultAndClose(user, edrLine)
       expect(pcHotspot).toHaveAccessibleName('経理部 中野の端末（PC）・調査済み')
 
-      // --- 執務室: person(中野。単一action=即実行)。証言が会話フレーム(話者=橘固定)で表示される。 ---
-      // 「閉じる」は会話フレームのchildrenのため、タイプライターの全文表示(またはスキップ)後に
-      // しか出ない(#64/T042)。ここではタップでスキップする(見出しの証言文がスキップボタンの
-      // accessible nameになる)。
+      // --- 執務室: person(中野。単一action=即実行)。調査結果が会話フレーム(話者=橘)で表示される。 ---
       await user.click(screen.getByRole('button', { name: '中野（人物）' }))
       expect(await screen.findAllByText('橘')).not.toHaveLength(0)
-      const nakanoTestimony =
-        '「月末で請求書処理が立て込んでいて、深く確認せずに開いてしまいました」と中野は証言。ファイルを開いた際にマクロ有効化の警告が出たが、「よくあることだと思い」有効にしたという。'
-      expect(screen.getByText(nakanoTestimony)).toBeInTheDocument()
-      await skipTypewriterByClick(user, nakanoTestimony)
-      await user.click(screen.getByRole('button', { name: '閉じる' }))
+      const nakanoLine =
+        '中野さんに話を聞きました。月末で請求書処理が立て込み、深く確認せずに開いてしまったと。マクロ有効化の警告が出たことにも、深く気を留めなかったそうです。'
+      await skipCollectResultAndClose(user, nakanoLine)
 
       // --- 執務室: person(経理部長。単一action=即実行)。 ---
       await user.click(screen.getByRole('button', { name: '経理部長（人物）' }))
-      const buchoTestimony =
-        '経理部長は「今月は取引先の請求サイクルが集中する時期で、多少雑な件名のメールでも本物だと思い込みやすい状況だった」と説明。添付ファイルのマクロ実行に関する社内規程の周知は徹底されていなかったという。'
-      expect(await screen.findByText(buchoTestimony)).toBeInTheDocument()
-      await skipTypewriterByClick(user, buchoTestimony)
-      await user.click(screen.getByRole('button', { name: '閉じる' }))
+      const buchoLine =
+        '経理部長に伺いました。今月は取引先の請求サイクルが集中する時期で、多少雑な件名のメールでも本物だと思い込みやすい状況だったと。マクロ実行に関する社内規程の周知も、徹底されていなかったようです。'
+      await skipCollectResultAndClose(user, buchoLine)
 
       // --- 執務室: book(資料棚。collectを2件持つ=1件選ぶたびにシートが閉じるため、
-      //     2回に分けて開き直して両方collectする)。 ---
+      //     2回に分けて開き直して両方collectする)。文献系はCVE等の技術文献なら霧島、
+      //     それ以外は橘が既定だが、本シナリオはどちらもspeakerを明示している。 ---
       await user.click(screen.getByRole('button', { name: '資料棚（書籍）' }))
       expect(await screen.findByRole('group', { name: '資料棚の操作' })).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: 'セキュリティ注意喚起情報を確認する' }))
       await waitFor(() => {
         expect(screen.queryByRole('group', { name: '資料棚の操作' })).not.toBeInTheDocument()
       })
+      const advisoryLine =
+        '業界団体の注意喚起を確認した。取引先を装った請求書メールにマクロ付きファイルを添付し、開封後にC2サーバへ接続させる手口が、直近全国で報告されている。今回の型と一致する。'
+      await skipCollectResultAndClose(user, advisoryLine)
+
       await user.click(screen.getByRole('button', { name: '資料棚（書籍）' }))
       expect(await screen.findByRole('group', { name: '資料棚の操作' })).toBeInTheDocument()
       await user.click(
@@ -356,36 +373,47 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       await waitFor(() => {
         expect(screen.queryByRole('group', { name: '資料棚の操作' })).not.toBeInTheDocument()
       })
+      const guidelineLine =
+        'インシデント対応ガイドラインを確認しました。感染が疑われる端末は、まずネットワークから論理的に隔離し、電源は落とさないこと。揮発性メモリに乗った証拠を失わないためです。'
+      await skipCollectResultAndClose(user, guidelineLine)
       expect(screen.getByRole('button', { name: '資料棚（書籍）・調査済み' })).toBeInTheDocument()
 
       // --- サーバ室へシーンタブを切り替える。 ---
       await user.click(screen.getByRole('tab', { name: 'サーバ室' }))
       expect(screen.getByRole('tab', { name: 'サーバ室' })).toHaveAttribute('aria-selected', 'true')
 
-      // device(プロキシサーバ・メールサーバ。単一action=即実行)。
+      // device(プロキシサーバ・メールサーバ。単一action=即実行)。ログ系=話者は霧島の既定。
       await user.click(screen.getByRole('button', { name: 'プロキシサーバ（機器）' }))
+      const proxyLine =
+        '深夜帯、中野のPCから見覚えのない海外IPアドレスへ、約30分間隔で通信が続いている。典型的なビーコン通信のパターンだ。'
+      await skipCollectResultAndClose(user, proxyLine)
       expect(
         screen.getByRole('button', { name: 'プロキシサーバ（機器）・調査済み' }),
       ).toBeInTheDocument()
+
       await user.click(screen.getByRole('button', { name: 'メールサーバ（機器）' }))
+      const mailLine =
+        '問題のメールを確認した。取引先名を騙った件名で、送信元は正規ドメインによく似た別ドメインだ。手口としては典型的だが、手が込んでいる。'
+      await skipCollectResultAndClose(user, mailLine)
       expect(
         screen.getByRole('button', { name: 'メールサーバ（機器）・調査済み' }),
       ).toBeInTheDocument()
 
       // pc(解析用端末。単一action=即実行。dangerは無いのでシートを経由せずcollectのみ)。
       await user.click(screen.getByRole('button', { name: '解析用端末（PC）' }))
+      const sandboxLine =
+        '回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加のプログラムを取得し、プロキシログと同じ宛先へビーコン通信している。IoCとして他端末の調査にも使える。'
+      await skipCollectResultAndClose(user, sandboxLine)
       expect(screen.getByRole('button', { name: '解析用端末（PC）・調査済み' })).toBeInTheDocument()
 
-      // person(情シス担当。単一action=即実行)。証言が会話フレームで表示される。
-      // ip-witness-itstaff には証言カード(is_dummy:true)のほか非ダミーの対策カード
-      // (card-countermeasure-isolate)も紐づいており、pickTestimonyCard は非ダミー優先の
-      // ためこちらの本文が表示される(src/ui/components/explore/scene-explorer.tsx)。
+      // person(情シス担当。単一action=即実行)。調査結果が会話フレームで表示される。
+      // ip-witness-itstaff には証言カードのほか対策カード2枚(正誤の別)も同時に紐づくが、
+      // lineはYAMLで明示した証言ベースの台詞のみを提示する(#66でpickTestimonyCard=非ダミー
+      // 優先の経路を廃止したため、対策カードの本文が誤って表示される不具合=#62は再現しない)。
       await user.click(screen.getByRole('button', { name: '情シス担当（人物）' }))
-      const itStaffTestimony =
-        '感染が疑われる端末をネットワークから論理的に隔離する(LANケーブル抜線・Wi-Fi無効化)。電源は落とさず、揮発性メモリとディスクの証拠を保全した後にIoCを抽出し、被害範囲を特定する。あわせて添付ファイルのマクロ自動実行を組織的に無効化し、標的型メールへの注意喚起を周知する。'
-      expect(await screen.findByText(itStaffTestimony)).toBeInTheDocument()
-      await skipTypewriterByClick(user, itStaffTestimony)
-      await user.click(screen.getByRole('button', { name: '閉じる' }))
+      const itStaffLine =
+        '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。'
+      await skipCollectResultAndClose(user, itStaffLine)
 
       // 一覧側(常に併設)でも9/9件が調査済みとして共有されている(scenes・一覧は同じ状態を共有)。
       expect(screen.getByText('9/9 件調査済み')).toBeInTheDocument()
@@ -396,6 +424,30 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       expect(enterResolution).toBeEnabled()
       await user.click(enterResolution)
       expect(await screen.findByRole('heading', { name: '解決' })).toBeInTheDocument()
+    },
+  )
+
+  it(
+    '情シス担当への聞き取り(ip-witness-itstaff)は証言ベースの台詞のみを提示し、' +
+      '同時に紐づく対策カードの本文が誤って表示されない(#62回帰・#66で構造的に解消)',
+    async () => {
+      const user = userEvent.setup()
+      renderApp()
+
+      await user.click(screen.getByRole('link', { name: 'つづきから' }))
+      await user.click(await screen.findByRole('button', { name: 'マップを選ぶ' }))
+      await user.click(await screen.findByRole('button', { name: 'タップで進行' }))
+      await user.click(screen.getByRole('tab', { name: 'サーバ室' }))
+
+      await user.click(screen.getByRole('button', { name: '情シス担当（人物）' }))
+      const itStaffLine =
+        '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。'
+      expect(await screen.findByText(itStaffLine)).toBeInTheDocument()
+      // #62の症状(対策カードの本文が証言として表示される)が再現しないことを確認する。
+      expect(
+        screen.queryByText(/感染が疑われる端末をネットワークから論理的に隔離する/),
+      ).not.toBeInTheDocument()
+      expect(screen.queryByText(/感染が疑われる端末の電源を直ちに落とし/)).not.toBeInTheDocument()
     },
   )
 })

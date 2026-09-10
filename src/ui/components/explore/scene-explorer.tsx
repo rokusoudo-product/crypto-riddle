@@ -1,7 +1,8 @@
-// src/ui/components/explore/scene-explorer.tsx — 探索④の背景シーン表示(#52/#56・T038)。
+// src/ui/components/explore/scene-explorer.tsx — 探索④の背景シーン表示(#52/#56・T038、
+// 調査結果の会話フレーム化・不可視ホットスポット化は#52 Phase4.7/#66・T044)。
 //
 // DESIGN.md「探索シーン」節が正: 背景シーン(16:9・モバイル縦はレターボックス)の上に
-// クリック可能なホットスポット(実<button>・48px以上・ラベル・フォーカス可視)を重ね、
+// クリック可能なホットスポット(実<button>・48px以上・aria-label・フォーカス可視)を重ね、
 // タップして調べる。シーンタブでシーン切替(キーボード到達可能)。
 //
 // scenario.scenes が無い場合(省略時)は呼び出し側(explore-screen.tsx)が本コンポーネントを
@@ -13,34 +14,45 @@
 // する(#56 実装方針を維持。立ち絵と同じくrepoルートの assets/ を相対importする、
 // conversation-frame.tsx と同じパターン)。
 //
+// ホットスポットの見せ方(#52 Phase4.7・T018''代表決定): 通常はアイコンも名前ラベルも
+// 表示しない(背景の絵に溶け込ませる)。ホバー/キーボードフォーカス時にのみ□マーカー(矩形の
+// アウトライン)で位置と操作可能を示す(hover:/focus-visible:のCSSのみで実現、JS側の状態は
+// 持たない)。読み上げ用の aria-label(種別・名前・調査済みか)は常に保持する(WCAG 2.4.7)。
+//
 // ホットスポットの動作(docs/scenario_schema.md §2.5・spec §8.4):
 // - collect: investigation_point_id のカードを獲得する(呼び出し側の onCollect 経由、
-//   既存のINVESTIGATEイベントに接続。coreの状態機械は変更しない)。
+//   既存のINVESTIGATEイベントに接続。coreの状態機械は変更しない)。獲得後は調査結果を
+//   会話フレームで台詞提示する(下記参照)。
 // - danger: feedback(教育的な台詞)を表示するのみ。ペナルティ無し・操作継続可(詰み防止)。
 //   dispatchは一切呼ばないため、電源を落とした後も同じホットスポットは何度でも操作できる。
+//   従来どおりアクションシート内のテキストで表示する(会話フレーム化はしない、#66スコープ外)。
 // - noop: 何もせず閉じる。
 // - 1ホットスポットのactionsが1件のみの場合はアクションシートを出さず、即座にそのactionを
 //   実行する(spec本文「PC等で複数actionがあるものはアクションシートで選ばせる」の裏返しで、
 //   1件のみ=personの「話を聞く」等は選ぶ余地が無いため即実行にする)。
 //
-// 人物(person)ホットスポットの証言表示(#50の探索④部分をここに統合):
-// scenarioのcard/investigation_pointにはUI表示用の「話者」フィールドが無く(coreスキーマは
-// #55/T037でこのIssueの対象外として凍結)、証言を語る霧島/橘の割り当てはUI側の見せ方の
-// 選択に過ぎない。橘は「場を動かす司令塔」(docs/characters.md §5)であり聞き取りの進行役に
-// 自然という理由で、本コンポーネントでは証言表示の話者を橘に固定する(コアデータに依存しない
-// 表示上の割り当てのため、後で変更してもスキーマへの影響は無い)。
+// 調査結果の会話フレーム提示(#52 Phase4.7・T044、#62 吸収):
+// 人物の証言だけでなく、PC のログ・書籍の文献も含めて種別を問わず同じ経路で会話フレームに
+// 台詞提示する(旧: personのみ・かつ非ダミー先頭カードを選ぶpickTestimonyCardだったため、
+// 対策カードが証言として表示される不具合があった=#62。line/speakerの明示に一本化した
+// 本Issueで、その経路自体を廃止して構造的に解消する)。
+// 台詞(line)は collect action の line(#65/T043)を使い、無ければ既定の導入文
+// (person:「{ラベル}に話を聞いた。」/それ以外:「{ラベル}を調べた。」)＋そのinvestigation_point
+// に紐づく先頭カードの本文にフォールバックする。話者(speaker)は action.speaker を優先し、
+// 無ければ investigation_point.category から既定を導出する(ログを見る→霧島／それ以外
+// (人に聞く・文献を引く)→橘。resolveCollectPresentation参照)。
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
-import { BookOpen, Check, Monitor, Smartphone, User, X } from 'lucide-react'
+import { X } from 'lucide-react'
 
 import type {
-  Card,
   Character,
   HotspotAction,
-  HotspotObjectType,
+  InvestigationPoint,
   Scenario,
   Scene,
   SceneHotspot,
 } from '@/core/model'
+import { CardDrawer } from '@/ui/components/card-drawer'
 import { ConversationFrame } from '@/ui/components/conversation-frame'
 import { Button } from '@/ui/components/ui/button'
 import { cn } from '@/ui/lib/utils'
@@ -54,23 +66,14 @@ const BACKGROUND_SRC: Record<string, string> = {
   'bg-s1-server': bgS1Server,
 }
 
-const OBJECT_TYPE_ICON: Record<HotspotObjectType, typeof Monitor> = {
-  pc: Monitor,
-  person: User,
-  book: BookOpen,
-  device: Smartphone,
-}
-
-// 色だけに頼らず種別をラベルでも示す(DESIGN.md「探索シーン」節・WCAG 1.4.1)。
-const OBJECT_TYPE_LABEL: Record<HotspotObjectType, string> = {
+// 色だけに頼らず種別をaria-label(常時保持)でも示す(DESIGN.md「探索シーン」節・WCAG 1.4.1)。
+// 通常表示ではアイコン・可視ラベルを一切出さないため、UI上の用途は aria-label の組み立てのみ。
+const OBJECT_TYPE_LABEL: Record<SceneHotspot['object_type'], string> = {
   pc: 'PC',
   person: '人物',
   book: '書籍',
   device: '機器',
 }
-
-/** 証言表示の話者(UI都合の固定割り当て。ファイル冒頭コメント参照)。 */
-const TESTIMONY_SPEAKER: Character = '橘'
 
 type CollectAction = Extract<HotspotAction, { kind: 'collect' }>
 
@@ -87,10 +90,35 @@ function isHotspotInvestigated(
   return ids.length > 0 && ids.every((id) => investigatedPointIds.includes(id))
 }
 
-/** 証言表示に使うカードを選ぶ(非ダミー優先。無ければ先頭)。 */
-function pickTestimonyCard(scenario: Scenario, investigationPointId: string): Card | undefined {
-  const cards = scenario.cards.filter((c) => c.investigation_point_id === investigationPointId)
-  return cards.find((c) => !c.is_dummy) ?? cards[0]
+/** 調査3系統(investigation_point.category)から話者の既定を導出する(ログを見る→霧島／
+ * 人に聞く・文献を引く→橘。DESIGN.md「探索シーン」節)。CVE等の技術文献はaction.speakerの
+ * 明示で霧島に振れる(このデフォルトはaction.speaker未指定の場合のみ使われる)。 */
+function defaultSpeakerForCategory(category: InvestigationPoint['category']): Character {
+  return category === 'ログを見る' ? '霧島' : '橘'
+}
+
+/**
+ * collect action の話者・台詞を解決する(#52 Phase4.7/T044)。line/speakerが明示されていれば
+ * それを使い、無ければ既定の導入文＋カード本文(先頭カード)にフォールバックする。
+ * is_dummyでの選別は行わない(#62 吸収: 非ダミー優先で選ぶ経路自体を廃止したため)。
+ */
+function resolveCollectPresentation(
+  scenario: Scenario,
+  hotspot: SceneHotspot,
+  action: CollectAction,
+): { speaker: Character; line: string } {
+  const point = scenario.investigation_points.find((p) => p.id === action.investigation_point_id)
+  const speaker = action.speaker ?? defaultSpeakerForCategory(point?.category ?? '人に聞く')
+  if (action.line) return { speaker, line: action.line }
+
+  const firstCardBody = scenario.cards.find(
+    (c) => c.investigation_point_id === action.investigation_point_id,
+  )?.body
+  const intro =
+    hotspot.object_type === 'person'
+      ? `${hotspot.label}に話を聞いた。`
+      : `${hotspot.label}を調べた。`
+  return { speaker, line: firstCardBody ? `${intro}${firstCardBody}` : intro }
 }
 
 export interface SceneExplorerProps {
@@ -98,6 +126,8 @@ export interface SceneExplorerProps {
   /** scenario.scenes(呼び出し側で存在確認済みの非空配列)。 */
   scenes: readonly Scene[]
   investigatedPointIds: readonly string[]
+  /** 獲得済みカードid(会話フレーム上の?ボタン=CardDrawerに渡す、探索で得た手持ちカードの無料閲覧用)。 */
+  ownedCardIds: readonly string[]
   /** investigation_point_id を1件獲得する(既存のINVESTIGATEイベント配線先)。 */
   onCollect: (pointId: string) => void
 }
@@ -107,6 +137,7 @@ export function SceneExplorer({
   scenario,
   scenes,
   investigatedPointIds,
+  ownedCardIds,
   onCollect,
 }: SceneExplorerProps) {
   const tabsId = useId()
@@ -121,15 +152,20 @@ export function SceneExplorer({
   // (シーン切替時にクリアするため、シーンIDを跨いだ一意化は不要)。
   const [openHotspotIndex, setOpenHotspotIndex] = useState<number | null>(null)
   const [dangerFeedback, setDangerFeedback] = useState<string | null>(null)
-  const [testimony, setTestimony] = useState<{ hotspotLabel: string; line: string } | null>(null)
+  // 調査結果の会話フレーム表示状態(#52 Phase4.7/T044)。人物の証言に限らずcollect全種で使う。
+  const [collectResult, setCollectResult] = useState<{
+    hotspotLabel: string
+    speaker: Character
+    line: string
+  } | null>(null)
 
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
   const returnFocusRef = useRef<HTMLButtonElement | null>(null)
-  // アクションシート・証言パネルを開いたら、フォーカスを内部の最初の操作対象へ自動的に移す
+  // アクションシート・調査結果パネルを開いたら、フォーカスを内部の最初の操作対象へ自動的に移す
   // (ダイアログ/ディスクロージャの一般的なフォーカス管理。id経由でDOM要素を掴む方式にし、
   // Button コンポーネントの ref 転送有無に依存しないようにする)。
   const sheetFirstActionId = `${tabsId}-sheet-first-action`
-  const testimonyCloseId = `${tabsId}-testimony-close`
+  const resultCloseId = `${tabsId}-result-close`
 
   useEffect(() => {
     if (openHotspotIndex !== null) {
@@ -137,15 +173,15 @@ export function SceneExplorer({
     }
   }, [openHotspotIndex, sheetFirstActionId])
 
-  // 証言パネルの「閉じる」はConversationFrameのchildrenのため、タイプライターの全文表示
-  // (またはスキップ)が完了するまでDOMに存在しない(#64/T042)。以前のように testimony が
+  // 調査結果パネルの「閉じる」はConversationFrameのchildrenのため、タイプライターの全文表示
+  // (またはスキップ)が完了するまでDOMに存在しない(#64/T042)。以前のように collectResult が
   // 変わった直後にフォーカスしても閉じるボタンはまだ無く空振りするため、ConversationFrame の
   // onLineRevealed(全文表示完了の通知)を経由してフォーカスする。
 
   function closeOverlays() {
     setOpenHotspotIndex(null)
     setDangerFeedback(null)
-    setTestimony(null)
+    setCollectResult(null)
   }
 
   function returnFocus() {
@@ -171,16 +207,11 @@ export function SceneExplorer({
   function runAction(hotspot: SceneHotspot, action: HotspotAction) {
     if (action.kind === 'collect') {
       onCollect(action.investigation_point_id)
-      if (hotspot.object_type === 'person') {
-        const card = pickTestimonyCard(scenario, action.investigation_point_id)
-        setOpenHotspotIndex(null)
-        setDangerFeedback(null)
-        setTestimony({ hotspotLabel: hotspot.label, line: card?.body ?? action.label })
-        return
-      }
+      // 種別を問わず同じ経路で調査結果を会話フレームに台詞提示する(#62吸収、ファイル冒頭コメント参照)。
+      const { speaker, line } = resolveCollectPresentation(scenario, hotspot, action)
       setOpenHotspotIndex(null)
       setDangerFeedback(null)
-      returnFocus()
+      setCollectResult({ hotspotLabel: hotspot.label, speaker, line })
       return
     }
     if (action.kind === 'danger') {
@@ -200,7 +231,7 @@ export function SceneExplorer({
     trigger: HTMLButtonElement,
   ) {
     returnFocusRef.current = trigger
-    setTestimony(null)
+    setCollectResult(null)
     // 単一actionのショートカット即実行は「collectのみ」の場合に限る(例: personの「話を聞く」)。
     // danger/noop単独の場合はアクションシートを経由させ、教育的フィードバックの表示先
     // (アクションシート内)を確保する(danger単独ホットスポットでもfeedbackが必ず表示される)。
@@ -215,6 +246,8 @@ export function SceneExplorer({
 
   const openHotspot =
     openHotspotIndex !== null ? (activeScene.hotspots[openHotspotIndex] ?? null) : null
+  // 調査結果の会話フレーム上に置く?ボタン(CardDrawer)へ渡す、探索で得た手持ちカード(#66)。
+  const ownedCards = scenario.cards.filter((card) => ownedCardIds.includes(card.id))
 
   return (
     <div className="flex flex-col gap-3">
@@ -283,31 +316,27 @@ export function SceneExplorer({
           )}
           {activeScene.hotspots.map((hotspot, hotspotIndex) => {
             const [x, y] = hotspot.position
-            const Icon = OBJECT_TYPE_ICON[hotspot.object_type]
             const investigated = isHotspotInvestigated(hotspot, investigatedPointIds)
             const needsSheet = hotspot.actions.length > 1
             return (
               <Button
                 key={hotspotIndex}
                 type="button"
-                variant="outline"
+                variant="ghost"
                 aria-label={`${hotspot.label}（${OBJECT_TYPE_LABEL[hotspot.object_type]}）${investigated ? '・調査済み' : ''}`}
                 aria-expanded={needsSheet ? openHotspotIndex === hotspotIndex : undefined}
                 aria-haspopup={needsSheet ? 'true' : undefined}
                 style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
-                className="bg-card absolute min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 flex-col gap-1 px-2 py-1"
+                // 通常はアイコンも名前ラベルも表示しない(背景の絵に溶け込ませる、DESIGN.md
+                // 「探索シーン」節・T018''代表決定)。ホバー/キーボードフォーカス時にのみ
+                // □マーカー(矩形のアウトライン)を出し、位置と操作可能を示す。
+                // aria-expanded:bg-mutedはButtonのghost variant既定のため、シートを開いた
+                // ホットスポットに常時の塗りが出ないよう打ち消す(不可視の原則を優先)。
+                className="absolute min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-transparent bg-transparent hover:border-ring hover:bg-transparent hover:ring-3 hover:ring-ring/50 focus-visible:border-ring aria-expanded:bg-transparent dark:hover:bg-transparent"
                 onClick={(event) =>
                   handleHotspotActivate(hotspot, hotspotIndex, event.currentTarget)
                 }
-              >
-                {investigated ? (
-                  <Check aria-hidden="true" className="size-4" />
-                ) : (
-                  <Icon aria-hidden="true" className="size-4" />
-                )}
-                {/* 種別を色＋アイコン＋ラベルで示す(色だけに頼らない, DESIGN.md「探索シーン」節)。 */}
-                <span className="text-xs">{hotspot.label}</span>
-              </Button>
+              />
             )
           })}
         </div>
@@ -369,26 +398,39 @@ export function SceneExplorer({
           </div>
         )}
 
-        {/* 人物の証言は会話フレームで表示する(#50の探索④部分の統合、DESIGN.md「探索シーン」節)。 */}
-        {testimony && (
+        {/* 調査結果は種別を問わず会話フレームで台詞提示する(#52 Phase4.7/T044・#62吸収、
+            DESIGN.md「探索シーン」節。ファイル冒頭コメント参照)。
+            「閉じる」を?ボタン(CardDrawer)より先にDOM上へ置く: タイプライターのスキップ操作
+            (#64/T042)は完了後に children 内の最初のフォーカス可能要素へ自動的にフォーカスを
+            移すため、閉じるが先勝ちするようにしてホットスポットへのフォーカス復帰動線
+            (returnFocus)を保つ。?ボタンは視覚上は同じ行の右側に置く(flexのjustify-betweenで
+            並び順=視覚位置がそのまま合致するため、DOM順と見た目の両立を犠牲にしない)。 */}
+        {collectResult && (
           <ConversationFrame
-            speaker={TESTIMONY_SPEAKER}
-            line={testimony.line}
-            onLineRevealed={() => document.getElementById(testimonyCloseId)?.focus()}
+            speaker={collectResult.speaker}
+            line={collectResult.line}
+            onLineRevealed={() => document.getElementById(resultCloseId)?.focus()}
           >
-            <p className="text-muted-foreground text-xs">{testimony.hotspotLabel}からの証言</p>
-            <Button
-              type="button"
-              variant="outline"
-              id={testimonyCloseId}
-              className="h-12 min-w-12 self-start px-6"
-              onClick={() => {
-                setTestimony(null)
-                returnFocus()
-              }}
-            >
-              閉じる
-            </Button>
+            <p className="text-muted-foreground text-xs">
+              {collectResult.hotspotLabel}を調べた結果
+            </p>
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                id={resultCloseId}
+                className="h-12 min-w-12 px-6"
+                onClick={() => {
+                  setCollectResult(null)
+                  returnFocus()
+                }}
+              >
+                閉じる
+              </Button>
+              {/* カード閲覧(無料)の?ボタン(DESIGN.md「探索シーン」節。解決の card-drawer と同じ、
+                  相談=回数消費とは別物)。 */}
+              <CardDrawer cards={ownedCards} triggerVariant="icon" />
+            </div>
           </ConversationFrame>
         )}
       </div>

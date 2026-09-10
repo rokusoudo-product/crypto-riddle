@@ -15,12 +15,18 @@ import { useScreenState } from '@/ui/state/use-screen-state'
 //
 // 2026-09-10(#52/#56・T038): 探索を「背景シーン＋ホットスポット」方式に刷新した。
 // `scenario.scenes`(#55/T037で追加された省略可能フィールド)がある場合は SceneExplorer
-// (背景シーン・シーンタブ・ホットスポット・アクションシート・人物証言の会話フレーム)を
+// (背景シーン・シーンタブ・ホットスポット・アクションシート・調査結果の会話フレーム)を
 // 表示し、無い場合は従来どおり本ファイルの一覧のみを表示する(docs/scenario_schema.md §2.5)。
 // 「調査ポイント一覧」は scenes の有無に関わらず**常に併設**し、背景に頼らずキーボードのみで
 // 全ポイント調査→解決へ進めることを保証する(Issue #56 完了条件・WCAG)。
 // scenes・一覧のどちらも同じ dispatch({type:'INVESTIGATE'}) に接続するだけで、core の
 // シナリオ進行ステートマシン(src/core/scenario/state.ts)には一切手を入れていない。
+//
+// 2026-09-11(#52 Phase4.7/#66・T044): ホットスポットを常時不可視にしたため(scene-explorer.tsx)、
+// 「調査ポイント一覧」はモバイル(タッチ端末)でも折りたたまず初期表示することが完了条件になった
+// (DESIGN.md「探索シーン」節)。本ファイルは元々この一覧を折りたたみ機構なしで常時表示している
+// ため、追加のコード変更は不要(デスクトップも同じ常時表示のままでよい、Issue #66)。
+// e2e(e2e/s1-playthrough.spec.ts のモバイル幅テスト)でこの前提を回帰確認する。
 export function ExploreScreen() {
   const state = useScreenState()
   const navigate = useNavigate()
@@ -74,6 +80,7 @@ export function ExploreScreen() {
             scenario={scenario}
             scenes={scenes}
             investigatedPointIds={progress.investigatedPointIds}
+            ownedCardIds={progress.ownedCardIds}
             onCollect={handleInvestigate}
           />
         )}

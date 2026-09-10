@@ -51,20 +51,26 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
     expect(screen.getByText('田中さんへの聞き取り')).toBeInTheDocument()
   })
 
-  it('ホットスポットは48px以上の実<button>で、種別・可視ラベルを持つ', () => {
+  it('ホットスポットは48px以上の実<button>で、通常は不可視(可視テキスト無し)・aria-labelは常時保持する(#66)', () => {
     renderExplore(exploreSceneFixture)
     const pcHotspot = screen.getByRole('button', { name: /経理担当のPC（PC）/ })
     expect(pcHotspot.tagName).toBe('BUTTON')
     expect(pcHotspot).toHaveClass('min-h-12', 'min-w-12')
-    // 色だけに頼らず、可視のラベルテキストも持つ(DESIGN.md「探索シーン」節・WCAG 1.4.1)。
-    expect(within(pcHotspot).getByText('経理担当のPC')).toBeInTheDocument()
+    // 通常はアイコンも名前ラベルも表示しない(DESIGN.md「探索シーン」節・T018''代表決定)。
+    // 種別・調査済みかは aria-label(getByRoleのname)だけで常に保持する(WCAG 2.4.7)。
+    expect(pcHotspot).toHaveTextContent('')
+    // ホバー/キーボードフォーカス時に□マーカー(枠線)を出すクラスを持つ(jsdomは疑似クラスを
+    // 評価しないため、クラス文字列の存在で確認する)。
+    expect(pcHotspot.className).toMatch(/hover:border-ring/)
+    expect(pcHotspot.className).toMatch(/focus-visible:border-ring/)
     const personHotspot = screen.getByRole('button', { name: /田中さん（人物）/ })
     expect(personHotspot).toHaveClass('min-h-12', 'min-w-12')
+    expect(personHotspot).toHaveTextContent('')
   })
 
   it(
     '背景シーン経由で、キーボードのみで全ポイント調査→解決へ進められる' +
-      '(danger操作は教育的フィードバックのみでペナルティ無し・操作継続可)',
+      '(danger操作は教育的フィードバックのみでペナルティ無し・操作継続可、調査結果は会話フレームで台詞提示される#66)',
     async () => {
       const user = userEvent.setup()
       renderExplore(exploreSceneFixture)
@@ -90,35 +96,45 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(useGameStore.getState().progress).toBe(progressBeforeDanger)
 
       // Shift+Tabで「ログを取る」(collect)へ戻り、カードを獲得する。
-      // シートは閉じ、フォーカスはホットスポットへ戻る。
+      // シートは閉じ、調査結果が会話フレームで台詞提示される(#66/T044、PCのlineは明示済み)。
       await user.keyboard('{Shift>}{Tab}{/Shift}')
       expect(document.activeElement).toHaveTextContent('ログを取る')
       await user.keyboard('{Enter}')
       await waitFor(() => {
         expect(screen.queryByRole('group', { name: '経理担当のPCの操作' })).not.toBeInTheDocument()
       })
+      expect(screen.getAllByText('霧島').length).toBeGreaterThan(0)
+      const pcLine = '不審なプロセスの起動ログが残っている。マルウェア感染の可能性が高い。'
+      expect(screen.getByText(pcLine)).toBeInTheDocument()
+
+      // 「閉じる」は会話フレームのchildrenのため、タイプライターの全文表示(またはスキップ)後に
+      // しか出ない(#64/T042)。台詞そのものがスキップボタンのaccessible nameになるので、
+      // それをフォーカスしてEnterでキーボードのみスキップする。スキップすると children 内の
+      // 最初のフォーカス可能要素(=「閉じる」。?ボタンより先にDOM上へ置いている)へ
+      // 自動的にフォーカスが移る(ConversationFrame側の仕様)。
+      screen.getByRole('button', { name: pcLine }).focus()
+      await user.keyboard('{Enter}')
+      expect(document.activeElement).toHaveTextContent('閉じる')
+      await user.keyboard('{Enter}')
+      expect(screen.queryByText(pcLine)).not.toBeInTheDocument()
       expect(document.activeElement).toBe(pcHotspot)
       expect(pcHotspot).toHaveAccessibleName(/・調査済み/)
 
-      // 人物ホットスポット(person・単一action)。実行すると証言が会話フレームで表示される。
+      // 人物ホットスポット(person・単一action)。line/speakerを省略しているため、既定の
+      // 導入文＋カード本文へのフォールバックで会話フレームに表示される(話者既定=橘、#66)。
       const personHotspot = screen.getByRole('button', { name: /田中さん（人物）/ })
       personHotspot.focus()
       await user.keyboard('{Enter}')
       expect(await screen.findAllByText('橘')).not.toHaveLength(0)
-      const tanakaTestimony = '「昼過ぎに画面の様子がおかしくなった」と田中さんは証言した。'
-      expect(screen.getByText(tanakaTestimony)).toBeInTheDocument()
+      const tanakaLine =
+        '田中さんに話を聞いた。「昼過ぎに画面の様子がおかしくなった」と田中さんは証言した。'
+      expect(screen.getByText(tanakaLine)).toBeInTheDocument()
 
-      // 「閉じる」は会話フレームのchildrenのため、タイプライターの全文表示(またはスキップ)後に
-      // しか出ない(#64/T042)。証言文そのものがスキップボタンのaccessible nameになるので、
-      // それをフォーカスしてEnterでキーボードのみスキップする。スキップすると children 内の
-      // 最初のフォーカス可能要素(=「閉じる」)へ自動的にフォーカスが移る(ConversationFrame側の仕様)。
-      screen.getByRole('button', { name: tanakaTestimony }).focus()
+      screen.getByRole('button', { name: tanakaLine }).focus()
       await user.keyboard('{Enter}')
       expect(document.activeElement).toHaveTextContent('閉じる')
       await user.keyboard('{Enter}')
-      expect(
-        screen.queryByText('「昼過ぎに画面の様子がおかしくなった」と田中さんは証言した。'),
-      ).not.toBeInTheDocument()
+      expect(screen.queryByText(tanakaLine)).not.toBeInTheDocument()
       expect(document.activeElement).toBe(personHotspot)
 
       // 一覧側でも両方調査済みになっている(scenes・一覧は同じ状態を共有する)。
@@ -129,6 +145,32 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       await waitFor(() => expect(enterResolution).toBeEnabled())
     },
   )
+
+  it('調査結果の会話フレーム上の?ボタンで、獲得済みの手持ちカードを無料で閲覧できる(#66)', async () => {
+    const user = userEvent.setup()
+    renderExplore(exploreSceneFixture)
+
+    const pcHotspot = screen.getByRole('button', { name: /経理担当のPC（PC）/ })
+    pcHotspot.focus()
+    await user.keyboard('{Enter}')
+    // PCはcollect/danger/noopの3action=シート経由。最初のaction(collect)をそのまま実行する。
+    await user.keyboard('{Enter}')
+
+    const pcLine = '不審なプロセスの起動ログが残っている。マルウェア感染の可能性が高い。'
+    expect(await screen.findByText(pcLine)).toBeInTheDocument()
+
+    // ?ボタンはaria-label固定文言・48px(DESIGN.md「探索シーン」節)。台詞のタイプライターは
+    // 全文表示(またはスキップ)後にしか?ボタンが描画されないため、まずスキップする。
+    await user.click(screen.getByRole('button', { name: pcLine }))
+    const cardDrawerButton = await screen.findByRole('button', {
+      name: '手持ちカードを見る（無料）',
+    })
+    expect(cardDrawerButton).toHaveClass('size-12')
+    await user.click(cardDrawerButton)
+    expect(await screen.findByRole('heading', { name: '手持ちカード' })).toBeInTheDocument()
+    // ip-pc-logのcollectで獲得したカード(card-pc-log)が並ぶ(is_dummyの有無に関わらず全件)。
+    expect(screen.getByText('不審なプロセスの起動ログが残っていた。')).toBeInTheDocument()
+  })
 
   it('シーンタブは矢印キーで切り替えられ、切替後は別シーンのホットスポットが操作できる', async () => {
     const user = userEvent.setup()
