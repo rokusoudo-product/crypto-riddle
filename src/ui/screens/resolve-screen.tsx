@@ -114,7 +114,14 @@ export function ResolveScreen() {
               」への有効な対策カードを配置してください。
             </p>
             <CardPlacementBoard
-              cards={ownedCards(progress.ownedCardIds, scenario.cards)}
+              // 防衛策の選択肢は type='対策' のカードのみに絞る(scenario.ts の superRefine で
+              // countermeasure.required_card_ids も type='対策' に限定されている前提と揃える)。
+              // 絞らないと他 type のカードを誤って配置でき、countermeasure 用の
+              // wrong_answer_follow_ups(例: S1 の電源シャットダウンに対する解説)と
+              // 無関係な誤答でも同じ文言が出てしまう。
+              cards={ownedCards(progress.ownedCardIds, scenario.cards).filter(
+                (card) => card.type === '対策',
+              )}
               slotCount={scenario.resolution.countermeasure.required_card_ids.length}
               onConfirm={handleCountermeasureConfirm}
               confirmLabel="対策を選ぶ"

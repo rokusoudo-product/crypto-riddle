@@ -19,5 +19,9 @@ export default defineConfig({
     // src/ui/**/*.test.tsx 側は各ファイル先頭の `/** @vitest-environment jsdom */`
     // docblock で jsdom に切り替える（Vitest 4 は environmentMatchGlobs 廃止）。
     setupFiles: ['./src/test/setup.ts'],
+    // T017: e2e/*.spec.ts は Playwright(@playwright/test)専用で Vitest の対象ではない。
+    // 上記 include は元々 src/scripts 配下にしかマッチしないため実害は無いが、将来 include を
+    // 緩めた際に誤って拾わないよう明示的に除外しておく。
+    exclude: ['e2e/**', 'node_modules/**'],
   },
 })

@@ -9,7 +9,7 @@
 #   イラスト用の創作であり、代表監修前の制作素材としては扱わないこと。
 # - src/core/model/scenario.ts (zod, T005) に準拠する。`npm run build:data` で検証できる。
 
-schema_version: "0.1.0"
+schema_version: "0.2.0"
 id: s0-sample
 title: アルファテック社 顧客データ流出事件(スキーマサンプル)
 status: sample
@@ -23,11 +23,13 @@ subject_tags:
 difficulty: 2
 estimated_minutes: 12
 
-source:
-  type: original
-  note: >-
-    IPA SC で頻出のパスワードリスト攻撃というテーマ知識を参考にしたオリジナル創作。
-    特定年度・特定問題からの引用ではない。#14(出典表記規則)確定後に表記形式を見直す。
+# 出典表記(docs/citation-policy.md §5, #14)。特定の年度・問題からの引用ではなくテーマ参考のみのため
+# material_kind + note のみとし、exam/year_jp/division/question は捏造しない。
+references:
+  - material_kind: 攻撃手口
+    note: >-
+      IPA SC で頻出のパスワードリスト攻撃というテーマ知識を参考にしたオリジナル創作。
+      特定年度・特定問題からの引用ではない。
 
 related_terms:
   - term-password-list-attack

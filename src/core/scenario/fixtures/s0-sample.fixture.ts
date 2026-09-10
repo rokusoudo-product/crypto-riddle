@@ -17,17 +17,19 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const s0SampleFixture: Scenario = {
-  schema_version: '0.1.0',
+  schema_version: '0.2.0',
   id: 's0-sample',
   title: 'アルファテック社 顧客データ流出事件(スキーマサンプル)',
   status: 'sample',
   subject_tags: ['認証', '攻撃手法', 'インシデント対応', '法制度'],
   difficulty: 2,
   estimated_minutes: 12,
-  source: {
-    type: 'original',
-    note: 'IPA SC で頻出のパスワードリスト攻撃というテーマ知識を参考にしたオリジナル創作。特定年度・特定問題からの引用ではない。',
-  },
+  references: [
+    {
+      material_kind: '攻撃手口',
+      note: 'IPA SC で頻出のパスワードリスト攻撃というテーマ知識を参考にしたオリジナル創作。特定年度・特定問題からの引用ではない。',
+    },
+  ],
   related_terms: [
     'term-password-list-attack',
     'term-multi-factor-authentication',

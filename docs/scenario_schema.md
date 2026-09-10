@@ -13,7 +13,7 @@ related:
   - scripts/build-data.ts（YAML→JSON ビルドパイプライン。T010）
 status: reviewed
 created: 2026-08-07
-updated: 2026-09-09
+updated: 2026-09-10
 ---
 
 # crypto-riddle — シナリオ記述フォーマット
@@ -68,7 +68,7 @@ scripts/
 | `subject_tags` | §9 | 分野タグ。**7種で固定**（Issue #22 決定・2026-09-09）: `暗号`/`認証`/`Web`/`攻撃手法`/`インシデント対応`/`法制度`/`ネットワーク基盤`。値集合の正本は `src/core/model/tags.ts` の `SUBJECT_TAGS` |
 | `difficulty` | §9 | 1(易)〜5(難) |
 | `estimated_minutes` | US-1 | 想定プレイ時間(分)。目安10〜15分 |
-| `source` | FR-7 | 出典(§4 参照) |
+| `references` | FR-7 | 出典表記(§3 参照)。配列・省略可 |
 | `related_terms` | #4 | 用語カードマスタへの緩い参照(§6 参照) |
 | `intro` | §4.1 導入 | 背景・被害会社・サポート役の導入台詞 |
 | `investigation_points` | §7 探索 | 調査ポイント(3系統) |
@@ -92,8 +92,11 @@ spec §7 の「①ログを見る ②人に聞く ③文献を引く」を `inve
 
 ### 2.3 暗号解読（解決パート①）
 
-- `resolution.cipher_stages` は配列だが、**MVP では要素数を必ず1個に固定**（zod では `.length(1)`）。
+- `resolution.cipher_stages` は配列だが、**MVP では要素数を最大1個に制限**（zod では `.max(1)`）。
   これは Issue #3 の代表回答「まずは1種ずつ。複数種・複数段の汎用表現は後回し」を反映したもの。
+  **0個（暗号なし）も許容する**（T015, Issue #5 代表回答: 入門シナリオ S1 は初動対応中心で暗号を含めない）。
+  0個の場合、`src/core/scenario/state.ts` の `ENTER_RESOLUTION` は暗号ステージを飛ばし、探索完了から
+  直接 `attack_identification` ステージへ進む。
 - 複数段（例: 古典暗号で得た文字列を鍵に別処理→ハッシュ照合、等）が必要になったら、
   **配列に要素を増やすだけ**で対応できるよう設計してある(=拡張時にスキーマの形を壊さない)。
   `.length(1)` の制約を外すだけで良い想定。
@@ -113,21 +116,28 @@ spec §7 の「①ログを見る ②人に聞く ③文献を引く」を `inve
 - `attack_identification.required_card_ids` に `is_dummy: true` のカードを含めてはならない。
 - `countermeasure.required_card_ids` は `type: 対策` のカードのみを参照できる。
 
-## 3. 出典表記（`source`）
+## 3. 出典表記（`references`）
 
-FR-7「IPA 過去問由来素材に出典表記を明示する」に対応するフィールド。`#14`（IPA 過去問の出典表記規則）が
-未確定のため、現時点では次の緩い構造にとどめている:
+FR-7「IPA 過去問由来素材に出典表記を明示する」に対応するフィールド。フィールド構成の正本は
+`docs/citation-policy.md` §5（`#14`, 2026-09-10 制定）とし、本節はその要約に留める。
 
 ```yaml
-source:
-  type: ipa_sc_am2   # ipa_sc_am2 | ipa_sc_pm | original | other
-  exam_period: "2025年 秋期"
-  question_no: "問17"
-  note: "自由記述(改変の有無など)"
+references:
+  - exam: SC                # SC | NW（省略可。テーマ参考のみの場合は省略する）
+    year_jp: "令和6年度"      # 省略可
+    season: "春期"           # 春期 | 秋期。省略可
+    division: "午後"         # 省略可
+    question: "問2"          # 省略可
+    material_kind: 攻撃手口   # 攻撃手口 | 技術要素 | 事例類型 | 用語（必須）
+    note: "自由記述"          # 省略可
 ```
 
-`#14` 確定後、`type` の enum やフィールド構成を見直す可能性がある。破壊的変更になる場合は
-`schema_version` を上げること。
+- `material_kind` のみが必須。特定の年度・問題からの引用ではなく**テーマ知識のみを参考にした場合**は
+  `exam`/`year_jp`/`season`/`division`/`question` を省略し、根拠のない値を捏造しない（citation-policy §1・T015 代表回答）。
+- 参照元が無い完全オリジナルのシナリオには `references` 自体を省略する（citation-policy §3）。
+- 改変フラグは持たない（citation-policy §1「過去問と同じような問題は出さない」方針のため発生しない）。
+- **T015（2026-09-10）で `source`（単一・必須オブジェクト）から `references`（配列・省略可）へ破壊的変更し、
+  `schema_version` を `0.1.0` から `0.2.0` に上げた**（旧形式データはすべて本 PR で移行済み。移行関数は持たない）。
 
 ## 4. 法制度データの分離（`legal/*.yaml`）
 
@@ -203,7 +213,8 @@ Vitest テストがある）。
 
 ## 8. 既知の未確定事項
 
-- `source` のフィールド構成は `#14`（IPA 過去問の出典表記規則）確定後に見直す可能性がある。
-- 暗号を複数段にする場合の `cipher_stages` の `.length(1)` 制約解除、および各段の入出力の繋ぎ方
+- ~~`source` のフィールド構成は `#14`（IPA 過去問の出典表記規則）確定後に見直す可能性がある。~~ →
+  **解決済み（T015, 2026-09-10）**: `references`（citation-policy §5 準拠）へ移行済み。
+- 暗号を複数段にする場合の `cipher_stages` の `.max(1)` 制約解除、および各段の入出力の繋ぎ方
   （前段の平文を次段の鍵にする等）は、複数段化が実際に必要になった時点で設計する（#3 代表回答により後回し）。
 - シナリオ側 `related_terms` の実在チェックは #4 のマスタ整備後の追加候補として残る（§6）。

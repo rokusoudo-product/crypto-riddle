@@ -1,11 +1,36 @@
+import type { ScenarioReference } from '@/core/model'
 import { PrimaryAction, SecondaryAction } from '@/ui/components/screen-actions'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
+import { CLEAR_XP_REWARD } from '@/ui/store/save-integration'
 import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
 
+// docs/citation-policy.md §5 の exam コードを画面表示用の正式名称へ展開する(§3 表記例)。
+const EXAM_FULL_NAME: Record<NonNullable<ScenarioReference['exam']>, string> = {
+  SC: '情報処理安全確保支援士試験',
+  NW: 'ネットワークスペシャリスト試験',
+}
+
+/** citation-policy §3 の表記(例: 「情報処理安全確保支援士試験 令和6年度 春期 午後 問2（攻撃手口）」)を組み立てる。 */
+function formatReference(ref: ScenarioReference): string {
+  const head = [
+    ref.exam ? EXAM_FULL_NAME[ref.exam] : null,
+    ref.year_jp,
+    ref.season,
+    ref.division,
+    ref.question,
+  ]
+    .filter((part): part is string => Boolean(part))
+    .join(' ')
+  const label = head.length > 0 ? `${head}（${ref.material_kind}）` : `（${ref.material_kind}）`
+  return ref.note ? `${label} ${ref.note}` : label
+}
+
 // ⑦結果（ダーク文脈）。目的=判定・用語・出典／主要アクション=次へ・図鑑。
-// T013: クリア時の core ステートマシンの内容(clear_explanation・出典)を表示する。
+// T013: クリア時の core ステートマシンの内容(clear_explanation)を表示する。
+// T015/T016: 出典表記(references, docs/citation-policy.md §4 の主表示位置)と、クリアで加算された
+// XP・累計XPを表示する(FR-6・FR-7)。
 // SaveStorage への保存(クリア時)は store 側(dispatch)で行われるため、ここでは保存状態
 // (saveStatus)を確認して保存完了/失敗のフィードバックのみを表示する。
 export function ResultScreen() {
@@ -13,6 +38,7 @@ export function ResultScreen() {
   const scenario = useGameStore((s) => s.scenario)
   const progress = useGameStore((s) => s.progress)
   const saveStatus = useGameStore((s) => s.saveStatus)
+  const saveData = useGameStore((s) => s.saveData)
 
   const cleared = progress.part === 'clear'
 
@@ -35,16 +61,21 @@ export function ResultScreen() {
             <ul className="border-border bg-card flex flex-col gap-2 rounded-lg border p-4 text-sm">
               <li>攻撃手段: {scenario.resolution.attack_identification.attack_name}</li>
               <li>対策: {scenario.resolution.countermeasure.summary}</li>
-              {scenario.source.type !== 'original' && (
-                <li className="text-muted-foreground">
-                  出典: {scenario.source.type}
-                  {scenario.source.exam_period ? `(${scenario.source.exam_period})` : ''}
-                </li>
-              )}
-              {scenario.source.note && (
-                <li className="text-muted-foreground">{scenario.source.note}</li>
-              )}
+              <li>獲得XP: +{CLEAR_XP_REWARD}</li>
+              <li>累計XP: {saveData?.xp ?? 0}</li>
             </ul>
+            {scenario.references && scenario.references.length > 0 && (
+              <ul className="border-border bg-card flex flex-col gap-1 rounded-lg border p-4 text-sm">
+                <li className="font-semibold">
+                  本シナリオは以下を参考に作成したオリジナルの創作です。
+                </li>
+                {scenario.references.map((ref, index) => (
+                  <li key={index} className="text-muted-foreground">
+                    ・{formatReference(ref)}
+                  </li>
+                ))}
+              </ul>
+            )}
             {saveStatus === 'error' && (
               <p role="alert" className="text-destructive">
                 セーブデータの保存に失敗しました(端末のストレージ容量等をご確認ください)。

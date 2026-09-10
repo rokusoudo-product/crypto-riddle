@@ -17,7 +17,11 @@ import { characterSchema, dialogueLineSchema, legalRefIdSchema, termIdSchema } f
 import { subjectTagSchema } from './tags.ts'
 import { uniqueArraySchema } from './util.ts'
 
-export const scenarioSchemaVersionSchema = z.literal('0.1.0')
+// 0.2.0（T015, 2026-09-10）: source(単一・必須オブジェクト) を references(配列・省略可) へ置き換えた
+// 破壊的変更のため semver を上げた（docs/scenario_schema.md §3 の方針）。旧 0.1.0 データ（s0-sample 等）は
+// 本 PR で 0.2.0 形式へ合わせて更新済み（旧形式からの自動マイグレーションは持たない。本番セーブデータではなく
+// オーサリング用シナリオデータのため、実体のあるシナリオが少ないうちに移行するのが妥当と判断した）。
+export const scenarioSchemaVersionSchema = z.literal('0.2.0')
 
 /** マップID。ファイル名(拡張子除く)と一致させる（実在チェックは validate-collection.ts）。 */
 export const scenarioIdSchema = z.string().regex(/^[a-z][a-z0-9_-]*$/)
@@ -46,16 +50,31 @@ export const investigationPointIdSchema = slugIdSchema
 export const cardIdSchema = slugIdSchema
 export const cipherStageIdSchema = slugIdSchema
 
-/** 出典表記。IPA過去問由来か創作かを明示する(spec FR-7)。#14 未確定のため緩い構造。 */
-export const scenarioSourceSchema = z
+// 出典表記(references)。docs/citation-policy.md §5(#14, 2026-09-10 制定)の表に一本化した(T015)。
+// 「過去問と同じような問題は出さない」方針(citation-policy §1)のため、転載・改変フラグは持たない。
+// exam/year_jp/season/division/question は「特定の年度・問題」を示す場合のみ埋め、根拠のない値を
+// 捏造しない(T015 代表回答)。テーマ知識のみを参考にした場合は material_kind + note のみでよい。
+export const referenceExamSchema = z.enum(['SC', 'NW'])
+export type ReferenceExam = z.infer<typeof referenceExamSchema>
+
+export const referenceSeasonSchema = z.enum(['春期', '秋期'])
+export type ReferenceSeason = z.infer<typeof referenceSeasonSchema>
+
+export const referenceMaterialKindSchema = z.enum(['攻撃手口', '技術要素', '事例類型', '用語'])
+export type ReferenceMaterialKind = z.infer<typeof referenceMaterialKindSchema>
+
+export const scenarioReferenceSchema = z
   .object({
-    type: z.enum(['ipa_sc_am2', 'ipa_sc_pm', 'original', 'other']),
-    exam_period: z.string().optional(),
-    question_no: z.string().optional(),
+    exam: referenceExamSchema.optional(),
+    year_jp: z.string().optional(),
+    season: referenceSeasonSchema.optional(),
+    division: z.string().optional(),
+    question: z.string().optional(),
+    material_kind: referenceMaterialKindSchema,
     note: z.string().optional(),
   })
   .strict()
-export type ScenarioSource = z.infer<typeof scenarioSourceSchema>
+export type ScenarioReference = z.infer<typeof scenarioReferenceSchema>
 
 export const victimCompanySchema = z
   .object({
@@ -148,9 +167,12 @@ export type FollowUp = z.infer<typeof followUpSchema>
 
 export const resolutionSchema = z
   .object({
-    // MVP は必ず1要素(#3 代表回答)。複数段拡張は maxItems 制約を外すだけで対応できる設計
-    // （旧 JSON Schema の minItems/maxItems=1 を length(1) として引き継ぐ）。
-    cipher_stages: z.array(cipherStageSchema).length(1),
+    // MVP は最大1要素(#3 代表回答)。0件は「暗号なし」の入門シナリオ(S1, Issue #5 代表回答)を許容するため
+    // T015 で length(1) から max(1) に緩めた。複数段拡張は max(1) 制約を外すだけで対応できる設計
+    // （旧 JSON Schema の minItems/maxItems=1 を引き継いだ制約を、0件許容のぶんだけ緩和したもの）。
+    // 0件のときは resolution パートで暗号ステージを飛ばし、探索完了から直接 attack_identification へ進む
+    // （src/core/scenario/state.ts の ENTER_RESOLUTION 参照）。
+    cipher_stages: z.array(cipherStageSchema).max(1),
     attack_identification: attackIdentificationSchema,
     countermeasure: countermeasureSchema,
     wrong_answer_follow_ups: z.array(followUpSchema).min(1),
@@ -170,7 +192,8 @@ const scenarioObjectSchema = z
     subject_tags: uniqueArraySchema(subjectTagSchema, { minItems: 1 }),
     difficulty: z.number().int().min(1).max(5),
     estimated_minutes: z.number().int().min(1).max(60),
-    source: scenarioSourceSchema,
+    // 参照元が無い完全オリジナルのシナリオには表記を付けない(citation-policy §3)ため省略可。
+    references: z.array(scenarioReferenceSchema).optional(),
     related_terms: uniqueArraySchema(termIdSchema).optional(),
     intro: introSchema,
     investigation_points: z.array(investigationPointSchema).min(1),
