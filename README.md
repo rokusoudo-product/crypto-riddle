@@ -24,6 +24,7 @@
 | [docs/characters.md](docs/characters.md) | キャラクターバイブル（霧島 悠／橘 澪） |
 | [docs/term_cards.md](docs/term_cards.md) | 用語カードマスタ・誤用検出クイズ設計（Issue #4） |
 | [docs/architecture.md](docs/architecture.md) | 環境構成図（Mermaid） |
+| [docs/citation-policy.md](docs/citation-policy.md) | 出典表記規則（IPA過去問は題材参考のみ・設問の転載なし） |
 | [docs/concept.md](docs/concept.md) | 初期コンセプトメモ（歴史的経緯。正本は specs/） |
 | [docs/scenario_schema.md](docs/scenario_schema.md) | シナリオ記述フォーマット（`src/core/model/scenario.ts`・`scenarios/*.yaml`・`legal/*.yaml`） |
 
