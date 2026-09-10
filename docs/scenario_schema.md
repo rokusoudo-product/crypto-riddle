@@ -163,9 +163,10 @@ resolution:
   `MAX_CONSULTS=3` は `src/core/scenario/state.ts` の core 定数として持ち、zod スキーマには持たせない）。
 - 旧 `attack_identification` / `countermeasure`（`required_card_ids` 方式）は廃止し、この `questions` に統合した（防衛策の問いは最後の `question`。`subject_tag` は法制度/インシデント対応など）。
 
-### 2.5 探索の背景シーン（`scenes[]`）〔#52・T037 で実装〕
+### 2.5 探索の背景シーン（`scenes[]`）〔#52・T037 実装済／Phase 4.7 で `line`/`speaker` 追加〕
 
-> **⚠️ 目標形（#52・T018 プレイテスト反映）**: 探索④を「背景シーン＋クリック可能オブジェクト」にする（spec §7.1・DESIGN.md「探索シーン」節）。**zod 改訂は Phase 4.6 の T037**。本節はその目標形で、T037 マージ前の現行コードには `scenes` は無い（省略時＝一覧表示のため既存データは有効）。
+> **実装状況**: `scenes[]`（背景・ホットスポット・collect/danger/noop）は **T037（PR #58）で zod 実装済・schema 0.4.0**。S1 のデータは T040（PR #61）で投入済。
+> **⚠️ Phase 4.7 の目標形（#52・T018'' 再プレイ反映）**: 調査結果を解決と同じ会話フレームで台詞提示するため、`collect` に**省略可能な `line`（台詞）と `speaker`** を追加する（`danger` の `feedback` と対称）。**zod 改訂は Phase 4.7 の T043**（schema 0.4.0 → 0.5.0）。下記 YAML の `line`/`speaker` は T043 マージ前の現行コードには無い（省略時＝カード本文にフォールバックのため既存データは有効）。
 
 - `investigation_points`（カードの出所・3系統）は**正のまま維持**。`scenes[]` は**表示層（省略可）**で、省略すると一覧表示にフォールバックする。
 - 目標フィールド構成:
@@ -183,8 +184,10 @@ scenes:
         position: [0.30, 0.42]       # 背景に対する相対座標(0〜1)
         label: 経理担当のPC
         actions:
-          - { kind: collect, investigation_point_id: ip-maillog, label: メール受信ログを取る }
-          - { kind: collect, investigation_point_id: ip-edr,     label: EDRのアラートを確認 }
+          # collect は省略可能な line（台詞）と speaker を持てる（#52 Phase 4.7・0.5.0）。
+          - { kind: collect, investigation_point_id: ip-maillog, label: メール受信ログを取る,
+              speaker: 霧島, line: "霧島「受信ログを追った。問題のメールは取引先を騙る別ドメインからだ。」" }
+          - { kind: collect, investigation_point_id: ip-edr,     label: EDRのアラートを確認 }   # line/speaker 省略→既定文＋カード本文
           - { kind: danger,  label: 感染端末の電源を落とす, feedback: "橘「ここで電源を落とすと揮発性メモリの証拠が消えます。」" }
           - { kind: noop,    label: 今は触らない }
       - object_type: person
@@ -194,11 +197,12 @@ scenes:
           - { kind: collect, investigation_point_id: ip-witness, label: 話を聞く }
 ```
 
-- **アクション種別**: `collect`（`investigation_point_id` を参照してカード獲得）／`danger`（電源を落とす等＝`feedback` の教育的台詞のみ。**ペナルティなし・操作継続可**＝詰み防止、spec §8.4）／`noop`。
+- **アクション種別**: `collect`（`investigation_point_id` を参照してカード獲得。**省略可能な `line`＝台詞・`speaker`＝話者**を持てる＝Phase 4.7/0.5.0）／`danger`（電源を落とす等＝`feedback` の教育的台詞のみ。**ペナルティなし・操作継続可**＝詰み防止、spec §8.4）／`noop`。
+- **`collect` の `line`/`speaker`（Phase 4.7・省略可）**: 調査結果を会話フレームで台詞提示するための任意フィールド。**省略時は既定の導入文＋カード本文にフォールバック**（既存データは無改訂で有効）。`speaker` 省略時の既定は調査3系統から導出（①ログ→霧島／②人に聞く→橘／③文献→橘。技術文献の CVE 等は `speaker` を明示して霧島に振れる）。会話演出（タイプライター等）は DESIGN.md「会話フレーム」節。
 - **1オブジェクトが複数ポイントを束ねられる**（hotspot→point は 1:N。例: 1台のPCにメールログとEDRの2点）。
 - **整合性チェック（`scenes` があるとき）**: 各 `investigation_point` が**ちょうど1つの `collect` action** から参照されること（`superRefine`）。`scenes` 省略時はチェックしない。
 - **背景アセット**は image_agent 自作（16:9・アニメ調で立ち絵と統一。DESIGN.md「探索シーン」「アセット」節）。`background` はアセットIDで参照し、YAML にパスを直書きしない。
-- フィールド名・座標系・`object_type` の値集合の最終確定は **T037 の zod 改訂時**。
+- `scenes`/`hotspots`/`object_type`/座標系は **T037（0.4.0）で確定済**。`collect` の `line`/`speaker` は **T043（0.5.0）で確定**。
 
 ## 3. 出典表記（`references`）
 

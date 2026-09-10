@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-10 (#57: T040/T041 完了)
+updated: 2026-09-11 (#52 Phase 4.7 探索の会話フレーム化: T042-T044 新設・③''結果記録・量産ゲート更新・帳簿追随)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -347,7 +347,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   - 完了条件: 2背景が確定し DESIGN.md に記録、`assets/` に配置
   - **完了（2026-09-10, #60でマージ済み）**: 本チェックボックスは #60 のPRで反転漏れとなっていたため、本PR(#57)で反映した（差分自体は#60で完了済み）。
 - [x] **T040** S1・s0 に scenes データを追加（依存: T037）
-  - `scenarios/s1-targeted-email-intrusion.yaml`（執務室／サーバ室の2シーン・PC/人物/書籍のホットスポット・既存 `investigation_points` への collect 参照・PCの danger アクション）と `scenarios/s0-sample.yaml`（サンプルとして最小のシーン）＋各 fixture を追加
+  - `scenarios/s1-targeted-email-intrusion.yaml`（執務室／サーバ室の2シーン・PC/人物/書籍のホットスポット・既存 `investigation_points` への collect 参照・PCの danger アクション）と `scenarios/s0-sample.yaml`（**scenes は付けず省略＝一覧フォールバックの検証ケースとして維持**）＋各 fixture を追加
   - 完了条件: 両 YAML が 0.4.0 検証を通過し `npm run build:data` 成功
   - **完了（2026-09-10, #57）**: `scenarios/s1-targeted-email-intrusion.yaml` に執務室(`scene-office`)／
     サーバ室(`scene-server`)の2シーンを追加。既存 `investigation_points`(9件)は変更せず、
@@ -374,13 +374,35 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
     (`BACKGROUND_SRC`に実データが無いIDはT038時点のプレースホルダ表示に引き続きフォールバック
     するため、テスト専用フィクスチャ(`bg-test-*`)は無改修で回帰通過)。
 
-**チェックポイント③''**: 背景シーンで S1 探索→解決を通しプレイでき、代表が量産可と確認する
+**チェックポイント③''（2026-09-11・結果=フィードバックあり）**: 背景シーンで S1 探索→解決を通しプレイでき動作は健全だったが、代表から演出の追加要望（探索の調査結果も会話フレームで台詞提示・タイプライター・ホットスポット不可視化＋□・カード閲覧ボタン）が返った。量産可の確認は得られず、**Phase 4.7（探索の会話フレーム化）を挟む**。
+
+---
+
+## Phase 4.7: 探索の会話フレーム化（#52・T018'' 再プレイ反映）= 探索演出の刷新
+
+> T018''（2026-09-11・会話モード＋背景シーン後の再プレイ）代表フィードバック。探索の調査結果（人物証言・PC のログ・書籍の文献）を、解決と同じ**会話フレーム**（左右立ち絵＋会話ウィンドウ＋タイプライター）で台詞提示する。ホットスポットは通常不可視＋ホバー/フォーカスで□。詳細は spec §7.1・§8／DESIGN.md「会話フレーム」「探索シーン」節／plan §5／`docs/scenario_schema.md` §2.5。
+> 確定仕様（T018''・2026-09-11 代表決定）: 調査結果はすべて会話フレームで台詞提示／タイプライターは探索・解決共通（スキップ可・reduced-motion 即全文・支援技術には全文提供）／非発話側は直前話者を残しグレーアウト（支援役2名固定）／ホットスポットはアイコン・名前とも常時非表示でホバー/フォーカス時に□マーカー（`aria-label` 保持・一覧フォールバック維持・モバイルは一覧初期表示）／探索会話上にもカード閲覧（無料）の ? ボタン。
+> 委譲条件「**スキーマ差分は commit 前に報告して停止**」を維持。
+
+- [ ] **T042** 会話フレーム共通強化（依存: T033）
+  - `conversation-frame.tsx` にタイプライター表示（1文字ずつ・タップ/Enter でスキップ・`prefers-reduced-motion` で即全文・支援技術には全文を渡し1文字ずつ読み上げさせない）。操作要素（選択肢・相談・カード）は全文表示/スキップ後に提示。直前話者を残しグレーアウトを明文どおり担保。
+  - 完了条件: 会話フレーム単体テスト（タイプライター/スキップ/reduced-motion/a11y 全文提供）が通り、解決⑤の既存テスト・e2e がスキップ操作を挟んで通る
+- [ ] **T043** core: `collect` に `line`/`speaker` を追加（依存: T037）
+  - `src/core/model/scenario.ts` の `collect` アクションに**省略可能な `line`（台詞）と `speaker`** を追加（`danger` の `feedback` と対称）。**schema_version 0.4.0 → 0.5.0**（既存 YAML の版数追随＝T037 と同手順）。整合性チェックは現行維持。
+  - 完了条件: zod 単体テスト（`line`/`speaker` 有無・省略時フォールバック・0.5.0 検証）が通り `npm run build:data` 成功
+- [ ] **T044** 探索の会話フレーム化＋不可視ホットスポット＋S1 台詞＋E2E（依存: T042, T043, T038, T040）
+  - `SceneExplorer`：調査結果（人物・PC・書籍すべて）を会話フレームで台詞提示（話者は `speaker` or 3系統既定 ログ→霧島/証言→橘/文献→橘）。ホットスポットは通常不可視・ホバー/フォーカスで□マーカー（`aria-label` 保持・フォーカス可視）。探索会話上に ? ボタン（`card-drawer`・無料）。モバイルは一覧を初期表示。**#62（証言カード選択の不具合）を吸収**（`pickTestimonyCard` 経路を廃止）。
+  - S1（`s1-targeted-email-intrusion.yaml`）の 9 collect に `line`/`speaker` を執筆。fixture 追随。
+  - E2E：背景シーン経由で調査結果が会話フレームで出る・タイプライター/スキップ・?ボタン・一覧フォールバックの各経路。
+  - 完了条件: Vitest・Playwright e2e が CI で安定して通る／`npm run build:data` 成功
+
+**チェックポイント③'''**: 探索も会話フレームで S1 を通しプレイでき、代表が量産可と確認する（量産ゲート）
 
 ---
 
 ## Phase 5: マップ量産（plan §11-5）= プロダクション
 
-> **⚠️ 量産ゲート（#42・#52）**: Phase 5 は **Phase 4.5（会話モード）と Phase 4.6（探索の背景シーン化）が main にマージされるまで着手しない**。旧フォーマットで書いたシナリオ（`required_card_ids`／背景なし）は全て書き直しになるため、量産は会話モード schema 0.3.0＋探索 scenes 0.4.0 の確定後に開始する。各量産マップには**背景2〜3枚（IMAGE_WORKFLOW）**を各制作 Issue に含める。
+> **⚠️ 量産ゲート（#42・#52）**: Phase 5 は **Phase 4.5（会話モード）・Phase 4.6（探索の背景シーン化）・Phase 4.7（探索の会話フレーム化）が main にマージされ、チェックポイント③'''で代表が量産可と確認するまで着手しない**。旧フォーマットで書いたシナリオ（`required_card_ids`／背景なし／台詞なし）は全て書き直しになるため、量産は会話モード schema 0.3.0＋探索 scenes 0.4.0＋collect 台詞 0.5.0 の確定後に開始する。各量産マップには**背景2〜3枚（IMAGE_WORKFLOW）**を各制作 Issue に含める。
 
 - [ ] **T019** S2 制作（依存: T018、**Issue #6**: フォーマット確定後に個別 Issue を切り出して進める）
 - [ ] **T020** S3 制作（依存: T019 と同条件）
@@ -442,7 +464,11 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#44](https://github.com/rokusoudo-product/crypto-riddle/issues/44) 会話モード core 実装 | closed（完了） | **T030・T031・T032** | zod スキーマ・判定エンジン・ステートマシンを会話モードへ改訂。S1/s0 は暫定機械移植のみ（本格移行は #46）。UI(resolve/result/fail-screen等)は型エラー解消の最小限に留めた（#45） |
 | [#45](https://github.com/rokusoudo-product/crypto-riddle/issues/45) 会話フレーム＋会話モードUI＋XP減算 | closed（完了・PR #48） | **T033・T034** | 会話フレーム/カードドロワー新設・dnd-kit 削除・⑥失敗解説廃止・XP減算 |
 | [#46](https://github.com/rokusoudo-product/crypto-riddle/issues/46) 会話モード データ本執筆・結線・E2E | closed（完了・PR #49） | **T035・T036** | S1 誤答肢 reply 本執筆・explanations 多段化・e2e 会話モード化。**Phase 4.5 完了** |
-| [#52](https://github.com/rokusoudo-product/crypto-riddle/issues/52) 探索を背景シーン＋クリック可能オブジェクトにする | future（本ドキュメント改訂 PR。マージ後に実装 Issue へ分解） | **Phase 4.6（T037〜T041）** | T018 プレイテスト由来。spec §7.1＝探索背景シーン化。背景は image_agent 自作（IMAGE_WORKFLOW）。#50 の探索④部分を統合 |
+| [#52](https://github.com/rokusoudo-product/crypto-riddle/issues/52) 探索を背景シーン＋クリック可能オブジェクトにする（探索刷新の umbrella） | open（Phase 4.6 完了・4.7 進行中。③''' 通過後に代表クローズ） | **Phase 4.6（T037〜T041）＋Phase 4.7（T042〜T044）** | T018/T018'' 由来。spec §7.1。Phase 4.6=背景シーン化（#55/#56/#57 マージ済・#60 背景）。Phase 4.7=会話フレーム化（docs 本PR→実装 Issue 分解）。#50 の探索④部分を統合 |
+| [#55](https://github.com/rokusoudo-product/crypto-riddle/issues/55) 探索スキーマ scenes[]（0.4.0） | closed（完了・PR #58） | **T037** | scenes/hotspots/actions の zod・schema 0.4.0 |
+| [#56](https://github.com/rokusoudo-product/crypto-riddle/issues/56) 探索UI 背景シーン＋ホットスポット | closed（完了・PR #59） | **T038** | 背景シーン＋一覧フォールバック。#50 探索④を統合 |
+| [#57](https://github.com/rokusoudo-product/crypto-riddle/issues/57) S1/s0 scenes データ＋探索E2E | closed（完了・PR #61） | **T040＋T041** | S1 に2シーン投入・s0 は省略でフォールバック検証。T039 背景は #60 |
+| [#62](https://github.com/rokusoudo-product/crypto-riddle/issues/62) 人物証言が対策カードを表示する不具合 | bug（Phase 4.7 T044 で吸収予定） | **T044 に吸収** | #56 由来。`pickTestimonyCard` 経路が Phase 4.7 で消えるため吸収。クローズは T044 マージ時 |
 | [#41](https://github.com/rokusoudo-product/crypto-riddle/issues/41) タイトル CTA が実セーブ状態と未接続 | bug（`ready`・優先度 Phase 7） | 別途（Phase 7 の a11y/仕上げ候補） | T018 由来。回答済み（つづきから=中断再開／出し分け実装／Phase7）。会話モードとは独立 |
 | [#50](https://github.com/rokusoudo-product/crypto-riddle/issues/50) 会話フレームを③導入・④探索にも適用 | フォロー（探索④分は #52 に統合。残=③導入） | 別途 | 会話モード刷新の残作業 |
 | [#51](https://github.com/rokusoudo-product/crypto-riddle/issues/51) 暗号ステージ誤答のXP減算の要否 | フォロー（spec §8.4 で決定→反映） | T022 と連動 | 現行 S1 は暗号なしで実害なし |
@@ -455,7 +481,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   状態は解消されている。T005 の完了により T006・T010 も着手可能になり、**T007〜T009 も完了した
   （2026-09-10）ことで Phase 2 が完了し、チェックポイント②を達成した**
 - Phase 3（T011, T012, T014）は T001 のみに依存し、**Phase 2 と並行で進められる**
-- Phase 4 で Phase 2/3 が合流して縦スライス。T018（代表プレイテスト）で**会話モードへの刷新（#42）＋探索の背景シーン化（#52）が決定**したため、**Phase 4.5（会話モード・完了）→ Phase 4.6（探索背景シーン化）を挟んでから量産（Phase 5）に入る**。Phase 5 は Phase 4.5＋4.6 の main マージが関門
+- Phase 4 で Phase 2/3 が合流して縦スライス。T018（代表プレイテスト）で**会話モードへの刷新（#42）＋探索の背景シーン化（#52）が決定**、さらに T018''（背景シーン後の再プレイ）で**探索の会話フレーム化（#52 Phase 4.7）が決定**したため、**Phase 4.5（会話モード・完了）→ Phase 4.6（探索背景シーン化・完了）→ Phase 4.7（探索の会話フレーム化）を挟んでから量産（Phase 5）に入る**。Phase 5 は Phase 4.5＋4.6＋4.7 の main マージ＋チェックポイント③'''（代表の量産可確認）が関門
 - 自動実装（po-agent-daily-issue-check）に乗せる場合も、【代表】タスク（T004・T018・T029）は必ず代表操作で行う
 
 ## 実装戦略
