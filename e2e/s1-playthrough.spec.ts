@@ -133,3 +133,95 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
     await expect(page.getByText('累計XP: 90')).toBeVisible()
   })
 })
+
+// Issue #57/T041: S1 の実データに投入した scenes(執務室／サーバ室の背景シーン)を、一覧の
+// 「調査する」ボタンではなく背景シーンのホットスポットだけで探索できることを実ブラウザで確認する。
+// 上の describe は一覧側のみを使う既存の通しプレイなので、scenes 実データの結線はここでのみ
+// E2E 確認する(`src/ui/screens/s1-play-flow.test.tsx` の Vitest 版と同じ操作を実ブラウザで行う)。
+test.describe('S1「標的型メールからの侵入」背景シーン経由の探索(#57/T041)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/')
+  })
+
+  test('背景シーンのホットスポットのみで全9ポイントを調査でき、PCのdanger操作は教育的フィードバックのみで詰まずに解決へ進める', async ({
+    page,
+  }) => {
+    await page.getByRole('link', { name: 'つづきから' }).click()
+    await page.getByRole('button', { name: 'マップを選ぶ' }).click()
+    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
+
+    // 執務室／サーバ室の2シーンタブが表示され、背景画像(T039生成物)が読み込まれる。
+    const officeTab = page.getByRole('tab', { name: '執務室' })
+    const serverTab = page.getByRole('tab', { name: 'サーバ室' })
+    await expect(officeTab).toHaveAttribute('aria-selected', 'true')
+    await expect(serverTab).toBeVisible()
+    await expect(page.getByRole('img', { name: '執務室の背景' })).toBeVisible()
+
+    // --- 執務室: PC(経理部 中野の端末。collect/danger/noopの3action=アクションシート) ---
+    // exact:true にすると調査済み後にサフィックスが付いた名前と一致しなくなるため付けない。
+    const pcHotspot = page.getByRole('button', { name: '経理部 中野の端末（PC）' })
+    await pcHotspot.click()
+    await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeVisible()
+
+    // dangerを先に選ぶ: 教育的フィードバックのみが表示され、シートは閉じない(詰み防止)。
+    await page.getByRole('button', { name: '感染端末の電源を落とす' }).click()
+    await expect(
+      page.getByText('揮発性メモリの証拠が消えてしまいます', { exact: false }),
+    ).toBeVisible()
+    await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeVisible()
+
+    // 電源を落とした後も同じホットスポットを操作でき、EDRログをcollectできる(詰み防止)。
+    await page.getByRole('button', { name: 'EDRアラートを確認する' }).click()
+    await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeHidden()
+    await expect(pcHotspot).toHaveAccessibleName('経理部 中野の端末（PC）・調査済み')
+
+    // --- 執務室: person(中野・経理部長。単一action=即実行、証言は会話フレームで表示) ---
+    await page.getByRole('button', { name: '中野（人物）', exact: true }).click()
+    await expect(page.getByText('深く確認せずに開いてしまいました', { exact: false })).toBeVisible()
+    await page.getByRole('button', { name: '閉じる' }).click()
+
+    await page.getByRole('button', { name: '経理部長（人物）', exact: true }).click()
+    await expect(
+      page.getByText('取引先の請求サイクルが集中する時期', { exact: false }),
+    ).toBeVisible()
+    await page.getByRole('button', { name: '閉じる' }).click()
+
+    // --- 執務室: book(資料棚。collectを2件持つ=1件選ぶたびにシートが閉じるため開き直す) ---
+    const bookHotspot = page.getByRole('button', { name: '資料棚（書籍）' })
+    await bookHotspot.click()
+    await expect(page.getByRole('group', { name: '資料棚の操作' })).toBeVisible()
+    await page.getByRole('button', { name: 'セキュリティ注意喚起情報を確認する' }).click()
+    await expect(page.getByRole('group', { name: '資料棚の操作' })).toBeHidden()
+    await bookHotspot.click()
+    await expect(page.getByRole('group', { name: '資料棚の操作' })).toBeVisible()
+    await page.getByRole('button', { name: 'インシデント対応ガイドラインを確認する' }).click()
+    await expect(page.getByRole('group', { name: '資料棚の操作' })).toBeHidden()
+    await expect(bookHotspot).toHaveAccessibleName('資料棚（書籍）・調査済み')
+
+    // --- サーバ室へシーンタブを切り替える ---
+    await serverTab.click()
+    await expect(serverTab).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('img', { name: 'サーバ室の背景' })).toBeVisible()
+
+    // device(プロキシサーバ・メールサーバ)・pc(解析用端末)は単一action=即実行。
+    await page.getByRole('button', { name: 'プロキシサーバ（機器）', exact: true }).click()
+    await page.getByRole('button', { name: 'メールサーバ（機器）', exact: true }).click()
+    await page.getByRole('button', { name: '解析用端末（PC）', exact: true }).click()
+
+    // person(情シス担当。単一action=即実行)。証言(非ダミーの対策カードが優先表示される)。
+    await page.getByRole('button', { name: '情シス担当（人物）', exact: true }).click()
+    await expect(page.getByText('ネットワークから論理的に隔離する', { exact: false })).toBeVisible()
+    await page.getByRole('button', { name: '閉じる' }).click()
+
+    // 一覧側(常に併設)でも9/9件が調査済みとして共有されている。
+    await expect(page.getByText('9/9 件調査済み')).toBeVisible()
+    await expect(page.getByRole('button', { name: '調査する' })).toHaveCount(0)
+
+    // 背景シーン経由だけで「解決へ進む」が活性化し、解決パートへ遷移できる。
+    const enterResolution = page.getByRole('button', { name: '解決へ進む' })
+    await expect(enterResolution).toBeEnabled()
+    await enterResolution.click()
+    await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
+  })
+})

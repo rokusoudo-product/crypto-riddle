@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-10 (#56: T038 完了)
+updated: 2026-09-10 (#57: T040/T041 完了)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -345,12 +345,33 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 - [ ] **T039** S1 探索背景の生成（依存: #52 PR マージ、IMAGE_WORKFLOW）
   - S1 の2背景（執務室／サーバ室＝`bg-s1-office`/`bg-s1-server`）を IMAGE_WORKFLOW の承認ゲート（アセット定義＋プロンプト提示→代表承認→image_agent 生成）で用意。16:9・アニメ調で立ち絵と統一。生成物パス・プロンプトを DESIGN.md アセット節に追記
   - 完了条件: 2背景が確定し DESIGN.md に記録、`assets/` に配置
-- [ ] **T040** S1・s0 に scenes データを追加（依存: T037）
+- [x] **T040** S1・s0 に scenes データを追加（依存: T037）
   - `scenarios/s1-targeted-email-intrusion.yaml`（執務室／サーバ室の2シーン・PC/人物/書籍のホットスポット・既存 `investigation_points` への collect 参照・PCの danger アクション）と `scenarios/s0-sample.yaml`（サンプルとして最小のシーン）＋各 fixture を追加
   - 完了条件: 両 YAML が 0.4.0 検証を通過し `npm run build:data` 成功
-- [ ] **T041** 結線・E2E 更新（依存: T038, T040）
+  - **完了（2026-09-10, #57）**: `scenarios/s1-targeted-email-intrusion.yaml` に執務室(`scene-office`)／
+    サーバ室(`scene-server`)の2シーンを追加。既存 `investigation_points`(9件)は変更せず、
+    経理部端末のEDRアラート・中野/経理部長への聞き取り・文献2件を執務室(PC/人物2/書籍)へ、
+    プロキシログ・メールサーバログ・サンドボックス解析・情シス担当への聞き取りをサーバ室
+    (機器2/PC/人物)へ振り分け、各 investigation_point をちょうど1つの collect action から
+    参照する(superRefine 整合性チェック)。経理部PCのホットスポットに `danger`(感染端末の
+    電源を落とす。feedbackのみ・ペナルティ無し・操作継続可)を1つ追加し、既存カード
+    (card-reference-guideline等)の「電源を落とすと揮発性メモリの証拠が消える」という学びと
+    整合させた。`src/core/scenario/fixtures/s1-targeted-email-intrusion.fixture.ts` をYAMLと
+    完全一致するよう更新(`scripts/build-data.test.ts` の一致テストで確認)。`scenarios/s0-sample.yaml`
+    は意図的に scenes を追加せず(一覧フォールバックの検証ケースとして維持)。
+- [x] **T041** 結線・E2E 更新（依存: T038, T040）
   - 探索の結線テスト（背景／一覧の両経路・PC操作・危険操作の教育的FB・詰み防止）と Playwright e2e を更新
   - 完了条件: Vitest・Playwright E2E が CI で安定して通る
+  - **完了（2026-09-10, #57）**: `src/ui/screens/s1-play-flow.test.tsx` と `e2e/s1-playthrough.spec.ts`
+    に、S1 の実データ scenes を背景シーンのホットスポットのみで探索するテストを追加
+    (執務室→サーバ室の全9ホットスポット・PCのdanger操作は教育的FBのみでシートが閉じず
+    電源断後も操作継続可、collect後は「調査済み」化・一覧側と状態共有・「解決へ進む」活性化まで
+    確認)。既存の一覧側のみを使う通しプレイ(会話モード)テストは無改修のまま回帰通過。
+    s0-sample(scenesなし)の一覧フォールバック回帰は既存の `play-flow.test.tsx` が確認済み。
+    あわせて `src/ui/components/explore/scene-explorer.tsx` を小修正し、T039で生成済みの
+    背景アセット(`assets/backgrounds/bg-s1-*.png`)を実際に`<img>`で表示するようにした
+    (`BACKGROUND_SRC`に実データが無いIDはT038時点のプレースホルダ表示に引き続きフォールバック
+    するため、テスト専用フィクスチャ(`bg-test-*`)は無改修で回帰通過)。
 
 **チェックポイント③''**: 背景シーンで S1 探索→解決を通しプレイでき、代表が量産可と確認する
 

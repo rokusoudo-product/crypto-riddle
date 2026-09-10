@@ -7,9 +7,11 @@
 // scenario.scenes が無い場合(省略時)は呼び出し側(explore-screen.tsx)が本コンポーネントを
 // レンダーしないことで一覧表示にフォールバックする(docs/scenario_schema.md §2.5)。
 //
-// 背景画像はT039(IMAGE_WORKFLOW・ADC失効中)で未生成のため、`scene.background`(アセットID)は
-// 画像として読み込まず、トークン色のプレースホルダ(単色地+シーン名ラベル)で表示する
-// (画像生成はこのIssueのスコープ外。#56 実装方針)。
+// 背景画像(#57/T040・T039で生成済みの assets/backgrounds/bg-s1-*.png)は BACKGROUND_SRC に
+// 実データがある場合のみ<img>で読み込む。無い場合(テスト専用フィクスチャの `bg-test-*` 等、
+// 実背景が未生成のシーン)はトークン色のプレースホルダ(単色地+シーン名ラベル)にフォールバック
+// する(#56 実装方針を維持。立ち絵と同じくrepoルートの assets/ を相対importする、
+// conversation-frame.tsx と同じパターン)。
 //
 // ホットスポットの動作(docs/scenario_schema.md §2.5・spec §8.4):
 // - collect: investigation_point_id のカードを獲得する(呼び出し側の onCollect 経由、
@@ -42,6 +44,15 @@ import type {
 import { ConversationFrame } from '@/ui/components/conversation-frame'
 import { Button } from '@/ui/components/ui/button'
 import { cn } from '@/ui/lib/utils'
+
+import bgS1Office from '../../../../assets/backgrounds/bg-s1-office.png'
+import bgS1Server from '../../../../assets/backgrounds/bg-s1-server.png'
+
+/** 生成済み背景アセットのID→importの対応。無いIDはプレースホルダ表示にフォールバックする。 */
+const BACKGROUND_SRC: Record<string, string> = {
+  'bg-s1-office': bgS1Office,
+  'bg-s1-server': bgS1Server,
+}
 
 const OBJECT_TYPE_ICON: Record<HotspotObjectType, typeof Monitor> = {
   pc: Monitor,
@@ -247,20 +258,30 @@ export function SceneExplorer({
         className="flex flex-col gap-3"
       >
         {/* 背景シーン: 16:9既定・モバイル縦は幅にフィット(レターボックス)。横回転は強制しない。
-            背景画像は未生成(T039)のためトークン色のプレースホルダ+シーン名で成立させる。
+            BACKGROUND_SRC に実データがあれば<img>で読み込み、無ければ(背景未生成のシーン)
+            トークン色のプレースホルダ+シーン名で成立させる。
             role="img"はプレースホルダ層(内側のdiv)にだけ付ける: WAI-ARIAのimgロールは
             Children Presentational(子孫を装飾扱いにする)ため、外側のdivに付けると
-            支援技術から実<button>のホットスポットが子孫として隠れてしまう。 */}
+            支援技術から実<button>のホットスポットが子孫として隠れてしまう
+            (<img>の場合は要素自体がimgロールを持つため同様に子孫を隠す点は変わらない)。 */}
         <div className="border-border bg-muted relative aspect-video w-full overflow-hidden rounded-lg border">
-          <div
-            role="img"
-            aria-label={`${activeScene.title}の背景（画像は準備中のためプレースホルダ表示）`}
-            className="absolute inset-0 flex items-center justify-center"
-          >
-            <span className="font-heading text-muted-foreground text-base sm:text-lg">
-              {activeScene.title}（背景 準備中）
-            </span>
-          </div>
+          {BACKGROUND_SRC[activeScene.background] ? (
+            <img
+              src={BACKGROUND_SRC[activeScene.background]}
+              alt={`${activeScene.title}の背景`}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+          ) : (
+            <div
+              role="img"
+              aria-label={`${activeScene.title}の背景（画像は準備中のためプレースホルダ表示）`}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              <span className="font-heading text-muted-foreground text-base sm:text-lg">
+                {activeScene.title}（背景 準備中）
+              </span>
+            </div>
+          )}
           {activeScene.hotspots.map((hotspot, hotspotIndex) => {
             const [x, y] = hotspot.position
             const Icon = OBJECT_TYPE_ICON[hotspot.object_type]
