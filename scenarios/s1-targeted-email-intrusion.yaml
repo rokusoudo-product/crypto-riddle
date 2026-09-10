@@ -111,8 +111,18 @@ investigation_points:
 # PC(経理部 中野の端末)には danger アクション(電源を落とす)を1つ設け、
 # カード群(card-reference-guideline・card-witness-itstaff-shutdown)にある
 # 「電源を落とすと揮発性メモリの証拠が消える」という学びと整合させる(feedbackのみ・
-# ペナルティ無し・操作継続可=詰み防止, spec §8.4)。人物ホットスポットの証言表示は
-# UI側で話者を橘に固定する(scene-explorer.tsx。coreスキーマに話者フィールドは無い)。
+# ペナルティ無し・操作継続可=詰み防止, spec §8.4)。
+#
+# 各collect actionのline/speaker(#52 Phase4.7/#65・T043で追加されたスキーマ、#66・T044で
+# 本文執筆)は、カード本文の事実に忠実にキャラの口調で書いた(カードそのものの引用ではなく、
+# 調査結果を語る一言に言い換えている)。話者はscene-explorer.tsxのresolveCollectPresentation
+# が投げる既定(ログを見る→霧島／人に聞く・文献を引く→橘)と一致させつつ、技術寄りの内容には
+# 明示speakerで振っている: ip-reference-advisory(攻撃手口の注意喚起)は文献系だが内容が
+# 技術的なため霧島を明示。ip-witness-itstaffの台詞は証言カード(card-witness-itstaff-shutdown、
+# is_dummy:true)を土台にしつつ、同じinvestigation_point_idに紐づく対策カード2枚
+# (card-countermeasure-isolate/-shutdown、正誤の別)がどちらが正しいかは匂わせない
+# (is_dummyはUIに一切出さない方針。旧pickTestimonyCard=非ダミー優先の経路は#66で廃止した
+# =#62吸収。詳細はscene-explorer.tsxファイル冒頭コメント)。
 # position(相対座標)は生成済み背景 assets/backgrounds/bg-s1-*.png を実際に目視して配置した
 # (机上のノートPC・座っている社員・書棚・サーバラック・中央奥の運用端末に重なるよう調整。
 # executive室に描かれた人物は1名のみのため、経理部長ホットスポットは特定の家具に重ねず、
@@ -129,6 +139,8 @@ scenes:
           - kind: collect
             investigation_point_id: ip-edr-alert
             label: EDRアラートを確認する
+            line: 中野の端末でExcelのマクロ実行に続いて、見慣れないPowerShellプロセスが起動した記録がある。侵入の起点はここだろう。
+            speaker: 霧島
           - kind: danger
             label: 感染端末の電源を落とす
             feedback: "橘「ここで電源を落とすと、動作中のプロセスや通信先の情報が乗った揮発性メモリの証拠が消えてしまいます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全してください。」"
@@ -141,6 +153,8 @@ scenes:
           - kind: collect
             investigation_point_id: ip-witness-nakano
             label: 中野に話を聞く
+            line: 中野さんに話を聞きました。月末で請求書処理が立て込み、深く確認せずに開いてしまったと。マクロ有効化の警告が出たことにも、深く気を留めなかったそうです。
+            speaker: 橘
       - object_type: person
         position: [0.87, 0.6]
         label: 経理部長
@@ -148,6 +162,8 @@ scenes:
           - kind: collect
             investigation_point_id: ip-witness-manager
             label: 経理部長に話を聞く
+            line: 経理部長に伺いました。今月は取引先の請求サイクルが集中する時期で、多少雑な件名のメールでも本物だと思い込みやすい状況だったと。マクロ実行に関する社内規程の周知も、徹底されていなかったようです。
+            speaker: 橘
       - object_type: book
         position: [0.6, 0.16]
         label: 資料棚
@@ -155,9 +171,13 @@ scenes:
           - kind: collect
             investigation_point_id: ip-reference-advisory
             label: セキュリティ注意喚起情報を確認する
+            line: 業界団体の注意喚起を確認した。取引先を装った請求書メールにマクロ付きファイルを添付し、開封後にC2サーバへ接続させる手口が、直近全国で報告されている。今回の型と一致する。
+            speaker: 霧島
           - kind: collect
             investigation_point_id: ip-reference-guideline
             label: インシデント対応ガイドラインを確認する
+            line: インシデント対応ガイドラインを確認しました。感染が疑われる端末は、まずネットワークから論理的に隔離し、電源は落とさないこと。揮発性メモリに乗った証拠を失わないためです。
+            speaker: 橘
   - id: scene-server
     title: サーバ室
     background: bg-s1-server
@@ -169,6 +189,8 @@ scenes:
           - kind: collect
             investigation_point_id: ip-proxy-log
             label: プロキシログを確認する
+            line: 深夜帯、中野のPCから見覚えのない海外IPアドレスへ、約30分間隔で通信が続いている。典型的なビーコン通信のパターンだ。
+            speaker: 霧島
       - object_type: device
         position: [0.82, 0.45]
         label: メールサーバ
@@ -176,6 +198,8 @@ scenes:
           - kind: collect
             investigation_point_id: ip-mail-log
             label: メールサーバのログを確認する
+            line: 問題のメールを確認した。取引先名を騙った件名で、送信元は正規ドメインによく似た別ドメインだ。手口としては典型的だが、手が込んでいる。
+            speaker: 霧島
       - object_type: pc
         position: [0.5, 0.55]
         label: 解析用端末
@@ -183,6 +207,8 @@ scenes:
           - kind: collect
             investigation_point_id: ip-sandbox-analysis
             label: サンドボックスでの検体解析結果を確認する
+            line: 回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加のプログラムを取得し、プロキシログと同じ宛先へビーコン通信している。IoCとして他端末の調査にも使える。
+            speaker: 霧島
       - object_type: person
         position: [0.5, 0.8]
         label: 情シス担当
@@ -190,6 +216,8 @@ scenes:
           - kind: collect
             investigation_point_id: ip-witness-itstaff
             label: 情シス担当に話を聞く
+            line: 情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。
+            speaker: 橘
 
 cards:
   - id: card-proxy-c2

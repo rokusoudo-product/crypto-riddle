@@ -1,4 +1,5 @@
-// src/ui/screens/explore-scene.fixture.ts — 探索の背景シーンUI(#56/T038)のテスト専用フィクスチャ。
+// src/ui/screens/explore-scene.fixture.ts — 探索の背景シーンUI(#56/T038、調査結果の会話
+// フレーム化は#52 Phase4.7/#66・T044)のテスト専用フィクスチャ。
 //
 // Issue #56 の指示により、実データの `scenarios/*.yaml` に `scenes` を追加しない
 // (scenes の実データ投入は別 Issue #57/T040 の範囲。二重実装防止)。そのため本ファイルで
@@ -9,12 +10,15 @@
 //
 // 構成:
 // - investigation_points 2件: ip-pc-log(ログを見る・PCホットスポット経由)、
-//   ip-witness(人に聞く・personホットスポット経由で証言=会話フレーム表示を確認する用)。
+//   ip-witness(人に聞く・personホットスポット経由で調査結果=会話フレーム表示を確認する用)。
 // - scenes 2件: scene-office(PC・person の2ホットスポット。PCはcollect/danger/noopの
 //   3action=アクションシート確認用、personはcollect1件のみ=単一actionの即時実行確認用)、
 //   scene-server(collectを持たないdeviceホットスポットのみ=シーンタブ切替の確認用。
 //   investigation_point を増やさないためcollectは置かない)。
 // - resolution.questions は1問のみ(暗号なし)にして、探索→解決の結線テストを短く保つ。
+// - PCのcollect actionには line/speaker を明示し(#66/T044)、明示経路を確認する。personの
+//   collect actionは意図的に line/speaker を省略し、既定の導入文＋カード本文へのフォールバック
+//   経路(scene-explorer.tsx の resolveCollectPresentation)を確認する。
 import { scenarioSchema } from '@/core/model'
 import type { Scenario } from '@/core/model'
 
@@ -77,7 +81,13 @@ const rawScenario: Scenario = {
           position: [0.3, 0.4],
           label: '経理担当のPC',
           actions: [
-            { kind: 'collect', investigation_point_id: 'ip-pc-log', label: 'ログを取る' },
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-pc-log',
+              label: 'ログを取る',
+              line: '不審なプロセスの起動ログが残っている。マルウェア感染の可能性が高い。',
+              speaker: '霧島',
+            },
             {
               kind: 'danger',
               label: '電源を落とす',
