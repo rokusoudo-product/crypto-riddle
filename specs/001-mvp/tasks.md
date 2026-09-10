@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-10 (#52 探索背景シーン化: Phase 4.6〔T037-T041〕追加・量産ゲート更新)
+updated: 2026-09-10 (#55: T037 完了)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -314,9 +314,16 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 > 本フェーズの各タスクは **#52 の PR（本ドキュメント改訂）が代表マージされた後**、実装 Issue に分解して起票する（`ready` は代表付与 → Sonnet 実装。委譲条件「**スキーマ差分は commit 前に報告して停止**」を維持）。
 > 確定仕様（#52・2026-09-10 代表決定）: 背景＋ホットスポット／PCで危険操作も出す（電源後もPC操作可・XP減算なし＝spec §8.4）／場所ごと複数背景（S1=2シーン）／背景は image_agent 自作（16:9・アニメ調で立ち絵と統一・検索画像は流用しない）／モバイル縦はレターボックス＋横パン／背景に依存しない一覧フォールバック（キーボード完遂）。
 
-- [ ] **T037** 探索スキーマ拡張（依存: T006）
+- [x] **T037** 探索スキーマ拡張（依存: T006）
   - `src/core/model/scenario.ts` に**省略可能な `scenes[]`**（背景アセットID・複数シーン・`hotspots[]`〔種別 PC/人物/書籍/機器・相対座標・ラベル・`actions[]`〕・`actions[]` は `collect`〔`investigation_point_id` 参照〕/`danger`/`noop`）を追加。`investigation_points` は維持。**schema_version 0.3.0 → 0.4.0**。整合性チェック=各 investigation_point がちょうど1つの collect action から参照される（`scenes` 省略時はチェックしない＝一覧フォールバック）
   - 完了条件: zod 単体テスト（正常系・境界・不正 reject・省略時フォールバック）が通る
+  - **完了（2026-09-10, #55）**: `docs/scenario_schema.md` §2.5 の目標形どおりに実装。`sceneSchema`/
+    `sceneHotspotSchema`/`hotspotActionSchema`（`collect`/`danger`/`noop` の discriminated union）を追加し、
+    `scenarioObjectSchema` に省略可能な `scenes` を追加。`superRefine` に scenes 整合性チェック
+    （collect の `investigation_point_id` 実在確認＋各 investigation_point がちょうど1回参照されることの
+    確認。`scenes` 省略時はスキップ）を追加。既存 `scenarios/*.yaml`・対応 fixture・関連テストの
+    `schema_version` を 0.3.0→0.4.0 に一括更新（`scenes` データ自体はまだ追加していない。本番データ投入は
+    #57/T040 の範囲）。
 - [ ] **T038** 探索UI（背景シーン＋ホットスポット）（依存: T011, T037, T033）
   - 背景シーン＋シーンタブ＋ホットスポット（実 `<button>` 48px+・ラベル・フォーカス可視）＋PC操作アクションシート（ログ取得／電源を落とす〔教育的FBのみ・減算なし・操作継続可〕／今は触らない）＋**一覧フォールバック**（キーボード完遂）。人物の証言は**会話フレーム**で表示（#50 の探索④部分を統合）。16:9 をモバイル縦でレターボックス＋横パン
   - 完了条件: 背景・一覧の両方で、キーボードのみで全ポイント調査→解決へ進める結線テストが通る

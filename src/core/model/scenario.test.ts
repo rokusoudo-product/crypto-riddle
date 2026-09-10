@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
-import { scenarioSchema, type Scenario } from './scenario.ts'
+import { scenarioSchema, type Scene, type Scenario } from './scenario.ts'
 
 function validScenario(): Scenario {
   return {
-    schema_version: '0.3.0',
+    schema_version: '0.4.0',
     id: 's0-sample',
     title: 'アルファテック社 顧客データ流出事件(テスト用)',
     status: 'sample',
@@ -352,5 +352,177 @@ describe('references(出典表記, docs/citation-policy.md §5)', () => {
     // @ts-expect-error 意図的に必須フィールドを欠落させる
     scenario.references = [{ note: 'x' }]
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+})
+
+// scenes(探索の背景シーン、#52・T037、docs/scenario_schema.md §2.5)。
+// validScenario() の investigation_points(ip-proxy-log/ip-witness-tanaka/ip-itdept)を
+// ちょうど1回ずつ collect action から参照する構成にしてある。
+function validScenes(): Scene[] {
+  return [
+    {
+      id: 'scene-office',
+      title: '執務室',
+      background: 'bg-s1-office',
+      hotspots: [
+        {
+          object_type: 'pc',
+          position: [0.3, 0.42],
+          label: '経理担当のPC',
+          actions: [
+            { kind: 'collect', investigation_point_id: 'ip-proxy-log', label: 'プロキシログを見る' },
+            { kind: 'collect', investigation_point_id: 'ip-itdept', label: '対策メモを見る' },
+            {
+              kind: 'danger',
+              label: '感染端末の電源を落とす',
+              feedback: '橘「ここで電源を落とすと揮発性メモリの証拠が消えます。」',
+            },
+            { kind: 'noop', label: '今は触らない' },
+          ],
+        },
+        {
+          object_type: 'person',
+          position: [0.7, 0.38],
+          label: '田中さん',
+          actions: [{ kind: 'collect', investigation_point_id: 'ip-witness-tanaka', label: '話を聞く' }],
+        },
+      ],
+    },
+  ]
+}
+
+describe('scenes(探索の背景シーン, #52/T037)', () => {
+  it('正常系: office相当のscenes(collect/danger/noop、1オブジェクト複数collect)を受理する', () => {
+    const scenario = validScenario()
+    scenario.scenes = validScenes()
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: scenes を省略しても既存シナリオはそのまま通る(一覧表示フォールバック)', () => {
+    const scenario = validScenario()
+    expect(scenario.scenes).toBeUndefined()
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('境界: position [0, 0] と [1, 1] を受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].position = [0, 0]
+    scenes[0].hotspots[1].position = [1, 1]
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: position の要素が1を超える場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].position = [1.5, 0.5]
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: position の要素が0未満の場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].position = [-0.1, 0.5]
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: 未知の object_type を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // @ts-expect-error 意図的に未対応の object_type を渡す
+    scenes[0].hotspots[0].object_type = 'window'
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: collect action に investigation_point_id が無い場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // @ts-expect-error 意図的に必須フィールドを欠落させる
+    scenes[0].hotspots[0].actions[0] = { kind: 'collect', label: 'ラベルのみ' }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: danger action に feedback が無い場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // @ts-expect-error 意図的に必須フィールドを欠落させる
+    scenes[0].hotspots[0].actions[2] = { kind: 'danger', label: '電源を落とす' }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: 未定義フィールドを含む hotspot を拒否する(.strict())', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // @ts-expect-error 意図的に未定義フィールドを渡す
+    scenes[0].hotspots[0].unknown_field = 'x'
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: 未定義フィールドを含む scene を拒否する(.strict())', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // @ts-expect-error 意図的に未定義フィールドを渡す
+    scenes[0].unknown_field = 'x'
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: collect が存在しない investigation_point を指す場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-not-exist',
+      label: '話を聞く',
+    }
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(
+        result.error.issues.some((issue) => issue.message.includes('investigation_points に存在しません')),
+      ).toBe(true)
+    }
+  })
+
+  it('reject: ある investigation_point が collect action から2回参照される場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // ip-witness-tanaka の代わりに、既に参照済みの ip-proxy-log をもう一度参照させる(2回目)。
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-proxy-log',
+      label: 'もう一度確認する',
+    }
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('ちょうど1回参照'))).toBe(
+        true,
+      )
+    }
+  })
+
+  it('reject: ある investigation_point が collect action から0回参照される場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // 田中さんの hotspot を除去し、ip-witness-tanaka を誰も参照しない状態にする。
+    scenes[0].hotspots = [scenes[0].hotspots[0]]
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('ちょうど1回参照'))).toBe(
+        true,
+      )
+    }
   })
 })
