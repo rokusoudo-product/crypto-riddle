@@ -342,9 +342,10 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
     (`src/ui/screens/explore-scene.fixture.ts`)で `src/ui/screens/explore-screen.test.tsx`
     の結線テスト（背景・一覧の両経路でキーボードのみ全ポイント調査→解決へ進める、danger の
     教育的FB・詰み防止、人物証言の会話フレーム表示、4状態）を追加した。
-- [ ] **T039** S1 探索背景の生成（依存: #52 PR マージ、IMAGE_WORKFLOW）
+- [x] **T039** S1 探索背景の生成（依存: #52 PR マージ、IMAGE_WORKFLOW）
   - S1 の2背景（執務室／サーバ室＝`bg-s1-office`/`bg-s1-server`）を IMAGE_WORKFLOW の承認ゲート（アセット定義＋プロンプト提示→代表承認→image_agent 生成）で用意。16:9・アニメ調で立ち絵と統一。生成物パス・プロンプトを DESIGN.md アセット節に追記
   - 完了条件: 2背景が確定し DESIGN.md に記録、`assets/` に配置
+  - **完了（2026-09-10, #60でマージ済み）**: 本チェックボックスは #60 のPRで反転漏れとなっていたため、本PR(#57)で反映した（差分自体は#60で完了済み）。
 - [x] **T040** S1・s0 に scenes データを追加（依存: T037）
   - `scenarios/s1-targeted-email-intrusion.yaml`（執務室／サーバ室の2シーン・PC/人物/書籍のホットスポット・既存 `investigation_points` への collect 参照・PCの danger アクション）と `scenarios/s0-sample.yaml`（サンプルとして最小のシーン）＋各 fixture を追加
   - 完了条件: 両 YAML が 0.4.0 検証を通過し `npm run build:data` 成功
