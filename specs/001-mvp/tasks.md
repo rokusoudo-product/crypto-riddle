@@ -243,18 +243,51 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
     表示用一時状態。zod スキーマには持たせない）を追加。暗号誤答は cipher ステージに留まり
     `lastAnswerFeedback` のみ更新（reply/explanation は無し、自由記述回答のため）。
     XP減算そのものは #45（T034）の範囲
-- [ ] **T033** 会話フレーム＋会話モードUI（依存: T011, T032。dnd-kit 削除）
+- [x] **T033** 会話フレーム＋会話モードUI（依存: T011, T032。dnd-kit 削除）
   - DESIGN.md「会話フレーム」（下部会話ウィンドウ・中央左右立ち絵・非発話側グレーアウト＋名札）を共通コンポーネント化。解決画面に選択肢ボタン（各48px・キーボード完遂）・相談ボタン（残数表示）・手持ちカードドロワー（無料閲覧）を載せる。`card-placement-board.tsx` と `@dnd-kit/*` 依存を削除
   - 完了条件: キーボードのみで回答・相談・カード閲覧・クリアまで完遂できる結線テストが通る
-- [ ] **T034** XP減算・試行記録（依存: T032, T009）
+  - **完了（2026-09-10, #45）**: `src/ui/components/conversation-frame.tsx`（霧島＝左・橘＝右固定、非発話側は
+    `grayscale`+`opacity-60`、両側に常時名札を表示し色以外でも発話者を判別可能にした, WCAG 1.4.1）・
+    `src/ui/components/card-drawer.tsx`（`<details>`ではなく制御された`aria-expanded`ボタン、無料閲覧と
+    相談=コスト消費の違いをラベルで明示）を新設し、`resolve-screen.tsx` に配線した。誤答時は会話文
+    (`line`=問い文)を保持したまま`aria-live="polite"`でreply+段階解説を表示（`role="alert"`にはしない）。
+    `card-placement-board.tsx`/`use-card-placement.ts`（テスト含む）と `@dnd-kit/core`・`@dnd-kit/utilities`
+    依存を削除。⑥失敗解説画面(`fail-screen.tsx`)・`/resolve/fail`ルートも削除（誤答時は解決パート内に
+    留まるため不要）。`src/ui/screens/s1-play-flow.test.tsx`にキーボード(Tab/Enter)のみで
+    誤答→相談→カードドロワー閲覧→正答→次の問い→正答→クリアまで完遂する結線テストを追加し、
+    完了条件を満たした。`src/ui/screens/play-flow.test.tsx`（s0-sample・暗号ステージ）も会話モードへ
+    書き直した。Playwright e2e(`e2e/s1-playthrough.spec.ts`)は元々`test.describe.skip`のままで
+    #46(T036)の範囲。
+- [x] **T034** XP減算・試行記録（依存: T032, T009）
   - 誤答1回・相談1回ごとに獲得XPを減算（下限あり）。SaveData に解答試行・相談回数を記録し結果画面に反映。⑥失敗解説画面を廃止し会話内解説へ統合
   - 完了条件: 減算ロジックと下限、SaveData 反映の単体テストが通る
+  - **完了（2026-09-10, #45）**: `src/ui/store/save-integration.ts` に `computeClearXpReward(progress)` を
+    追加（`WRONG_ANSWER_XP_PENALTY=10`／`CONSULT_XP_PENALTY=15`／下限0。単価は spec/plan に定義が無い
+    ため最小の妥当値。誤答は選択肢に残った reply のみだが相談は`consult_hint`を丸ごと得られるため
+    相談の方を重くした。本調整は引き続き T022 の範囲）。`applyClearToSaveData` はこの値をXPに加算し、
+    `SaveData.scenario_progress` に `wrong_answer_count`／`consult_count`／`no_hint_clear`
+    （既存の未使用フィールドを稼働）を記録する（`core/model/save-data.ts` へ optional フィールドを
+    追加。既存 strict object への追加のみのため `SAVE_DATA_SCHEMA_VERSION` は据え置き＝後方互換）。
+    結果画面(`result-screen.tsx`)に誤答・相談回数と、それを反映した獲得XPを表示。最後の問いの
+    正解replyは正解と同時に`/result`へ遷移するため解決画面では表示されず、`progress.lastAnswerFeedback`
+    を結果画面側で参照して表示するようにした。単体テストは `save-integration.test.ts`
+    （`computeClearXpReward`・`applyClearToSaveData`の新フィールド）、結線テストは
+    `s1-play-flow.test.tsx` に追加。
 - [ ] **T035** S1・s0 を会話モードへ移植（依存: T030。関連: T015）
   - `scenarios/s1-targeted-email-intrusion.yaml` を questions 形式へ書き換え（起点→初動の2問。教育的失敗＝電源断おとりを誤答 `reply`＋深まる解説へ移植）。`scenarios/s0-sample.yaml` も追随。データは本2本のみを同時移行（移行関数は持たない）
   - 完了条件: 両 YAML が新スキーマの zod 検証を通過し、`npm run build:data` が成功する
+  - **付記（2026-09-10, #45）**: #45 の作業中に確認したところ、両 YAML・対応する fixture
+    （`s1-targeted-email-intrusion.fixture.ts`/`s0-sample.fixture.ts`）は既に `schema_version: "0.3.0"`・
+    `questions[]` 形式へ移行済みだった（`npm run build:data` も成功する）。#44 の core 実装時に
+    済ませたと見られるが、本チェックボックスの更新漏れの可能性がある。#45 は Issue 範囲外のため
+    チェックは付けずコメントのみ残す。#46 着手時に事実確認のうえチェックを更新されたい。
 - [ ] **T036** 結線・E2E の更新（依存: T033, T034, T035。関連: T016, T017）
   - `src/ui/screens/s1-play-flow.test.tsx`・`e2e/s1-playthrough.spec.ts` を会話モードへ更新（正解ルート＋誤答で深まる解説＋相談）。旧カード配置テスト（`card-placement-board.test.tsx` 等）を削除
   - 完了条件: Vitest・Playwright E2E が CI で安定して通る
+  - **付記（2026-09-10, #45）**: Vitest側（`s1-play-flow.test.tsx`・`play-flow.test.tsx`）と旧カード配置
+    テスト（`card-placement-board.test.tsx`等）の削除は T033 の完了条件を満たすため #45 で先行実施済み。
+    #46 で残るのは `e2e/s1-playthrough.spec.ts`（Playwright, 現状`test.describe.skip`）の会話モードへの
+    更新のみ。
 
 **チェックポイント③'**: 会話モードで S1 を通しプレイでき、代表が量産可と再確認する
 

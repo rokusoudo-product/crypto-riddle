@@ -12,8 +12,11 @@ import {
   applyClearToSaveData,
   applyProgressToSaveData,
   CLEAR_XP_REWARD,
+  computeClearXpReward,
+  CONSULT_XP_PENALTY,
   createDefaultSaveData,
   MASTERY_POINTS_PER_TAG,
+  WRONG_ANSWER_XP_PENALTY,
 } from './save-integration'
 
 function progressAfterInvestigatingOne(): ScenarioProgressState {
@@ -66,7 +69,14 @@ describe('applyClearToSaveData', () => {
       '2026-09-10T00:00:00.000Z',
     )
     expect(updated.scenario_progress).toEqual([
-      { scenario_id: 's0-sample', cleared: true, cleared_at: '2026-09-10T00:00:00.000Z' },
+      {
+        scenario_id: 's0-sample',
+        cleared: true,
+        cleared_at: '2026-09-10T00:00:00.000Z',
+        no_hint_clear: true,
+        wrong_answer_count: 0,
+        consult_count: 0,
+      },
     ])
   })
 
@@ -117,4 +127,57 @@ describe('applyClearToSaveData', () => {
     expect(updated.subject_mastery['認証']).toBe(5 + MASTERY_POINTS_PER_TAG)
     expect(updated.subject_mastery['法制度']).toBe(MASTERY_POINTS_PER_TAG)
   })
+})
+
+// T034(FR-11, spec §8.4): 誤答1回・相談1回ごとに獲得XPを減算する(下限あり)。
+describe('computeClearXpReward', () => {
+  function progressWith(wrongAttemptsByQuestionId: Record<string, number>, consultsUsed: number) {
+    return { ...progressAfterInvestigatingOne(), wrongAttemptsByQuestionId, consultsUsed }
+  }
+
+  it('誤答・相談が0回ならCLEAR_XP_REWARDそのままになる', () => {
+    expect(computeClearXpReward(progressWith({}, 0))).toBe(CLEAR_XP_REWARD)
+  })
+
+  it('誤答1回ごとにWRONG_ANSWER_XP_PENALTYを減算する', () => {
+    expect(computeClearXpReward(progressWith({ 'q-1': 2 }, 0))).toBe(
+      CLEAR_XP_REWARD - 2 * WRONG_ANSWER_XP_PENALTY,
+    )
+  })
+
+  it('相談1回ごとにCONSULT_XP_PENALTYを減算する', () => {
+    expect(computeClearXpReward(progressWith({}, 3))).toBe(CLEAR_XP_REWARD - 3 * CONSULT_XP_PENALTY)
+  })
+
+  it('誤答・相談は合算して減算し、複数の問いの誤答回数も合計する', () => {
+    expect(computeClearXpReward(progressWith({ 'q-1': 1, 'q-2': 2 }, 1))).toBe(
+      CLEAR_XP_REWARD - 3 * WRONG_ANSWER_XP_PENALTY - 1 * CONSULT_XP_PENALTY,
+    )
+  })
+
+  it('減算がCLEAR_XP_REWARDを上回っても0未満にはしない(下限)', () => {
+    expect(computeClearXpReward(progressWith({ 'q-1': 20 }, 3))).toBe(0)
+  })
+})
+
+describe('applyClearToSaveData の誤答・相談の記録(T034)', () => {
+  it('誤答・相談回数ぶんXPを減算し、scenario_progressに回数を記録する', () => {
+    const save = createDefaultSaveData()
+    const progress = progressWithWrongAndConsult()
+    const updated = applyClearToSaveData(save, s0SampleFixture, progress)
+    expect(updated.xp).toBe(CLEAR_XP_REWARD - 2 * WRONG_ANSWER_XP_PENALTY - 1 * CONSULT_XP_PENALTY)
+    expect(updated.scenario_progress[0]).toMatchObject({
+      wrong_answer_count: 2,
+      consult_count: 1,
+      no_hint_clear: false,
+    })
+  })
+
+  function progressWithWrongAndConsult() {
+    return {
+      ...progressAfterInvestigatingOne(),
+      wrongAttemptsByQuestionId: { 'q-1': 2 },
+      consultsUsed: 1,
+    }
+  }
 })

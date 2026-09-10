@@ -16,7 +16,6 @@ describe.each([
   ['/intro', '導入'],
   ['/explore', '探索'],
   ['/resolve', '解決'],
-  ['/resolve/fail', '失敗解説'],
   ['/result', '結果'],
   ['/cards', 'カード図鑑'],
 ])('ルート %s', (path, heading) => {

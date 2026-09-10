@@ -2,7 +2,7 @@ import type { ScenarioReference } from '@/core/model'
 import { PrimaryAction, SecondaryAction } from '@/ui/components/screen-actions'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
-import { CLEAR_XP_REWARD } from '@/ui/store/save-integration'
+import { computeClearXpReward } from '@/ui/store/save-integration'
 import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
 
@@ -41,6 +41,11 @@ export function ResultScreen() {
   const saveData = useGameStore((s) => s.saveData)
 
   const cleared = progress.part === 'clear'
+  const wrongAnswerCount = Object.values(progress.wrongAttemptsByQuestionId).reduce(
+    (sum, n) => sum + n,
+    0,
+  )
+  const xpEarned = computeClearXpReward(progress)
 
   return (
     <ScreenContainer title="結果">
@@ -51,6 +56,14 @@ export function ResultScreen() {
       >
         {cleared ? (
           <>
+            {/* T033/#45: 最後の問いの正解 reply は、正解と同時に /result へ遷移するため解決画面
+                (⑤)では表示する間がない。progress.lastAnswerFeedback は dispatch 後も game-store に
+                残り続けるため、ここで参照して表示する(advisor 指摘)。 */}
+            {progress.lastAnswerFeedback?.correct === true && progress.lastAnswerFeedback.reply && (
+              <p className="border-border bg-card rounded-lg border p-3 text-sm">
+                {progress.lastAnswerFeedback.reply}
+              </p>
+            )}
             <ul className="flex flex-col gap-3">
               {scenario.resolution.clear_explanation.map((line, index) => (
                 <li key={index} className="border-border bg-card rounded-lg border p-3">
@@ -70,7 +83,11 @@ export function ResultScreen() {
                   </li>
                 )
               })}
-              <li>獲得XP: +{CLEAR_XP_REWARD}</li>
+              {/* T034(FR-11, spec §8.4): 誤答・相談回数と、それを反映した獲得XPを表示する。 */}
+              <li>
+                誤答: {wrongAnswerCount}回 / 相談: {progress.consultsUsed}回
+              </li>
+              <li>獲得XP: +{xpEarned}</li>
               <li>累計XP: {saveData?.xp ?? 0}</li>
             </ul>
             {scenario.references && scenario.references.length > 0 && (
