@@ -27,7 +27,12 @@ import { uniqueArraySchema } from './util.ts'
 // scenes[] を追加。investigation_points(カードの出所・3系統)は正のまま維持し、scenes は表示層として
 // 追加しただけの後方互換な拡張(省略時は一覧表示にフォールバック)。詳細は spec.md §7.1・
 // docs/scenario_schema.md §2.5。
-export const scenarioSchemaVersionSchema = z.literal('0.4.0')
+// 0.5.0（T043, 2026-09-11, #52 Phase4.7/#65）: scenes[].hotspots[].actions の collect action に
+// 省略可能な line(台詞)・speaker(話者)を追加した後方互換な拡張(danger の feedback と対称)。
+// 調査結果を解決パートと同じ会話フレームで台詞提示するための下地。省略時のフォールバック(既定の
+// 導入文＋カード本文)の生成は UI 側(T044)の範囲であり、本バージョンは型の追加のみ。詳細は
+// docs/scenario_schema.md §2.5。
+export const scenarioSchemaVersionSchema = z.literal('0.5.0')
 
 /** マップID。ファイル名(拡張子除く)と一致させる（実在チェックは validate-collection.ts）。 */
 export const scenarioIdSchema = z.string().regex(/^[a-z][a-z0-9_-]*$/)
@@ -137,7 +142,9 @@ export type HotspotPosition = z.infer<typeof hotspotPositionSchema>
 
 // ホットスポットのアクションは kind を判別子とする discriminated union にする(docs/scenario_schema.md §2.5)。
 // - collect: investigation_point_id を参照してカードを獲得する(1オブジェクトが複数ポイントを
-//   束ねられる。hotspot→point は 1:N。例: 1台のPCにメールログとEDRの2点)。
+//   束ねられる。hotspot→point は 1:N。例: 1台のPCにメールログとEDRの2点)。省略可能な
+//   line(台詞)・speaker(話者)を持てる(#52 Phase4.7/T043, 0.5.0。danger の feedback と対称)。
+//   省略時は既定の導入文＋カード本文へのフォールバック(UI側T044の範囲)。
 // - danger: 電源を落とす等の危険な選択肢。feedback は教育的な台詞のみを返し、ペナルティなし・
 //   操作継続可(詰み防止, spec §8.4)。
 // - noop: 何も起きない選択肢。
@@ -146,6 +153,11 @@ const collectHotspotActionSchema = z
     kind: z.literal('collect'),
     investigation_point_id: investigationPointIdSchema,
     label: z.string().min(1),
+    // 調査結果を会話フレームで台詞提示するための任意フィールド(#52 Phase4.7/T043)。
+    // line: キャラの台詞。speaker: 既存の会話フレームの話者型(characterSchema=霧島/橘)。
+    // 両者は独立して省略可能(line のみ・speaker のみ・両方・両省略のいずれも許容)。
+    line: z.string().min(1).optional(),
+    speaker: characterSchema.optional(),
   })
   .strict()
 const dangerHotspotActionSchema = z

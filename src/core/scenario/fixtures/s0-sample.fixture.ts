@@ -17,7 +17,7 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const s0SampleFixture: Scenario = {
-  schema_version: '0.4.0',
+  schema_version: '0.5.0',
   id: 's0-sample',
   title: 'アルファテック社 顧客データ流出事件(スキーマサンプル)',
   status: 'sample',
