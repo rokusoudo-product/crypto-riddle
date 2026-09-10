@@ -1,5 +1,7 @@
 // e2e/s1-playthrough.spec.ts — T017: S1「標的型メールからの侵入」通しプレイの E2E テスト。
 //
+// 会話モードUI(#45)実装後に #46(T036) で書き直す。それまで旧カード配置UI向けのため skip。
+//
 // tasks.md T017 完了条件「Playwright で S1 通しプレイの E2E を作成し、CI で安定して通ること」に対応する。
 // 実ブラウザ(chromium)・実 IndexedDB(SaveStorage)を使い、ビルド成果物(vite preview)に対して
 // 導入→探索(必要カード取得)→解決(暗号なし: 攻撃特定→防衛)→結果まで、実データで1マップ通しプレイできる
@@ -62,7 +64,7 @@ async function submitCorrectAttackIdentification(page: import('@playwright/test'
   await page.getByRole('button', { name: '攻撃手段を特定する' }).click()
 }
 
-test.describe('S1「標的型メールからの侵入」通しプレイ(T017)', () => {
+test.describe.skip('S1「標的型メールからの侵入」通しプレイ(T017)', () => {
   test.beforeEach(async ({ page }) => {
     // IndexedDB(SaveStorage)は実ブラウザのタブ間で共有されないが、同一オリジンの前回実行が
     // 残らないよう、テストごとに新規コンテキストの前提で開始する(playwright.config.ts のプロジェクト
