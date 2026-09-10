@@ -4,6 +4,10 @@
 // (暗号→攻撃特定→防衛)→結果まで、s0-sample を1マップ通しでプレイできることを確認する。
 // 誤答時に follow_up(失敗解説)へ遷移し、RESUME_FROM_FOLLOW_UP で解決パートへ復帰できることも確認する。
 //
+// T015 で既定シナリオが S1(暗号なし)に差し替わったため、本ファイルは s0-sample を明示的に
+// resetGameStoreForTests へ渡し、暗号ステージを含む正解ルート・誤答フォローの回帰確認を維持する
+// (S1 の通しプレイは src/ui/screens/s1-play-flow.test.tsx を参照)。
+//
 // useGameStore は zustand のモジュール単位シングルトンで Provider を経由しないため、
 // テストごとに resetGameStoreForTests でストアと SaveStorage を既知の状態へ戻す
 // (game-store.ts のコメント参照)。
@@ -14,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 import type { SaveData } from '@/core/model'
 import type { SaveStorage } from '@/core/save'
+import { s0SampleFixture } from '@/core/scenario/fixtures/s0-sample.fixture'
 import { AppRoutes } from '@/ui/routes'
 import { resetGameStoreForTests } from '@/ui/store/game-store'
 
@@ -48,7 +53,7 @@ describe('1マップ通しプレイの結線(T013)', () => {
 
   beforeEach(() => {
     storage = new InMemorySaveStorage()
-    resetGameStoreForTests({ storage })
+    resetGameStoreForTests({ storage, scenario: s0SampleFixture })
   })
 
   it('タイトル→マップ選択→導入→探索→解決(正解ルート)→結果まで進行できる', async () => {

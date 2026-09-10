@@ -16,13 +16,12 @@ import {
 
 function baseScenario(overrides: Partial<Scenario> = {}): Scenario {
   return {
-    schema_version: '0.1.0',
+    schema_version: '0.2.0',
     id: 's0-sample',
     title: 'サンプル',
     subject_tags: ['認証'],
     difficulty: 1,
     estimated_minutes: 10,
-    source: { type: 'original' },
     intro: {
       background: 'x',
       victim_company: { name: 'x', description: 'x' },

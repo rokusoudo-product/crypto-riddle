@@ -15,6 +15,9 @@
 //   resolution(*) --(不正解)--> follow_up (失敗解説。wrong_answer_follow_ups から該当行を保持)
 //   follow_up --(RESUME_FROM_FOLLOW_UP)--> resolution(誤答したステージに復帰。「初動をやり直す」)
 //
+// T015(Issue #5)で追加: scenario.resolution.cipher_stages が0件の「暗号なし」シナリオ(入門編 S1)では
+// ENTER_RESOLUTION が resolution(cipher) をスキップし、直接 resolution(attack_identification) へ進む。
+//
 // core/ は React および src/ui/ を import してはならない（plan.md §2、advisor 承認条件）。
 import { judgeCardSelection, judgeCipherStage } from '../judge/index.ts'
 import type { FollowUp, Scenario } from '../model/index.ts'
@@ -127,7 +130,13 @@ export function scenarioReducer(
 
     case 'ENTER_RESOLUTION': {
       if (!canEnterResolution(state, scenario)) return state
-      return { ...state, part: 'resolution', resolutionStage: 'cipher' }
+      // 暗号なしシナリオ(T015, Issue #5)は cipher ステージを飛ばす。
+      const hasCipher = scenario.resolution.cipher_stages.length > 0
+      return {
+        ...state,
+        part: 'resolution',
+        resolutionStage: hasCipher ? 'cipher' : 'attack_identification',
+      }
     }
 
     case 'SUBMIT_CIPHER_ANSWER': {

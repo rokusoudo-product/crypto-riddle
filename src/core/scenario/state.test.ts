@@ -16,13 +16,12 @@ import {
  */
 function buildScenario(): Scenario {
   return {
-    schema_version: '0.1.0',
+    schema_version: '0.2.0',
     id: 'test-scenario',
     title: 'テストシナリオ',
     subject_tags: ['ネットワーク基盤'],
     difficulty: 1,
     estimated_minutes: 10,
-    source: { type: 'original' },
     intro: {
       background: '背景',
       victim_company: { name: '被害企業', description: '説明' },
@@ -198,6 +197,17 @@ describe('canEnterResolution / ENTER_RESOLUTION(解決パートへの遷移条�
     const resolving = scenarioReducer(scenario, fullyExplored, { type: 'ENTER_RESOLUTION' })
     expect(resolving.part).toBe('resolution')
     expect(resolving.resolutionStage).toBe('cipher')
+  })
+})
+
+describe('ENTER_RESOLUTION: 暗号なしシナリオ(Issue #5, T015)は cipher ステージを飛ばす', () => {
+  it('cipher_stages が0件の場合、resolution(attack_identification) に直接進む', () => {
+    const scenario = buildScenario()
+    scenario.resolution.cipher_stages = []
+    const fullyExplored = stateAfterFullExploration(scenario)
+    const resolving = scenarioReducer(scenario, fullyExplored, { type: 'ENTER_RESOLUTION' })
+    expect(resolving.part).toBe('resolution')
+    expect(resolving.resolutionStage).toBe('attack_identification')
   })
 })
 

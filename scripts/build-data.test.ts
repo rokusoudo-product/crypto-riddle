@@ -4,6 +4,8 @@ import path from 'node:path'
 
 import { afterEach, describe, expect, it } from 'vitest'
 
+import { s1TargetedEmailIntrusionFixture } from '../src/core/scenario/fixtures/s1-targeted-email-intrusion.fixture.ts'
+
 import { runBuild } from './build-data.ts'
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..')
@@ -22,14 +24,12 @@ laws:
 
 function validScenarioYaml(id: string): string {
   return `
-schema_version: "0.1.0"
+schema_version: "0.2.0"
 id: ${id}
 title: テストシナリオ
 subject_tags: [ネットワーク基盤]
 difficulty: 1
 estimated_minutes: 10
-source:
-  type: original
 intro:
   background: x
   victim_company:
@@ -106,6 +106,15 @@ describe('runBuild — 実リポジトリのサンプルデータ', () => {
     expect(result.laws.length).toBeGreaterThan(0)
     // terms_core.yaml が Issue #22 で7種目(ネットワーク基盤)を使用していることの回帰確認。
     expect(result.terms.some((t) => t.subject_tags.includes('ネットワーク基盤'))).toBe(true)
+  })
+
+  // T015(Issue #5): S1 の TypeScript フィクスチャ(src/ui/store/game-store.ts が既定データとして使う)は
+  // scenarios/s1-targeted-email-intrusion.yaml の手書きの写しであり、乖離するとゲーム内表示と
+  // YAML(正本)がずれてしまう。runBuild の結果と突き合わせて一致を保証する回帰テスト。
+  it('S1 の YAML から生成した内容が s1-targeted-email-intrusion.fixture.ts と一致する', async () => {
+    const result = await runBuild(REPO_ROOT)
+    const s1 = result.scenarios.find((s) => s.id === 's1-targeted-email-intrusion')
+    expect(s1).toEqual(s1TargetedEmailIntrusionFixture)
   })
 })
 

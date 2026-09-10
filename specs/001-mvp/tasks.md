@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-10
+updated: 2026-09-10 (T015-T017)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -168,16 +168,38 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 1マップをアート・UI 込みの完成品質で通しプレイできるようにし、物量とスコープを再確認する工程。
 
-- [ ] **T015** S1 シナリオデータ作成（依存: T010、**Issue #5 の ready 付与**、前提: **Issue #14**（出典表記規則）の確定）
+- [x] **T015** S1 シナリオデータ作成（依存: T010、**Issue #5 の ready 付与**、前提: **Issue #14**（出典表記規則）の確定）
   - S1「標的型メール侵入」完全版 YAML（プロトの流用はしない・暗号は含めず初動対応中心 = #5 代表回答）。
     IPA 過去問由来の素材には #14 の規則で出典を表記（FR-7）
   - 完了条件: S1 が zod 検証を通過し、導入→探索→解決の全データが揃っている
-- [ ] **T016** S1 通しプレイの結線（依存: T013, T014, T015）
+  - **完了（2026-09-10）**: `scenarios/s1-targeted-email-intrusion.yaml`（被害企業「株式会社浜通商事」、
+    調査ポイント9・カード15を新規創作。ゲートPの「アルファテック社」は流用せず）。#14 確定に合わせ、
+    `source`（単一・必須）を `references`（配列・省略可、`docs/citation-policy.md` §5 準拠）へ破壊的変更し
+    `schema_version` を `0.2.0` に更新（`src/core/model/scenario.ts`。s0-sample も追随）。入門編のため
+    暗号を含めない代表回答に対応し `resolution.cipher_stages` の制約を `.length(1)` から `.max(1)`
+    （0件許容）へ緩和、`src/core/scenario/state.ts` の `ENTER_RESOLUTION` は0件時に cipher ステージを
+    飛ばす。教育的失敗の分岐（「電源を直ちに落とす」対策カード→揮発性メモリの証拠消失を橘が解説→
+    やり直しで正しい初動=論理的隔離へ誘導）を countermeasure の誤答フォローとして実装
+- [x] **T016** S1 通しプレイの結線（依存: T013, T014, T015）
   - S1 で1マップ通しプレイ（FR-1〜FR-6）。サポート役（霧島/橘）の導入説明・探索誘導・誤答フォロー・クリア解説を含む
   - 完了条件: ブラウザで S1 を最初から最後までプレイでき、XP・分野習熟が保存される
-- [ ] **T017** E2E テスト（依存: T016）
+  - **完了（2026-09-10）**: `src/ui/store/game-store.ts` の既定シナリオを s0-sample から S1 に差し替え、
+    マップ選択画面（`map-select-screen.tsx`）は新設した `scenarios`（選択可能なシナリオ一覧）から一覧
+    表示するよう変更（S2〜S3 追加時に配列が増える設計）。FR-6 の未結線（クリアしても xp:0・
+    subject_mastery:{} のまま）を `src/ui/store/save-integration.ts` の `applyClearToSaveData` に
+    XP（`CLEAR_XP_REWARD=100`固定）・分野習熟（クリアしたシナリオの `subject_tags` それぞれに
+    `MASTERY_POINTS_PER_TAG=1`）の加算を実装して解消（加算値は spec/plan に定義が無い最小の妥当値。
+    本調整は T022 の範囲）。結果画面に獲得XP・累計XP・出典表記（FR-7）を表示。結線テストは
+    `src/ui/screens/s1-play-flow.test.tsx`（Vitest + Testing Library）で正解ルートと教育的失敗の
+    分岐の両方を確認
+- [x] **T017** E2E テスト（依存: T016）
   - Playwright で S1 通しプレイの E2E を作成し、T003 のワークフローに追加
   - 完了条件: CI で E2E が安定して通る
+  - **完了（2026-09-10）**: `playwright.config.ts`（chromium のみ、`vite preview` を webServer に使用）・
+    `e2e/s1-playthrough.spec.ts`（正解ルートと教育的失敗の分岐の2ケース、タップ=クリック操作のみ）を
+    追加し、`.github/workflows/ci.yml` に独立ジョブ `e2e` を追加（`playwright install --with-deps
+    chromium` → `npm run test:e2e`。ローカル(WSL非対話)では `--with-deps` の sudo プロンプトを避け
+    `npx playwright install chromium` のみで実行）
 - [ ] **T018** 【代表】プレイテストと調整（依存: T017）
   - 代表がプレイし、面白さ・難易度・カード枚数/ダミー比率・プレイ時間を評価。
     仕様変更が出たら **spec.md に書き戻してから**次工程へ（生きたドキュメント運用）

@@ -44,6 +44,11 @@ export function TitleScreen() {
           <PrimaryAction to="/maps">つづきから</PrimaryAction>
           <SecondaryAction to="/cards">カード図鑑</SecondaryAction>
         </div>
+        {/* citation-policy.md §4「タイトル/README」の包括表記。 */}
+        <p className="text-muted-foreground max-w-[60ch] text-xs">
+          IPA
+          情報処理技術者試験の過去問題を題材の参考として使用しています（設問の転載はありません）。
+        </p>
       </StateFrame>
     </ScreenContainer>
   )

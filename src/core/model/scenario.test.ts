@@ -4,14 +4,14 @@ import { hasNoDummyCountermeasure, scenarioSchema, type Scenario } from './scena
 
 function validScenario(): Scenario {
   return {
-    schema_version: '0.1.0',
+    schema_version: '0.2.0',
     id: 's0-sample',
     title: 'アルファテック社 顧客データ流出事件(テスト用)',
     status: 'sample',
     subject_tags: ['認証', '攻撃手法', 'インシデント対応', '法制度'],
     difficulty: 2,
     estimated_minutes: 12,
-    source: { type: 'original', note: 'テスト用フィクスチャ' },
+    references: [{ material_kind: '攻撃手口', note: 'テスト用フィクスチャ' }],
     related_terms: ['term-password-list-attack'],
     intro: {
       background: '深夜、管理画面に不審なアクセスが記録された。',
@@ -152,13 +152,13 @@ describe('scenarioSchema', () => {
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 
-  it('reject: cipher_stages が0件を拒否する(MVPは必ず1要素)', () => {
+  it('境界: cipher_stages が0件(暗号なしシナリオ, Issue #5)を受理する', () => {
     const scenario = validScenario()
     scenario.resolution.cipher_stages = []
-    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
   })
 
-  it('reject: cipher_stages が2件を拒否する(MVPは必ず1要素)', () => {
+  it('reject: cipher_stages が2件を拒否する(MVPは最大1要素)', () => {
     const scenario = validScenario()
     scenario.resolution.cipher_stages.push({ ...scenario.resolution.cipher_stages[0], id: 'cs-2' })
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
@@ -235,6 +235,42 @@ describe('scenarioSchema', () => {
   it('reject: countermeasure.required_card_ids がダミーカードを参照する場合を拒否する', () => {
     const scenario = validScenario()
     scenario.resolution.countermeasure.required_card_ids = ['card-countermeasure-firewall']
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+})
+
+describe('references(出典表記, docs/citation-policy.md §5)', () => {
+  it('references を省略しても受理する(参照元が無い完全オリジナル)', () => {
+    const scenario = validScenario()
+    delete scenario.references
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('material_kind のみ(テーマ参考のみ、exam/year_jp等を捏造しない)でも受理する', () => {
+    const scenario = validScenario()
+    scenario.references = [{ material_kind: '攻撃手口' }]
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('exam/year_jp/season/division/question を伴う完全な形式も受理する', () => {
+    const scenario = validScenario()
+    scenario.references = [
+      {
+        exam: 'SC',
+        year_jp: '令和6年度',
+        season: '春期',
+        division: '午後',
+        question: '問2',
+        material_kind: '攻撃手口',
+      },
+    ]
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: material_kind を欠くと拒否する', () => {
+    const scenario = validScenario()
+    // @ts-expect-error 意図的に必須フィールドを欠落させる
+    scenario.references = [{ note: 'x' }]
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 })

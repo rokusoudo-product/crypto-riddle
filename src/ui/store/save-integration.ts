@@ -8,11 +8,29 @@
 // そのため ui 側のこのファイルに置く。ゲームロジック(判定・遷移)自体は再実装せず、
 // core が返した ScenarioProgressState をそのまま材料として使うだけにとどめる。
 //
-// ここでは XP 加算等のバランス設計(未確定, tasks.md T018 で調整予定)には踏み込まず、
-// 「クリア済みフラグ」「獲得カードの永続化」という T009 のスキーマがすでに持っているフィールドの
-// 反映のみを行う(スコープを T013/T014 に限定する)。
-import { SAVE_DATA_SCHEMA_VERSION, type SaveData, type ScenarioProgress } from '@/core/model'
+// T013/T014 時点では「クリア済みフラグ」「獲得カードの永続化」という T009 のスキーマが
+// すでに持っているフィールドの反映のみを行い、XP 加算等のバランス設計には踏み込まないスコープだった。
+// T016(FR-6, Issue #5)でこの続きを実装する: spec.md §9「報酬: 事件クリアで XP」「分野別に習熟度を
+// 記録」に対応する具体的な加算値は spec/plan に定義が無いため、最小の妥当値として以下を採用した
+// (バランス調整の本調整は tasks.md T022 の範囲。値は PR 本文に明記のうえ代表レビューを受ける)。
+//   - CLEAR_XP_REWARD(固定値)をクリアのたびに加算する(再クリアでも加算される。単純化のため
+//     「初回クリアのみ」等の重複防止ロジックは持たない)。
+//   - シナリオの subject_tags に含まれる分野タグそれぞれに +1 する(MASTERY_POINTS_PER_TAG)。
+import {
+  SAVE_DATA_SCHEMA_VERSION,
+  type SaveData,
+  type Scenario,
+  type ScenarioProgress,
+  type SubjectMastery,
+  type SubjectTag,
+} from '@/core/model'
 import type { ScenarioProgressState } from '@/core/scenario'
+
+/** 事件クリアで加算する固定XP(spec §9「報酬: 事件クリアでXP」の最小実装値)。 */
+export const CLEAR_XP_REWARD = 100
+
+/** クリアしたシナリオの分野タグ1つあたりに加算する習熟ポイント(最小実装値)。 */
+export const MASTERY_POINTS_PER_TAG = 1
 
 /** 未保存(初回起動)時の既定 SaveData。 */
 export function createDefaultSaveData(): SaveData {
@@ -39,6 +57,15 @@ function upsertScenarioProgress(
   return list.map((p, i) => (i === index ? entry : p))
 }
 
+/** クリアしたシナリオの subject_tags それぞれに MASTERY_POINTS_PER_TAG を加算する。 */
+function addMasteryForTags(mastery: SubjectMastery, tags: readonly SubjectTag[]): SubjectMastery {
+  const next: SubjectMastery = { ...mastery }
+  for (const tag of tags) {
+    next[tag] = (next[tag] ?? 0) + MASTERY_POINTS_PER_TAG
+  }
+  return next
+}
+
 /**
  * 探索でカードを獲得した等、「重要進行時」の中間保存(plan.md §6)。
  * クリア済みフラグは変更しない(まだクリアしていないため)。
@@ -51,20 +78,25 @@ export function applyProgressToSaveData(save: SaveData, progress: ScenarioProgre
 }
 
 /**
- * クリア時の保存(plan.md §6)。scenario_progress にクリア済みを記録し、
- * 獲得済みカードを永続データへ合流させる。
+ * クリア時の保存(plan.md §6)。scenario_progress にクリア済みを記録し、獲得済みカードを
+ * 永続データへ合流させ、XP・分野習熟(subject_mastery)を加算する(T016, FR-6)。
+ *
+ * 第2引数は `scenario.id` だけでなく `subject_tags` も必要とするため、シナリオ丸ごとではなく
+ * 必要なフィールドだけを `Pick` で受け取る(呼び出し側でシナリオ全体を保持していなくても使える)。
  */
 export function applyClearToSaveData(
   save: SaveData,
-  scenarioId: string,
+  scenario: Pick<Scenario, 'id' | 'subject_tags'>,
   progress: ScenarioProgressState,
   clearedAt: string = new Date().toISOString(),
 ): SaveData {
   const withCards = applyProgressToSaveData(save, progress)
   return {
     ...withCards,
+    xp: withCards.xp + CLEAR_XP_REWARD,
+    subject_mastery: addMasteryForTags(withCards.subject_mastery, scenario.subject_tags),
     scenario_progress: upsertScenarioProgress(withCards.scenario_progress, {
-      scenario_id: scenarioId,
+      scenario_id: scenario.id,
       cleared: true,
       cleared_at: clearedAt,
     }),

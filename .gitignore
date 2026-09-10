@@ -19,6 +19,11 @@ dist-ssr
 # po_agent 作業用スクラッチ（PR本文ドラフト等。コミット対象外）
 /tmp/
 
+# T017: Playwright E2E の実行成果物(トレース・レポート)。CI が毎回生成する。
+/playwright-report/
+/test-results/
+/blob-report/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

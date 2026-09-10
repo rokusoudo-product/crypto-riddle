@@ -13,9 +13,15 @@
 // 記載されているが、`src/data/*.json` はビルド成果物で .gitignore 対象(src/data/README.md)であり、
 // CI(.github/workflows/ci.yml)も「Test」ステップの後に build:data を実行する順序になっている。
 // そのためテスト実行時点では `src/data/scenarios.json` が存在しない前提を置けない。
-// `src/core/scenario/fixtures/s0-sample.fixture.ts` は s0-sample.yaml の内容を写した
-// 純粋な TypeScript リテラル(常にビルド・テストの両方で参照可能)であるため、
-// 本 PR ではこちらをプレイ用データの既定値として使う(README 更新は T015 以降、実データ接続時)。
+// `src/core/scenario/fixtures/*.fixture.ts` は各シナリオ YAML の内容を写した純粋な TypeScript
+// リテラル(常にビルド・テストの両方で参照可能)であるため、本 PR (T015/T016)でもこちらを
+// プレイ用データとして使う(README 更新は複数マップが実データで揃う T019〜T021 以降を想定)。
+//
+// T015(Issue #5)で S1「標的型メールからの侵入」が実データとして揃ったため、T013 時点の
+// s0-sample(スキーマ演習用サンプル。暗号を含む点も含めて S1 とは意図的に別内容)から
+// 既定シナリオを S1 に差し替えた。`scenarios` は「マップ選択に表示する選択可能なシナリオ一覧」
+// (T016: マップ選択に S1 を出す)を持たせるための配列で、S2〜S3 が実装される Phase 5 以降で
+// 要素が増える想定(現時点は S1 の1本のみ)。
 import { create } from 'zustand'
 
 import type { SaveData, Scenario } from '@/core/model'
@@ -26,7 +32,7 @@ import {
   type ScenarioEvent,
   type ScenarioProgressState,
 } from '@/core/scenario'
-import { s0SampleFixture } from '@/core/scenario/fixtures/s0-sample.fixture'
+import { s1TargetedEmailIntrusionFixture } from '@/core/scenario/fixtures/s1-targeted-email-intrusion.fixture'
 
 import {
   applyClearToSaveData,
@@ -36,8 +42,12 @@ import {
 
 export type SaveStatus = 'idle' | 'loading' | 'ready' | 'error'
 
+const DEFAULT_SCENARIO = s1TargetedEmailIntrusionFixture
+
 export interface GameStoreState {
-  /** 現在プレイ中のシナリオ(マップ)。T015 以降、複数マップ対応時に差し替え可能にする。 */
+  /** マップ選択画面に表示する、選択可能なシナリオ一覧(T016)。 */
+  scenarios: Scenario[]
+  /** 現在プレイ中のシナリオ(マップ)。 */
   scenario: Scenario
   /** core のシナリオ進行ステートマシンの現在状態。 */
   progress: ScenarioProgressState
@@ -70,7 +80,7 @@ async function persistProgress(
     const current = get().saveData ?? createDefaultSaveData()
     const updated =
       progress.part === 'clear'
-        ? applyClearToSaveData(current, scenario.id, progress)
+        ? applyClearToSaveData(current, scenario, progress)
         : applyProgressToSaveData(current, progress)
     await activeSaveStorage.save(updated)
     set({ saveData: updated, saveStatus: 'ready' })
@@ -82,8 +92,9 @@ async function persistProgress(
 }
 
 export const useGameStore = create<GameStoreState>()((set, get) => ({
-  scenario: s0SampleFixture,
-  progress: createInitialScenarioState(s0SampleFixture),
+  scenarios: [DEFAULT_SCENARIO],
+  scenario: DEFAULT_SCENARIO,
+  progress: createInitialScenarioState(DEFAULT_SCENARIO),
   saveData: null,
   saveStatus: 'idle',
 
@@ -124,14 +135,18 @@ export const useGameStore = create<GameStoreState>()((set, get) => ({
  */
 export function resetGameStoreForTests(options?: {
   scenario?: Scenario
+  /** マップ選択に表示するシナリオ一覧。省略時は `scenario`(またはその既定値)の1件のみ。 */
+  scenarios?: Scenario[]
   storage?: SaveStorage
 }): void {
-  const scenario = options?.scenario ?? s0SampleFixture
+  const scenario = options?.scenario ?? DEFAULT_SCENARIO
+  const scenarios = options?.scenarios ?? [scenario]
   activeSaveStorage = options?.storage ?? new IndexedDbSaveStorage()
   // 部分マージ(既定)で呼ぶ: replace(第2引数 true)にすると dispatch/hydrate/restartScenario
   // 等のアクション関数まで消えてしまう(zustand の setState は replace 時に置換したオブジェクトが
   // 新しい state 全体になるため)。
   useGameStore.setState({
+    scenarios,
     scenario,
     progress: createInitialScenarioState(scenario),
     saveData: null,
