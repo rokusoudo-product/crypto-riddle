@@ -13,7 +13,7 @@ related:
   - scripts/build-data.ts（YAML→JSON ビルドパイプライン。T010）
 status: reviewed
 created: 2026-08-07
-updated: 2026-09-10（#46・T035/T036 完了反映）
+updated: 2026-09-10（#52 探索の背景シーン `scenes[]` 目標形を §2.5 に追加）
 ---
 
 # crypto-riddle — シナリオ記述フォーマット
@@ -68,7 +68,7 @@ scripts/
 
 | フィールド | spec 対応 | 説明 |
 |---|---|---|
-| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.3.0"`（会話モード、#42・T030） |
+| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.3.0"`（会話モード、#42・T030）。**探索の背景シーン（#52・T037）で `"0.4.0"` に更新予定** |
 | `id` | - | マップID。**ファイル名(拡張子除く)と一致必須**(`validate-collection.ts` の `checkScenarioFilenames` がチェック) |
 | `title` | §4 | マップタイトル(事件名) |
 | `status` | - | `draft`/`reviewed`/`published`/`sample`。省略時 `draft` |
@@ -79,7 +79,8 @@ scripts/
 | `references` | FR-7 | 出典表記(§3 参照)。配列・省略可 |
 | `related_terms` | #4 | 用語カードマスタへの緩い参照(§6 参照) |
 | `intro` | §4.1 導入 | 背景・被害会社・サポート役の導入台詞 |
-| `investigation_points` | §7 探索 | 調査ポイント(3系統) |
+| `investigation_points` | §7 探索 | 調査ポイント(3系統)。**カードの出所の正**（`scenes` 有無に関わらず維持） |
+| `scenes` | §7.1 探索 | **背景シーン表示層（#52・T037 で追加・省略可）**: 背景アセット・複数シーン・ホットスポット。省略時は一覧表示（§2.5） |
 | `cards` | §7 探索 | ヒントカード(正解・ダミーを含む) |
 | `resolution` | §8 解決 | **会話モード**（#42）: `cipher_stages`（暗号・維持／S1 は0件）＋ `questions[]`（問い列）。旧 `attack_identification`／`countermeasure` は `questions` へ統合（§2.4） |
 
@@ -161,6 +162,43 @@ resolution:
 - **相談**: `consult_hint`（または集めたカードからの自動整理）を、マップ単位3回まで提示する（spec §8.4。上限値
   `MAX_CONSULTS=3` は `src/core/scenario/state.ts` の core 定数として持ち、zod スキーマには持たせない）。
 - 旧 `attack_identification` / `countermeasure`（`required_card_ids` 方式）は廃止し、この `questions` に統合した（防衛策の問いは最後の `question`。`subject_tag` は法制度/インシデント対応など）。
+
+### 2.5 探索の背景シーン（`scenes[]`）〔#52・T037 で実装〕
+
+> **⚠️ 目標形（#52・T018 プレイテスト反映）**: 探索④を「背景シーン＋クリック可能オブジェクト」にする（spec §7.1・DESIGN.md「探索シーン」節）。**zod 改訂は Phase 4.6 の T037**。本節はその目標形で、T037 マージ前の現行コードには `scenes` は無い（省略時＝一覧表示のため既存データは有効）。
+
+- `investigation_points`（カードの出所・3系統）は**正のまま維持**。`scenes[]` は**表示層（省略可）**で、省略すると一覧表示にフォールバックする。
+- 目標フィールド構成:
+
+```yaml
+investigation_points:
+  - { id: ip-maillog, category: ログ, ... }   # 従来どおり（カードの出所の正）
+  - { id: ip-witness, category: 証言, ... }
+scenes:
+  - id: scene-office
+    title: 執務室
+    background: bg-s1-office        # DESIGN.md アセット節の背景アセットID
+    hotspots:
+      - object_type: pc              # pc | person | book | device
+        position: [0.30, 0.42]       # 背景に対する相対座標(0〜1)
+        label: 経理担当のPC
+        actions:
+          - { kind: collect, investigation_point_id: ip-maillog, label: メール受信ログを取る }
+          - { kind: collect, investigation_point_id: ip-edr,     label: EDRのアラートを確認 }
+          - { kind: danger,  label: 感染端末の電源を落とす, feedback: "橘「ここで電源を落とすと揮発性メモリの証拠が消えます。」" }
+          - { kind: noop,    label: 今は触らない }
+      - object_type: person
+        position: [0.70, 0.38]
+        label: 中野さん
+        actions:
+          - { kind: collect, investigation_point_id: ip-witness, label: 話を聞く }
+```
+
+- **アクション種別**: `collect`（`investigation_point_id` を参照してカード獲得）／`danger`（電源を落とす等＝`feedback` の教育的台詞のみ。**ペナルティなし・操作継続可**＝詰み防止、spec §8.4）／`noop`。
+- **1オブジェクトが複数ポイントを束ねられる**（hotspot→point は 1:N。例: 1台のPCにメールログとEDRの2点）。
+- **整合性チェック（`scenes` があるとき）**: 各 `investigation_point` が**ちょうど1つの `collect` action** から参照されること（`superRefine`）。`scenes` 省略時はチェックしない。
+- **背景アセット**は image_agent 自作（16:9・アニメ調で立ち絵と統一。DESIGN.md「探索シーン」「アセット」節）。`background` はアセットIDで参照し、YAML にパスを直書きしない。
+- フィールド名・座標系・`object_type` の値集合の最終確定は **T037 の zod 改訂時**。
 
 ## 3. 出典表記（`references`）
 
