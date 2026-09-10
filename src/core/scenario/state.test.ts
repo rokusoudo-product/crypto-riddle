@@ -18,7 +18,7 @@ import {
  */
 function buildScenario(): Scenario {
   return {
-    schema_version: '0.4.0',
+    schema_version: '0.5.0',
     id: 'test-scenario',
     title: 'テストシナリオ',
     subject_tags: ['ネットワーク基盤'],

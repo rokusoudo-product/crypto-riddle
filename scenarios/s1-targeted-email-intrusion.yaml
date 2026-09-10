@@ -7,7 +7,7 @@
 #   resolution.cipher_stages は空配列(src/core/model/scenario.ts の T015 変更で0件を許容)。
 # - 実在の企業・人物・事案を特定できない類型に抽象化し、攻撃手法は学習目的に必要な粒度に留め、
 #   再現手順書にはしていない(#5 受け入れ基準)。
-# - src/core/model/scenario.ts (zod, schema_version 0.4.0) に準拠する。`npm run build:data` で検証できる。
+# - src/core/model/scenario.ts (zod, schema_version 0.5.0) に準拠する。`npm run build:data` で検証できる。
 # - 解決パート(resolution)は会話モード(#42/T030)の questions[] 形式(#44 で旧 attack_identification/
 #   countermeasure/wrong_answer_follow_ups から機械移植。#46/T035 で誤答肢のセリフを本執筆し、
 #   各誤答理由が具体的なカード(EDR検知の時系列・プロキシログの向き等)を裏付けに引用する形へ仕上げた)。
@@ -18,7 +18,7 @@
 # `src/core/scenario/fixtures/s1-targeted-email-intrusion.fixture.ts`(手書きの写し)と食い違う。
 # 1行で書けば折り畳みが発生せず、フィクスチャとの文字列完全一致を保てる。
 
-schema_version: "0.4.0"
+schema_version: "0.5.0"
 id: s1-targeted-email-intrusion
 title: 標的型メールからの侵入
 status: reviewed

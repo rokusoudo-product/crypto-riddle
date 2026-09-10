@@ -4,7 +4,7 @@ import { scenarioSchema, type Scene, type Scenario } from './scenario.ts'
 
 function validScenario(): Scenario {
   return {
-    schema_version: '0.4.0',
+    schema_version: '0.5.0',
     id: 's0-sample',
     title: 'アルファテック社 顧客データ流出事件(テスト用)',
     status: 'sample',
@@ -524,5 +524,113 @@ describe('scenes(探索の背景シーン, #52/T037)', () => {
         true,
       )
     }
+  })
+})
+
+// collect action の line/speaker(#52 Phase4.7/T043、docs/scenario_schema.md §2.5)。
+// 省略時は既定の導入文＋カード本文へのフォールバック(UI側T044の範囲)。本Issueは型の追加まで。
+describe('scenes[].hotspots[].actions collect の line/speaker(#52 Phase4.7/T043)', () => {
+  it('正常系: line と speaker を両方指定した collect action を受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-proxy-log',
+      label: 'プロキシログを見る',
+      speaker: '霧島',
+      line: '霧島「深夜に大量ログイン試行の記録がある。」',
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: line のみ指定(speaker 省略)を受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-proxy-log',
+      label: 'プロキシログを見る',
+      line: '深夜に大量ログイン試行の記録がある。',
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: speaker のみ指定(line 省略)を受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-proxy-log',
+      label: 'プロキシログを見る',
+      speaker: '橘',
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: line/speaker を両方省略しても受理する(既定の導入文＋カード本文へのフォールバック)', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // validScenes() の collect action は元々 line/speaker を持たない。
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: line が空文字の場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-proxy-log',
+      label: 'プロキシログを見る',
+      line: '',
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: speaker が未知のキャラを拒否する(既存の会話フレームの話者enum=霧島/橘)', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-proxy-log',
+      label: 'プロキシログを見る',
+      // @ts-expect-error 意図的に未知のキャラを渡す
+      speaker: '田中',
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: collect action に未定義フィールドを含む場合を拒否する(.strict())', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-proxy-log',
+      label: 'プロキシログを見る',
+      // @ts-expect-error 意図的に未定義フィールドを渡す
+      unknown_field: 'x',
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+})
+
+describe('schema_version 0.5.0(#52 Phase4.7/T043)', () => {
+  it('reject: schema_version が旧版(0.4.0)を拒否する', () => {
+    const scenario = validScenario()
+    // @ts-expect-error 意図的に旧バージョンを渡す
+    scenario.schema_version = '0.4.0'
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('正常系: schema_version が 0.5.0 を受理する', () => {
+    const scenario = validScenario()
+    expect(scenario.schema_version).toBe('0.5.0')
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
   })
 })
