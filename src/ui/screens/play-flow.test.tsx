@@ -106,13 +106,17 @@ describe('1マップ通しプレイの結線(T013/T033) — s0-sample(暗号ス�
     await user.click(screen.getByRole('button', { name: '解答する' }))
 
     // 暗号正解 → 会話モードの q-attack-method(霧島)へ進む。
+    // 選択肢はConversationFrameのタイプライターが全文表示(またはスキップ)を終えるまで出ない
+    // (#64/T042)ため、タップでスキップする(会話文そのものがスキップボタンのaccessible name)。
     expect(await screen.findByText('この侵入の手口は何だと見る？')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'この侵入の手口は何だと見る？' }))
     await user.click(
       screen.getByRole('button', { name: 'パスワードリスト攻撃(流出パスワードの使い回し)' }),
     )
 
     // q-countermeasure(橘)へ進む。
     expect(await screen.findByText('有効な再発防止策は？')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '有効な再発防止策は？' }))
     await user.click(
       screen.getByRole('button', {
         name: '多要素認証(MFA)の導入とパスワード使い回し禁止の周知',

@@ -137,11 +137,10 @@ export function SceneExplorer({
     }
   }, [openHotspotIndex, sheetFirstActionId])
 
-  useEffect(() => {
-    if (testimony) {
-      document.getElementById(testimonyCloseId)?.focus()
-    }
-  }, [testimony, testimonyCloseId])
+  // 証言パネルの「閉じる」はConversationFrameのchildrenのため、タイプライターの全文表示
+  // (またはスキップ)が完了するまでDOMに存在しない(#64/T042)。以前のように testimony が
+  // 変わった直後にフォーカスしても閉じるボタンはまだ無く空振りするため、ConversationFrame の
+  // onLineRevealed(全文表示完了の通知)を経由してフォーカスする。
 
   function closeOverlays() {
     setOpenHotspotIndex(null)
@@ -372,7 +371,11 @@ export function SceneExplorer({
 
         {/* 人物の証言は会話フレームで表示する(#50の探索④部分の統合、DESIGN.md「探索シーン」節)。 */}
         {testimony && (
-          <ConversationFrame speaker={TESTIMONY_SPEAKER} line={testimony.line}>
+          <ConversationFrame
+            speaker={TESTIMONY_SPEAKER}
+            line={testimony.line}
+            onLineRevealed={() => document.getElementById(testimonyCloseId)?.focus()}
+          >
             <p className="text-muted-foreground text-xs">{testimony.hotspotLabel}からの証言</p>
             <Button
               type="button"
