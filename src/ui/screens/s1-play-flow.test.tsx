@@ -1,16 +1,21 @@
 /** @vitest-environment jsdom */
-// T016 完了条件: 「ブラウザで S1 を最初から最後までプレイでき、クリア時に XP・分野習熟が保存される」。
+// T016/T033 完了条件: 「ブラウザで S1 を最初から最後までプレイでき、クリア時に XP・分野習熟が保存される」
+// (T016)、「キーボードのみで回答・相談・カード閲覧・クリアまで完遂できる結線テストが通る」(T033)。
 // 実際の画面(AppRoutes)を Testing Library でレンダーし、タイトル→マップ選択→導入→探索→
-// 解決(暗号なし: 攻撃特定→防衛)→結果まで、S1「標的型メールからの侵入」を1マップ通しでプレイできることを
-// 確認する。s0-sample の暗号を含む正解ルート・誤答フォローの回帰は play-flow.test.tsx が担当するため、
-// ここでは (1) 暗号なしシナリオの resolution が attack_identification から始まること、
-// (2) FR-6(XP・分野習熟の加算保存)、(3) 教育的失敗の分岐(#5: 感染端末シャットダウン→揮発性メモリ
-// 証拠消失→やり直し)の3点に焦点を当てる。
+// 解決(会話モード。暗号なし: 起点→初動の2問)→結果まで、S1「標的型メールからの侵入」を
+// 1マップ通しでプレイできることを確認する。
+//
+// 2026-09-10(#42/#45/T033): 解決パートがカード配置(required_card_ids方式)から会話モード
+// (questions[]・選択肢ボタン)へ刷新されたため、旧版(カード配置UI・attack_identification/
+// countermeasure ステージ)を前提にしていた本ファイルの内容は全面的に書き直した。
+// マップ選択→導入→探索は既存UIのまま(クリック操作)なので変更せず、解決パートのみ
+// 会話モードUI(ConversationFrame・選択肢ボタン・相談・カードドロワー)に合わせて書き直し、
+// キーボード操作(Tab/Enter)で完遂できることを重点的に確認する。
 //
 // useGameStore は zustand のモジュール単位シングルトンで Provider を経由しないため、
 // テストごとに resetGameStoreForTests でストアと SaveStorage を既知の状態へ戻す
 // (game-store.ts のコメント参照)。S1 は T015 以降の既定シナリオのため scenario を明示指定しない。
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -19,7 +24,12 @@ import type { SaveData } from '@/core/model'
 import type { SaveStorage } from '@/core/save'
 import { AppRoutes } from '@/ui/routes'
 import { resetGameStoreForTests } from '@/ui/store/game-store'
-import { CLEAR_XP_REWARD, MASTERY_POINTS_PER_TAG } from '@/ui/store/save-integration'
+import {
+  CLEAR_XP_REWARD,
+  CONSULT_XP_PENALTY,
+  MASTERY_POINTS_PER_TAG,
+  WRONG_ANSWER_XP_PENALTY,
+} from '@/ui/store/save-integration'
 
 class InMemorySaveStorage implements SaveStorage {
   private record: SaveData | null = null
@@ -47,7 +57,7 @@ function renderApp() {
   )
 }
 
-/** 探索を最後まで終え、解決パート(attack_identification)へ進める共通手順。 */
+/** 探索を最後まで終え、解決パート(会話モード, q-entry-point)へ進める共通手順。クリック操作。 */
 async function playThroughExplorationToResolution(
   user: ReturnType<typeof userEvent.setup>,
 ): Promise<void> {
@@ -70,37 +80,10 @@ async function playThroughExplorationToResolution(
   const enterResolution = screen.getByRole('button', { name: '解決へ進む' })
   expect(enterResolution).toBeEnabled()
   await user.click(enterResolution)
+  expect(await screen.findByRole('heading', { name: '解決' })).toBeInTheDocument()
 }
 
-/** attack_identification ステージで正解の4枚をタップ配置して確定する。 */
-async function submitCorrectAttackIdentification(
-  user: ReturnType<typeof userEvent.setup>,
-): Promise<void> {
-  expect(
-    await screen.findByText(/攻撃手段の特定に必要なカードを選んで配置してください/),
-  ).toBeInTheDocument()
-  // 暗号なしシナリオ(S1)のため「暗号文:」は表示されない。
-  expect(screen.queryByText(/暗号文:/)).not.toBeInTheDocument()
-
-  for (const bodyFragment of [
-    '実在する取引先名を騙り',
-    'PowerShellプロセス',
-    'ビーコン通信のパターン',
-    '深く確認せずに開いてしまいました',
-  ]) {
-    const pool = screen.getByRole('list', { name: '手持ちカード' })
-    await user.click(within(pool).getByRole('button', { name: new RegExp(bodyFragment) }))
-    const emptySlot = screen.getAllByRole('button', { name: /\(空\)へ配置する/ })[0]
-    await user.click(emptySlot)
-  }
-  await user.click(screen.getByRole('button', { name: '攻撃手段を特定する' }))
-}
-
-// 2026-09-10(#42/#44): 解決パートがカード配置(required_card_ids方式)から会話モード
-// (questions[]・選択肢ボタン)へ刷新されたため、本ファイルが前提とするカード配置UI・
-// follow_up(失敗解説)画面への遷移は core のステートマシンから撤去された。
-// 本PRのスコープは core(T030-032)のため、結線テストの会話モードへの更新は #45(T036)で行う。
-describe.skip('S1「標的型メールからの侵入」通しプレイ(T016) — #45(T036)で会話モードへ更新', () => {
+describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', () => {
   let storage: InMemorySaveStorage
 
   beforeEach(() => {
@@ -108,37 +91,123 @@ describe.skip('S1「標的型メールからの侵入」通しプレイ(T016) �
     resetGameStoreForTests({ storage })
   })
 
-  it('タイトル→マップ選択→導入→探索→解決(暗号なし: 攻撃特定→防衛)→結果まで進行し、XP・分野習熟が保存される', async () => {
+  it(
+    'キーボードのみで、誤答→相談→カード閲覧→正答→次の問い→正答→クリアまで完遂でき、' +
+      '誤答・相談ぶんXPが減算されて保存される(T033完了条件・FR-11)',
+    async () => {
+      const user = userEvent.setup()
+      renderApp()
+
+      await playThroughExplorationToResolution(user)
+
+      // 会話フレーム: 発話者=霧島(立ち絵の名札+会話ウィンドウのピルの2箇所に表示)、問い文が表示される
+      // (会話モード, spec §8.2)。
+      expect(screen.getAllByText('霧島').length).toBeGreaterThanOrEqual(2)
+      expect(screen.getByText('この侵入、どこから入られたと見る？')).toBeInTheDocument()
+
+      // --- q-entry-point: キーボードで誤答を選ぶ(choices[1] = ウイルス対策ソフト〜) ---
+      await user.tab() // choice[0](正解)
+      await user.tab() // choice[1](誤答)
+      expect(document.activeElement).toHaveTextContent('ウイルス対策ソフトの定義ファイル更新エラー')
+      await user.keyboard('{Enter}')
+
+      // 誤答フォロー: 選択肢は残ったまま reply + 段階解説が表示される(aria-live, role=alertではない)。
+      expect(
+        await screen.findByText(/怪しく見えるものと、この侵入を直接裏付けるものは別だ/),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByText(/「怪しく見える」ことと「今回の侵入を裏付ける証拠であること」は違う/),
+      ).toBeInTheDocument()
+      // 問い文(line)は誤答後も変わらず表示され続ける(プレイヤーが問いを見失わない)。
+      expect(screen.getByText('この侵入、どこから入られたと見る？')).toBeInTheDocument()
+
+      // --- 相談(コストあり)をキーボードで使う ---
+      await user.tab() // choice[2]
+      await user.tab() // 相談ボタン
+      expect(document.activeElement).toHaveTextContent('相談する')
+      expect(document.activeElement).toHaveTextContent('残り3回')
+      await user.keyboard('{Enter}')
+      expect(
+        await screen.findByText(
+          'フィッシングメールの実在・マクロ実行の記録・C2通信の痕跡・中野の証言を分野で整理して提示する。',
+        ),
+      ).toBeInTheDocument()
+
+      // --- 手持ちカードをキーボードで無料閲覧する(相談との違いをラベルで明示) ---
+      await user.tab() // カードドロワーの開閉ボタン
+      expect(document.activeElement).toHaveTextContent('手持ちカードを見る（無料')
+      await user.keyboard('{Enter}')
+      expect(await screen.findByRole('heading', { name: '手持ちカード' })).toBeInTheDocument()
+      // 探索で獲得したカード(is_dummy含む)が並ぶ。
+      expect(screen.getAllByRole('listitem').length).toBeGreaterThan(0)
+
+      await user.tab() // 閉じるボタン
+      expect(document.activeElement).toHaveAccessibleName('手持ちカードを閉じる')
+      await user.keyboard('{Enter}')
+      expect(screen.queryByRole('heading', { name: '手持ちカード' })).not.toBeInTheDocument()
+
+      // --- q-entry-point: 正解を選ぶ(ドロワーを閉じてフォーカスが失われたので Tab から選び直す) ---
+      await user.tab() // choice[0](正解)
+      expect(document.activeElement).toHaveTextContent('取引先を装った請求書メールの添付ファイル')
+      await user.keyboard('{Enter}')
+
+      // q-initial-response(橘)へ進む。選択肢ボタンが再利用され、choice[0]がそのままフォーカスされ続ける
+      // (React が同じ key のノードを再利用するため)。念のため内容を確認してから決定する。
+      expect(await screen.findByText('感染が疑われる端末への初動対応は？')).toBeInTheDocument()
+      expect(document.activeElement).toHaveTextContent('ネットワークから論理的に隔離し')
+      await user.keyboard('{Enter}')
+
+      // クリア → ⑦結果画面へ遷移する。
+      expect(await screen.findByRole('heading', { name: '結果' })).toBeInTheDocument()
+
+      // 最後の問い(q-initial-response)の正解 reply は解決画面では表示する間がないため、
+      // 結果画面側で progress.lastAnswerFeedback を参照して表示する。
+      expect(
+        screen.getByText('それが正しい初動です。IoCを抽出して被害範囲の特定を進めましょう。'),
+      ).toBeInTheDocument()
+
+      // FR-11(spec §8.4): 誤答1回・相談1回ぶんXPが減算される。
+      const expectedXp = CLEAR_XP_REWARD - 1 * WRONG_ANSWER_XP_PENALTY - 1 * CONSULT_XP_PENALTY
+      expect(screen.getByText('誤答: 1回 / 相談: 1回')).toBeInTheDocument()
+      expect(await screen.findByText(`獲得XP: +${expectedXp}`)).toBeInTheDocument()
+      expect(await screen.findByText(`累計XP: ${expectedXp}`)).toBeInTheDocument()
+
+      await waitFor(() => {
+        const saved = storage.peek()
+        expect(saved?.xp).toBe(expectedXp)
+        expect(saved?.scenario_progress).toEqual([
+          expect.objectContaining({
+            scenario_id: 's1-targeted-email-intrusion',
+            cleared: true,
+            wrong_answer_count: 1,
+            consult_count: 1,
+            no_hint_clear: false,
+          }),
+        ])
+      })
+    },
+  )
+
+  it('誤答・相談なしでクリアするとXP減算なし・no_hint_clear:trueで保存される(FR-6・FR-11回帰)', async () => {
     const user = userEvent.setup()
     renderApp()
 
     await playThroughExplorationToResolution(user)
-    await submitCorrectAttackIdentification(user)
 
-    // 特定成功 → countermeasure ステージへ進む(暗号ステージを飛ばしているので直接ここに来る)。
-    expect(await screen.findByText(/への有効な対策カードを配置してください/)).toBeInTheDocument()
     await user.click(
-      within(screen.getByRole('list', { name: '手持ちカード' })).getByRole('button', {
-        name: /ネットワークから論理的に隔離する/,
+      screen.getByRole('button', {
+        name: '取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)',
       }),
     )
-    await user.click(screen.getByRole('button', { name: /\(空\)へ配置する/ }))
-    await user.click(screen.getByRole('button', { name: '対策を選ぶ' }))
+    expect(await screen.findByText('感染が疑われる端末への初動対応は？')).toBeInTheDocument()
+    await user.click(
+      screen.getByRole('button', {
+        name: 'ネットワークから論理的に隔離し(LANケーブル抜線・Wi-Fi無効化)、電源は落とさず揮発性メモリとディスクの証拠を保全する',
+      }),
+    )
 
-    // 防衛策成功 → clear → ⑦結果画面。
     expect(await screen.findByRole('heading', { name: '結果' })).toBeInTheDocument()
-    expect(screen.getAllByText(/標的型メール攻撃/).length).toBeGreaterThan(0)
-    expect(screen.getByText(/個人情報保護法に基づく報告要否/)).toBeInTheDocument()
-
-    // FR-7: 出典表記(citation-policy §4 の主表示位置=結果画面)。
-    expect(
-      screen.getByText('本シナリオは以下を参考に作成したオリジナルの創作です。'),
-    ).toBeInTheDocument()
-    expect(screen.getByText(/攻撃手口/)).toBeInTheDocument()
-
-    // FR-6: 事件クリアで XP・分野習熟が加算・保存される(前回の実機確認で xp:0 のままだった不具合の回帰確認)。
-    // 累計XP(saveData.xp)は SaveStorage への非同期保存が完了してから store に反映されるため、
-    // 同期の getByText ではなく findByText(再試行あり)で待つ。
+    expect(screen.getByText('誤答: 0回 / 相談: 0回')).toBeInTheDocument()
     expect(await screen.findByText(`獲得XP: +${CLEAR_XP_REWARD}`)).toBeInTheDocument()
     expect(await screen.findByText(`累計XP: ${CLEAR_XP_REWARD}`)).toBeInTheDocument()
 
@@ -149,54 +218,14 @@ describe.skip('S1「標的型メールからの侵入」通しプレイ(T016) �
         expect.objectContaining({
           scenario_id: 's1-targeted-email-intrusion',
           cleared: true,
+          wrong_answer_count: 0,
+          consult_count: 0,
+          no_hint_clear: true,
         }),
       ])
       for (const tag of ['攻撃手法', 'インシデント対応', '法制度', 'ネットワーク基盤'] as const) {
         expect(saved?.subject_mastery[tag]).toBe(MASTERY_POINTS_PER_TAG)
       }
     })
-  })
-
-  it('教育的失敗の分岐(#5): 感染端末をシャットダウンすると失敗解説へ進み、やり直すと正しい初動でクリアできる', async () => {
-    const user = userEvent.setup()
-    renderApp()
-
-    await playThroughExplorationToResolution(user)
-    await submitCorrectAttackIdentification(user)
-
-    expect(await screen.findByText(/への有効な対策カードを配置してください/)).toBeInTheDocument()
-
-    // わざと「電源を直ちに落とす」対策(教育的失敗の分岐)を選ぶ。
-    await user.click(
-      within(screen.getByRole('list', { name: '手持ちカード' })).getByRole('button', {
-        name: /電源を直ちに落とし/,
-      }),
-    )
-    await user.click(screen.getByRole('button', { name: /\(空\)へ配置する/ }))
-    await user.click(screen.getByRole('button', { name: '対策を選ぶ' }))
-
-    // follow_up(失敗解説)へ遷移し、「なぜ誤りか」(揮発性メモリの証拠消失)が解説される。
-    expect(await screen.findByRole('heading', { name: '失敗解説' })).toBeInTheDocument()
-    expect(screen.getByText('橘')).toBeInTheDocument()
-    expect(screen.getByText(/揮発性メモリの情報が失われます/)).toBeInTheDocument()
-
-    // 「初動をやり直す」は確認ダイアログを経由する(DESIGN.md)。
-    await user.click(screen.getByRole('button', { name: '初動をやり直す' }))
-    expect(screen.getByRole('alertdialog', { name: '初動をやり直す確認' })).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'やり直す' }))
-
-    // RESUME_FROM_FOLLOW_UP で countermeasure ステージに復帰する(暗号なしのため cipher には戻らない)。
-    expect(await screen.findByRole('heading', { name: '解決' })).toBeInTheDocument()
-    expect(await screen.findByText(/への有効な対策カードを配置してください/)).toBeInTheDocument()
-
-    // 復帰後、正しい初動(論理的隔離)を選べば通常どおりクリアできる。
-    await user.click(
-      within(screen.getByRole('list', { name: '手持ちカード' })).getByRole('button', {
-        name: /ネットワークから論理的に隔離する/,
-      }),
-    )
-    await user.click(screen.getByRole('button', { name: /\(空\)へ配置する/ }))
-    await user.click(screen.getByRole('button', { name: '対策を選ぶ' }))
-    expect(await screen.findByRole('heading', { name: '結果' })).toBeInTheDocument()
   })
 })

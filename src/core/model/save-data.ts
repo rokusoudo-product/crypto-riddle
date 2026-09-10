@@ -22,6 +22,13 @@ export const scenarioProgressSchema = z
     cleared: z.boolean(),
     cleared_at: z.iso.datetime().optional(),
     no_hint_clear: z.boolean().optional(),
+    // 2026-09-10(#45/T034): 会話モード(spec §8.4)の誤答・相談回数を記録する。
+    // 追加フィールドのみ(strict object へ optional 追加)のため SAVE_DATA_SCHEMA_VERSION は
+    // 据え置く(旧セーブデータにフィールドが無くても optional のため検証を通る、後方互換)。
+    /** クリア時点までの誤答回数の合計(questions 全体, spec §8.4「誤答1回ごとにXP減算」)。 */
+    wrong_answer_count: z.number().int().min(0).optional(),
+    /** クリア時点までの相談使用回数(マップ単位, MAX_CONSULTS=3, spec §8.4)。 */
+    consult_count: z.number().int().min(0).optional(),
   })
   .strict()
 export type ScenarioProgress = z.infer<typeof scenarioProgressSchema>
