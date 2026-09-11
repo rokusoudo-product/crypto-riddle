@@ -48,14 +48,11 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
     await expect(page.getByText('VPN装置のアクセスログ')).toBeVisible()
 
-    // 執務室(背景未生成のためプレースホルダ表示。scene-explorer.tsx の BACKGROUND_SRC
-    // フォールバック=コード変更なしで動作することの確認を兼ねる)。
+    // 執務室(#88で bg-s2-office を BACKGROUND_SRC に登録済み。実背景<img>が表示される)。
     const officeTab = page.getByRole('tab', { name: '執務室' })
     const serverTab = page.getByRole('tab', { name: 'サーバ室' })
     await expect(officeTab).toHaveAttribute('aria-selected', 'true')
-    await expect(
-      page.getByRole('img', { name: '執務室の背景（画像は準備中のためプレースホルダ表示）' }),
-    ).toBeVisible()
+    await expect(page.getByRole('img', { name: '執務室の背景' })).toBeVisible()
 
     // --- 執務室: PC(情シス管理端末。collect×2/danger/noopの4action=アクションシート) ---
     const pcHotspot = page.getByRole('button', { name: '情シス管理端末（PC）' })
@@ -119,9 +116,7 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
     // --- ドア(door)でサーバ室へ移動する(タブと併用可能・#78・T046-ui-dataと同じ結線) ---
     await page.getByRole('button', { name: 'サーバ室への扉（扉）' }).click()
     await expect(serverTab).toHaveAttribute('aria-selected', 'true')
-    await expect(
-      page.getByRole('img', { name: 'サーバ室の背景（画像は準備中のためプレースホルダ表示）' }),
-    ).toBeVisible()
+    await expect(page.getByRole('img', { name: 'サーバ室の背景' })).toBeVisible()
 
     // --- サーバ室: person(保守業者。VPN装置のログ+証言を統合したホットスポット。
     //     S1の「サーバ管理者」統合と同じ考え方で、promptの挨拶が見出しに出る) ---
