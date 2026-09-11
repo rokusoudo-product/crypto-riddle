@@ -29,6 +29,10 @@
 //
 // Issue #75(#6量産2本目)で S3「ECサイトのカード情報漏洩」が実データとして揃ったため、
 // 同様に `scenarios` に追加した(マップ選択で3件とも選べる)。DEFAULT_SCENARIO は変更しない。
+//
+// Issue #76(#6量産4本目・法務新規シナリオ)で SL「委託先クラウドストレージからの個人データ漏えい」が
+// 実データとして揃ったため、同様に `scenarios` に追加した(マップ選択で4件とも選べる)。
+// DEFAULT_SCENARIO は変更しない。
 import { create } from 'zustand'
 
 import type { SaveData, Scenario } from '@/core/model'
@@ -42,6 +46,7 @@ import {
 import { s1TargetedEmailIntrusionFixture } from '@/core/scenario/fixtures/s1-targeted-email-intrusion.fixture'
 import { s2VpnRansomwareFixture } from '@/core/scenario/fixtures/s2-vpn-ransomware.fixture'
 import { s3EcCardLeakFixture } from '@/core/scenario/fixtures/s3-ec-card-leak.fixture'
+import { slConsignmentBreachFixture } from '@/core/scenario/fixtures/sl-consignment-breach.fixture'
 
 import {
   applyClearToSaveData,
@@ -101,7 +106,7 @@ async function persistProgress(
 }
 
 export const useGameStore = create<GameStoreState>()((set, get) => ({
-  scenarios: [DEFAULT_SCENARIO, s2VpnRansomwareFixture, s3EcCardLeakFixture],
+  scenarios: [DEFAULT_SCENARIO, s2VpnRansomwareFixture, s3EcCardLeakFixture, slConsignmentBreachFixture],
   scenario: DEFAULT_SCENARIO,
   progress: createInitialScenarioState(DEFAULT_SCENARIO),
   saveData: null,
