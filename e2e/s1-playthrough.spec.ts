@@ -342,20 +342,38 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     // 引き継ぐ)。
     const wrapUpLine = 'そろそろ問題をまとめようか。'
     await expect(page.getByText(wrapUpLine)).toBeVisible()
-    await skipTypewriter(page, wrapUpLine)
 
-    // 右上の「調査ポイント一覧」トグルは会話状態でも常時表示されるため、「わかった」を押す前に
-    // 一覧側で9/9件が調査済みとして共有されていること・「解決へ進む」の活性化を確認できる
+    // PR#92追補・代表FB「閉じて再探索も可・ロックしない」: 会話ウィンドウの外側(背景シーンの
+    // 見えている部分、`onOutsideDismiss`が付いた要素=`data-testid`で取得)をクリックすると、
+    // 「わかった」を押さなくても誘導会話を閉じて探索状態に戻れる。閉じるとサーバ室の
+    // ホットスポット(サーバ管理者)がまた操作でき、詰みにならないことを確認する。
+    await page.getByTestId('conversation-overlay-backdrop').click()
+    await expect(page.getByText(wrapUpLine)).toBeHidden()
+    await expect(adminHotspot).toBeVisible()
+
+    // 再探索: 調査済みのホットスポットも操作でき(電源を落とす操作と同様に詰まない設計)、
+    // 何もしない(noop)を選んでシートを閉じても誘導会話は自動的には再表示されない
+    // (ナグ防止・PR#92追補)。
+    await adminHotspot.click()
+    await expect(adminSheet).toBeVisible()
+    await page.getByRole('button', { name: '何でもない' }).click()
+    await expect(adminSheet).toBeHidden()
+    await expect(page.getByText(wrapUpLine)).toBeHidden()
+
+    // 右上の「調査ポイント一覧」トグルは探索状態でも常時表示されるため、誘導会話を閉じた後も
+    // 9/9件が調査済みとして共有されていること・「解決へ進む」の活性化を確認できる
     // (#66→T047でトグル化)。
     await page.getByRole('button', { name: '調査ポイント一覧' }).click()
     await expect(page.getByText('9/9 件調査済み')).toBeVisible()
     await expect(page.getByRole('button', { name: '調査する' })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: '解決へ進む' })).toBeEnabled()
+    const enterResolution = page.getByRole('button', { name: '解決へ進む' })
+    await expect(enterResolution).toBeEnabled()
     await page.getByRole('button', { name: '調査ポイント一覧' }).click()
 
-    // 「わかった」は探索状態には戻らず、「解決へ進む」ボタンと同じ遷移で解決画面へ直接進む
-    // (#52 追補、DESIGN.md「探索シーン」節「探索完了→解決への誘導」)。
-    await page.getByRole('button', { name: 'わかった' }).click()
+    // 誘導会話を閉じた後も、「解決へ進む」ボタンから直接解決画面へ進める(ロックしない、
+    // PR#92追補・代表FB)。「わかった」経由の遷移は他マップのE2E・vitestで確認済みのため、
+    // ここでは代替経路(解決へ進む)を確認する。
+    await enterResolution.click()
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
   })
 

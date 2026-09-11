@@ -50,11 +50,29 @@ import { useScreenState } from '@/ui/state/use-screen-state'
 // ではなく「解決へ進む」ボタンと同じ handleEnterResolution をそのまま呼ぶ形に変更した
 // (DESIGN.md「探索シーン」節「探索完了→解決への誘導」)。dispatch({type:'ENTER_RESOLUTION'})
 // が成功すると progress.part が 'resolution' になり、本コンポーネント冒頭の早期returnにより
-// 探索画面自体が表示されなくなるため、「表示済みフラグ」(旧 wrapUpPromptDismissed)はもはや
-// 不要になり削除した。ボタン文言「わかった」は維持し、SceneExplorer側の会話オーバーレイの
-// 「閉じる」とのアクセシブルネーム衝突を避ける意図(#71・T045)もそのまま残る
+// 探索画面自体が表示されなくなる。ボタン文言「わかった」は維持し、SceneExplorer側の会話
+// オーバーレイの「閉じる」とのアクセシブルネーム衝突を避ける意図(#71・T045)もそのまま残る
 // (誘導会話だけがボタンで画面遷移し、クリックで閉じる他の会話オーバーレイと非対称になるのは
 // 代表了承済み)。
+//
+// 2026-09-11(PR#92 追補・代表FB): 上記で「わかった」を解決画面遷移に変えた結果、誘導会話が
+// 出ている間は SceneExplorer 側が会話状態(isConversationActive)とみなしホットスポットを
+// 描画しなくなり、「わかった」でしか進めず背景ホットスポットの再探索ができない(ロック)
+// 状態になっていた。代表FB「閉じて再探索も可・ロックしない」を受け、いったん削除した
+// 「表示済みフラグ」を isWrapUpPromptDismissed として復活させる。旧実装との違いは:
+// - 「わかった」ボタンの遷移先はそのまま解決画面(handleEnterResolution)で変えない。
+// - 会話ウィンドウの**外側**(画面の見えている部分、conversation-frame.tsxの
+//   `onOutsideDismiss`)をクリック/タップ、またはEscapeで誘導会話を閉じ、探索状態
+//   (conversationSlotをnullにしてSceneExplorerのisConversationActiveをfalseに戻す)へ
+//   戻れるようにする。会話ウィンドウ自体(や「わかった」ボタン)のクリックでは閉じない
+//   (`onDismiss`は指定しない。指定すると「わかった」という実`<button>`を持つchildrenが
+//   role="button"のウィンドウにネストしてしまうため。conversation-frame.tsxのJSDoc参照)。
+// - 一度閉じたら isWrapUpPromptDismissed が true のまま維持され、誘導会話は自動的には
+//   再表示しない(ナグ防止)。canProceed はコレクション操作でしか変わらず不成立へは戻らない
+//   ため、フラグを false へ戻す経路は用意していない(そのまま「解決へ進む」から進めばよい)。
+// - 「解決へ進む」ボタンはこの誘導会話の状態と無関係に、canProceed 成立中は常に活性のまま
+//   描画され続ける(下記JSXの通り conversationSlot/wrapUpPrompt の外で組み立てているため、
+//   誘導会話を閉じた後もそのまま解決へ進める)。
 export function ExploreScreen() {
   const state = useScreenState()
   const navigate = useNavigate()
@@ -62,6 +80,10 @@ export function ExploreScreen() {
   const progress = useGameStore((s) => s.progress)
   const dispatch = useGameStore((s) => s.dispatch)
   const [isExplorerConversationOpen, setIsExplorerConversationOpen] = useState(false)
+  // 誘導会話「そろそろ問題をまとめようか」を外側クリック/Escapeで閉じたかどうか(PR#92追補・
+  // 代表FB。上記コンポーネント冒頭コメント参照)。一度trueにしたら自動的にはfalseへ戻さない
+  // (ナグ防止=再表示しない)。
+  const [isWrapUpPromptDismissed, setIsWrapUpPromptDismissed] = useState(false)
 
   if (progress.part !== 'exploration') {
     return (
@@ -88,6 +110,11 @@ export function ExploreScreen() {
   function handleEnterResolution() {
     const next = dispatch({ type: 'ENTER_RESOLUTION' })
     if (next.part === 'resolution') navigate('/resolve')
+  }
+
+  /** 誘導会話を外側クリック/Escapeで閉じ、探索状態へ戻す(PR#92追補・代表FB「ロックしない」)。 */
+  function handleDismissWrapUpPrompt() {
+    setIsWrapUpPromptDismissed(true)
   }
 
   const canProceed = canEnterResolution(progress, scenario)
@@ -157,16 +184,23 @@ export function ExploreScreen() {
   // 衝突しないようにしている。scenesがある場合はSceneExplorerのconversationSlotへ
   // layout="overlay"のまま渡し、背景を保持したまま重ねる(DESIGN.md「会話オーバーレイの
   // レイアウト」節)。scenesが無い場合のみ、旧来のstacked layoutで本ファイルが直接描画する。
+  // isWrapUpPromptDismissedがtrueの間はconversationSlot自体を渡さない(=undefined)ため、
+  // SceneExplorerのisConversationActiveがfalseに戻りホットスポットが再び操作できる
+  // (PR#92追補・代表FB。上記コンポーネント冒頭コメント参照)。onOutsideDismissは
+  // ウィンドウ**外側**のクリック/タップ・Escapeでのみ発火し、ウィンドウ自体や「わかった」
+  // ボタンのクリックとは競合しない(conversation-frame.tsxのJSDoc参照)。
   const wrapUpPrompt =
-    canProceed && !isExplorerConversationOpen ? (
+    canProceed && !isExplorerConversationOpen && !isWrapUpPromptDismissed ? (
       <ConversationFrame
         layout={hasScenes ? 'overlay' : 'stacked'}
         speaker="橘"
         line="そろそろ問題をまとめようか。"
+        onOutsideDismiss={handleDismissWrapUpPrompt}
       >
         <div className="flex items-center justify-between gap-2">
           <p className="text-muted-foreground text-xs">
-            必要な手がかりは出揃った。下の「解決へ進む」から進もう。
+            必要な手がかりは出揃った。まとめるなら「わかった」、もう少し調べたいなら画面をタップ
+            （Escapeでも可）して探索を続けよう。あとからでも下の「解決へ進む」から進める。
           </p>
           <Button
             type="button"
