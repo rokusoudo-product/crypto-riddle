@@ -5,6 +5,7 @@ import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import { s1TargetedEmailIntrusionFixture } from '../src/core/scenario/fixtures/s1-targeted-email-intrusion.fixture.ts'
+import { s2VpnRansomwareFixture } from '../src/core/scenario/fixtures/s2-vpn-ransomware.fixture.ts'
 
 import { runBuild } from './build-data.ts'
 
@@ -116,6 +117,15 @@ describe('runBuild — 実リポジトリのサンプルデータ', () => {
     const result = await runBuild(REPO_ROOT)
     const s1 = result.scenarios.find((s) => s.id === 's1-targeted-email-intrusion')
     expect(s1).toEqual(s1TargetedEmailIntrusionFixture)
+  })
+
+  // Issue #74(#6量産1本目): S2 も S1 と同じ理由(src/ui/store/game-store.ts が既定データ等として
+  // 使う TypeScript フィクスチャは scenarios/s2-vpn-ransomware.yaml の手書きの写し)で、
+  // 乖離検出の回帰テストを対にして追加する。
+  it('S2 の YAML から生成した内容が s2-vpn-ransomware.fixture.ts と一致する', async () => {
+    const result = await runBuild(REPO_ROOT)
+    const s2 = result.scenarios.find((s) => s.id === 's2-vpn-ransomware')
+    expect(s2).toEqual(s2VpnRansomwareFixture)
   })
 })
 

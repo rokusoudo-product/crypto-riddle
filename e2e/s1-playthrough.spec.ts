@@ -35,13 +35,27 @@ async function skipTypewriter(page: import('@playwright/test').Page, line: strin
   await page.getByRole('button', { name: line, exact: true }).click()
 }
 
+/**
+ * マップ選択でS1「標的型メールからの侵入」を選ぶ(2026-09-11(#74)以降、store.scenariosに
+ * S2「VPN装置の脆弱性放置とランサムウェア感染」も並ぶため、単純な
+ * `getByRole('button', { name: 'マップを選ぶ' })` は両マップの行にヒットしstrict modeで
+ * 落ちる。マップ選択の一覧行(li)をタイトルの文言で絞り込んでから押す)。
+ */
+async function selectS1Map(page: import('@playwright/test').Page) {
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: '標的型メールからの侵入' })
+    .getByRole('button', { name: 'マップを選ぶ' })
+    .click()
+}
+
 /** 探索を最後まで終え、解決パート(会話モード, q-entry-point)へ進める共通手順。 */
 async function playThroughExplorationToResolution(page: import('@playwright/test').Page) {
   await page.goto('/')
   await page.getByRole('link', { name: 'つづきから' }).click()
   await expect(page.getByRole('heading', { name: 'マップ選択' })).toBeVisible()
 
-  await page.getByRole('button', { name: 'マップを選ぶ' }).click()
+  await selectS1Map(page)
   await expect(page.getByRole('heading', { name: '導入' })).toBeVisible()
   await expect(page.getByText('株式会社浜通商事')).toBeVisible()
 
@@ -186,7 +200,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     page,
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
-    await page.getByRole('button', { name: 'マップを選ぶ' }).click()
+    await selectS1Map(page)
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
@@ -311,7 +325,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     page,
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
-    await page.getByRole('button', { name: 'マップを選ぶ' }).click()
+    await selectS1Map(page)
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
@@ -338,7 +352,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     page,
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
-    await page.getByRole('button', { name: 'マップを選ぶ' }).click()
+    await selectS1Map(page)
     await page.getByRole('button', { name: 'タップで進行' }).click()
 
     await page.getByRole('button', { name: '経理部 中野の端末（PC）' }).click()
@@ -366,7 +380,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     page,
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
-    await page.getByRole('button', { name: 'マップを選ぶ' }).click()
+    await selectS1Map(page)
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await page.getByRole('tab', { name: 'サーバ室' }).click()
 
@@ -398,7 +412,7 @@ test.describe('S1「標的型メールからの侵入」タッチ端末での調
   }) => {
     await page.goto('/')
     await page.getByRole('link', { name: 'つづきから' }).click()
-    await page.getByRole('button', { name: 'マップを選ぶ' }).click()
+    await selectS1Map(page)
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
@@ -421,7 +435,7 @@ test.describe('S1「標的型メールからの侵入」探索完了→解決へ
   }) => {
     await page.goto('/')
     await page.getByRole('link', { name: 'つづきから' }).click()
-    await page.getByRole('button', { name: 'マップを選ぶ' }).click()
+    await selectS1Map(page)
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
