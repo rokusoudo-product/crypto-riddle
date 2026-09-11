@@ -4,7 +4,7 @@ import { scenarioSchema, type Scene, type Scenario } from './scenario.ts'
 
 function validScenario(): Scenario {
   return {
-    schema_version: '0.5.0',
+    schema_version: '0.6.0',
     id: 's0-sample',
     title: 'アルファテック社 顧客データ流出事件(テスト用)',
     status: 'sample',
@@ -620,17 +620,145 @@ describe('scenes[].hotspots[].actions collect の line/speaker(#52 Phase4.7/T043
   })
 })
 
-describe('schema_version 0.5.0(#52 Phase4.7/T043)', () => {
-  it('reject: schema_version が旧版(0.4.0)を拒否する', () => {
+describe('schema_version 0.6.0(#52 Phase4.7 追補/T046)', () => {
+  it('reject: schema_version が旧版(0.5.0)を拒否する', () => {
     const scenario = validScenario()
     // @ts-expect-error 意図的に旧バージョンを渡す
-    scenario.schema_version = '0.4.0'
+    scenario.schema_version = '0.5.0'
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 
-  it('正常系: schema_version が 0.5.0 を受理する', () => {
+  it('正常系: schema_version が 0.6.0 を受理する', () => {
     const scenario = validScenario()
-    expect(scenario.schema_version).toBe('0.5.0')
+    expect(scenario.schema_version).toBe('0.6.0')
     expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+})
+
+// goto/door/prompt(#52 Phase4.7 追補・T046、docs/scenario_schema.md §2.5)。
+// validScenes() に scene-office 1つのみを定義しているため、goto の正常系テストでは
+// scene-server を追加した2シーン構成をローカルに組み立てる。
+function validTwoSceneScenesWithDoor(): Scene[] {
+  const scenes = validScenes()
+  scenes[0].hotspots.push({
+    object_type: 'door',
+    position: [0.92, 0.5],
+    label: 'サーバ室への扉',
+    actions: [{ kind: 'goto', scene_id: 'scene-server', label: 'サーバ室へ移動する' }],
+  })
+  scenes.push({
+    id: 'scene-server',
+    title: 'サーバ室',
+    background: 'bg-s1-server',
+    hotspots: [
+      {
+        object_type: 'door',
+        position: [0.08, 0.5],
+        label: '執務室への扉',
+        actions: [{ kind: 'goto', scene_id: 'scene-office', label: '執務室へ戻る' }],
+      },
+    ],
+  })
+  return scenes
+}
+
+describe('scenes[].hotspots[].actions の goto / object_type door / prompt(#52 Phase4.7 追補/T046)', () => {
+  it('正常系: door の goto action で2シーン間を相互に移動できる構成を受理する', () => {
+    const scenario = validScenario()
+    scenario.scenes = validTwoSceneScenesWithDoor()
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: goto.scene_id が scenes に実在しない場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validTwoSceneScenesWithDoor()
+    const doorHotspot = scenes[0].hotspots[scenes[0].hotspots.length - 1]
+    doorHotspot.actions[0] = {
+      kind: 'goto',
+      scene_id: 'scene-not-exist',
+      label: 'サーバ室へ移動する',
+    }
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(
+        result.error.issues.some((issue) => issue.message.includes('scenes に存在しません')),
+      ).toBe(true)
+    }
+  })
+
+  it('reject: goto.scene_id が自シーン自身を参照する場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validTwoSceneScenesWithDoor()
+    const doorHotspot = scenes[0].hotspots[scenes[0].hotspots.length - 1]
+    doorHotspot.actions[0] = {
+      kind: 'goto',
+      scene_id: 'scene-office',
+      label: '同じ部屋に留まる(不正)',
+    }
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('自シーン'))).toBe(true)
+    }
+  })
+
+  it('正常系: object_type: door のホットスポットを受理する', () => {
+    const scenario = validScenario()
+    const scenes = validTwoSceneScenesWithDoor()
+    expect(scenes[0].hotspots[scenes[0].hotspots.length - 1].object_type).toBe('door')
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: goto action に scene_id が無い場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validTwoSceneScenesWithDoor()
+    const doorHotspot = scenes[0].hotspots[scenes[0].hotspots.length - 1]
+    // @ts-expect-error 意図的に必須フィールドを欠落させる
+    doorHotspot.actions[0] = { kind: 'goto', label: 'サーバ室へ移動する' }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: goto action に未定義フィールドを含む場合を拒否する(.strict())', () => {
+    const scenario = validScenario()
+    const scenes = validTwoSceneScenesWithDoor()
+    const doorHotspot = scenes[0].hotspots[scenes[0].hotspots.length - 1]
+    doorHotspot.actions[0] = {
+      kind: 'goto',
+      scene_id: 'scene-server',
+      label: 'サーバ室へ移動する',
+      // @ts-expect-error 意図的に未定義フィールドを渡す
+      unknown_field: 'x',
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('正常系: hotspot に prompt(挨拶台詞)を指定した構成を受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].prompt = '田中「何か御用ですか？」'
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: prompt を省略しても受理する(省略時はラベルのみ)', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    expect(scenes[0].hotspots[1].prompt).toBeUndefined()
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: prompt が空文字の場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].prompt = ''
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 })
