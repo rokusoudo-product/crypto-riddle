@@ -68,11 +68,14 @@ const BACKGROUND_SRC: Record<string, string> = {
 
 // 色だけに頼らず種別をaria-label(常時保持)でも示す(DESIGN.md「探索シーン」節・WCAG 1.4.1)。
 // 通常表示ではアイコン・可視ラベルを一切出さないため、UI上の用途は aria-label の組み立てのみ。
+// door(T046・0.6.0でスキーマに追加)は aria-label 組み立てのみ対応(コンパイル成立のための
+// 最小追随)。goto action の実際のシーン遷移挙動(runAction 等)の実装は T046-ui-data の範囲。
 const OBJECT_TYPE_LABEL: Record<SceneHotspot['object_type'], string> = {
   pc: 'PC',
   person: '人物',
   book: '書籍',
   device: '機器',
+  door: '扉',
 }
 
 type CollectAction = Extract<HotspotAction, { kind: 'collect' }>

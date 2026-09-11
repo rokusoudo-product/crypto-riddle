@@ -6,7 +6,7 @@
 //
 // 単一シナリオ内で完結する参照整合性（card id 重複禁止・investigation_point_id の実在・
 // investigation_point に紐づく card の存在・scenes 内の collect action と investigation_point の
-// 1対1対応）は superRefine でここに集約し、旧 scripts/validate_scenarios.py の
+// 1対1対応・goto action の scene_id の実在と自シーン参照禁止（T046）は superRefine でここに集約し、旧 scripts/validate_scenarios.py の
 // validate_scenario_semantics 相当を zod 側で担保する
 // （会話モード（#42/T030）移行後は「問いの正解がちょうど1つ」は questionChoicesSchema の refine 側）。
 // ファイル名と id の一致、legal_refs の実在（legal/*.yaml は別ファイルのため cross-file）等、
@@ -32,7 +32,13 @@ import { uniqueArraySchema } from './util.ts'
 // 調査結果を解決パートと同じ会話フレームで台詞提示するための下地。省略時のフォールバック(既定の
 // 導入文＋カード本文)の生成は UI 側(T044)の範囲であり、本バージョンは型の追加のみ。詳細は
 // docs/scenario_schema.md §2.5。
-export const scenarioSchemaVersionSchema = z.literal('0.5.0')
+// 0.6.0（T046, 2026-09-11, #52 Phase4.7 追補）: シーン移動のドアと、系統をまたぐ統合ホットスポットの
+// ため、ホットスポットのアクション種別に goto(シーン移動、scene_id で移動先を指定。
+// investigation_point は参照しない)を、object_type に door(不可視・ドア用の種別)を、ホットスポットに
+// 省略可能な prompt(アクションシート見出し用の挨拶台詞)を追加した後方互換な拡張。goto.scene_id が
+// scenes[] に実在し自シーンでないことを superRefine で検証する。データ本体(実際の goto/door/prompt
+// の追加)は T046-ui-data の範囲であり、本バージョンは型の追加のみ。詳細は docs/scenario_schema.md §2.5。
+export const scenarioSchemaVersionSchema = z.literal('0.6.0')
 
 /** マップID。ファイル名(拡張子除く)と一致させる（実在チェックは validate-collection.ts）。 */
 export const scenarioIdSchema = z.string().regex(/^[a-z][a-z0-9_-]*$/)
@@ -132,8 +138,11 @@ export type Card = z.infer<typeof cardSchema>
 // ホットスポット」で探索④の見せ方を差し替えるだけの拡張。省略時は一覧表示にフォールバックする。
 export const sceneIdSchema = slugIdSchema
 
-/** ホットスポットの対象種別(spec §7.1・DESIGN.md「探索シーン」節でこの4種に固定)。 */
-export const hotspotObjectTypeSchema = z.enum(['pc', 'person', 'book', 'device'])
+/**
+ * ホットスポットの対象種別(spec §7.1・DESIGN.md「探索シーン」節でこの5種に固定)。
+ * door(T046・0.6.0)はシーン移動用の種別(不可視・□マーカーは共通・aria-label は「〜への扉」)。
+ */
+export const hotspotObjectTypeSchema = z.enum(['pc', 'person', 'book', 'device', 'door'])
 export type HotspotObjectType = z.infer<typeof hotspotObjectTypeSchema>
 
 /** 背景画像に対する相対座標(0〜1)。[x, y] の2要素タプル。 */
@@ -148,6 +157,10 @@ export type HotspotPosition = z.infer<typeof hotspotPositionSchema>
 // - danger: 電源を落とす等の危険な選択肢。feedback は教育的な台詞のみを返し、ペナルティなし・
 //   操作継続可(詰み防止, spec §8.4)。
 // - noop: 何も起きない選択肢。
+// - goto: シーン移動(T046・0.6.0)。scene_id で移動先の scene を指定する。investigation_point は
+//   参照しない(カードの出所は investigation_points/collect のみが正)。scene_id の実在・自シーン
+//   参照禁止は scenarioSchema の superRefine で検証する(単体の action からは他 scene の情報が
+//   見えないため)。
 const collectHotspotActionSchema = z
   .object({
     kind: z.literal('collect'),
@@ -173,10 +186,20 @@ const noopHotspotActionSchema = z
     label: z.string().min(1),
   })
   .strict()
+const gotoHotspotActionSchema = z
+  .object({
+    kind: z.literal('goto'),
+    // 移動先の scene id(sceneIdSchema は本ファイル冒頭側で定義済み)。実在チェック・自シーン参照
+    // 禁止は、単体の action からは他 scene の情報が見えないため scenarioSchema の superRefine で行う。
+    scene_id: sceneIdSchema,
+    label: z.string().min(1),
+  })
+  .strict()
 export const hotspotActionSchema = z.discriminatedUnion('kind', [
   collectHotspotActionSchema,
   dangerHotspotActionSchema,
   noopHotspotActionSchema,
+  gotoHotspotActionSchema,
 ])
 export type HotspotAction = z.infer<typeof hotspotActionSchema>
 
@@ -185,6 +208,9 @@ export const sceneHotspotSchema = z
     object_type: hotspotObjectTypeSchema,
     position: hotspotPositionSchema,
     label: z.string().min(1),
+    // 省略可能な挨拶台詞(T046・0.6.0)。アクションシートの見出しに出す。省略時はラベルのみ。
+    // 系統をまたぐ統合ホットスポット(人＋機器を1つに束ねる場合)で使う想定。
+    prompt: z.string().min(1).optional(),
     actions: z.array(hotspotActionSchema).min(1),
   })
   .strict()
@@ -384,10 +410,29 @@ export const scenarioSchema = scenarioObjectSchema.superRefine((data, ctx) => {
   if (data.scenes) {
     const collectCountByPointId = new Map<string, number>()
     for (const pointId of pointIds) collectCountByPointId.set(pointId, 0)
+    const sceneIds = new Set(data.scenes.map((scene) => scene.id))
 
     data.scenes.forEach((scene, sceneIndex) => {
       scene.hotspots.forEach((hotspot, hotspotIndex) => {
         hotspot.actions.forEach((action, actionIndex) => {
+          if (action.kind === 'goto') {
+            // goto.scene_id(T046・0.6.0)は scenes[] に実在し、かつ自シーン(移動元と同じ)を
+            // 指してはならない(docs/scenario_schema.md §2.5)。
+            if (!sceneIds.has(action.scene_id)) {
+              ctx.addIssue({
+                code: 'custom',
+                message: `scene '${scene.id}' の goto action が参照する scene_id '${action.scene_id}' が scenes に存在しません。`,
+                path: ['scenes', sceneIndex, 'hotspots', hotspotIndex, 'actions', actionIndex, 'scene_id'],
+              })
+            } else if (action.scene_id === scene.id) {
+              ctx.addIssue({
+                code: 'custom',
+                message: `scene '${scene.id}' の goto action が自シーン('${action.scene_id}')を参照しています。`,
+                path: ['scenes', sceneIndex, 'hotspots', hotspotIndex, 'actions', actionIndex, 'scene_id'],
+              })
+            }
+            return
+          }
           if (action.kind !== 'collect') return
           if (!pointIds.has(action.investigation_point_id)) {
             ctx.addIssue({
