@@ -35,11 +35,6 @@ import { useScreenState } from '@/ui/state/use-screen-state'
 // 「解決へ」の活性条件(canEnterResolution、下記 canProceed)を満たした時点で、会話フレームで
 // 「そろそろ問題をまとめようか」と橘(司令塔・既定話者)が1回促す(spec §7.1・DESIGN.md
 // 「探索シーン」節)。新しい活性条件は作らず、既存の canProceed をそのまま流用する。
-// 表示可否は `canProceed && !wrapUpPromptDismissed && !isExplorerConversationOpen` の派生値にし、
-// 専用の「表示済みフラグ」を持たない: canProceed は調査が進むほど単調に true へ向かう
-// 一方向の値のため(一度 true になった探索パート中に false へ戻ることはない、
-// src/core/scenario/state.ts)、「閉じるまで表示し続け、閉じたら二度と出さない」で
-// 「1回だけ促す(再調査のたびには出さない)」を満たせる。
 // isExplorerConversationOpen は SceneExplorer 側の会話オーバーレイ(調査結果=collect・dangerの
 // 教育的フィードバック)が開いているかどうかの通知(onConversationOpenChange)を受けるための
 // UI専用state(#71・T045で導入、T047でdangerも対象に拡張)。最後の1件をホットスポット経由で
@@ -50,15 +45,22 @@ import { useScreenState } from '@/ui/state/use-screen-state'
 // 背景を保持したまま重ねて表示する(DESIGN.md「会話オーバーレイのレイアウト」節。旧来の
 // 「背景の下に立ち絵バンド＋ウィンドウを積む」形=stacked layoutは、scenesが無い場合の
 // フォールバックにのみ残す)。
-// (このコンポーネントの再マウントを跨いだ「既読」の永続化は core スキーマ変更が要るため、
-// 本Issueの停止条件によりスコープ外とする。)
+//
+// 2026-09-11(#52 追補): 誘導会話「わかった」を、探索状態へ戻す(setWrapUpPromptDismissed)
+// ではなく「解決へ進む」ボタンと同じ handleEnterResolution をそのまま呼ぶ形に変更した
+// (DESIGN.md「探索シーン」節「探索完了→解決への誘導」)。dispatch({type:'ENTER_RESOLUTION'})
+// が成功すると progress.part が 'resolution' になり、本コンポーネント冒頭の早期returnにより
+// 探索画面自体が表示されなくなるため、「表示済みフラグ」(旧 wrapUpPromptDismissed)はもはや
+// 不要になり削除した。ボタン文言「わかった」は維持し、SceneExplorer側の会話オーバーレイの
+// 「閉じる」とのアクセシブルネーム衝突を避ける意図(#71・T045)もそのまま残る
+// (誘導会話だけがボタンで画面遷移し、クリックで閉じる他の会話オーバーレイと非対称になるのは
+// 代表了承済み)。
 export function ExploreScreen() {
   const state = useScreenState()
   const navigate = useNavigate()
   const scenario = useGameStore((s) => s.scenario)
   const progress = useGameStore((s) => s.progress)
   const dispatch = useGameStore((s) => s.dispatch)
-  const [wrapUpPromptDismissed, setWrapUpPromptDismissed] = useState(false)
   const [isExplorerConversationOpen, setIsExplorerConversationOpen] = useState(false)
 
   if (progress.part !== 'exploration') {
@@ -142,10 +144,12 @@ export function ExploreScreen() {
     </>
   )
 
-  // 探索完了→解決への誘導(#52 Phase4.7/#71・T045、T047で会話オーバーレイに統合): 「解決へ」の
-  // 活性条件を満たした瞬間に橘が会話フレームで1回促す。「わかった」を押すまでは表示し続け、
-  // 押したら二度と出さない(再調査のたびに毎回出すことはしない)。#64のタイプライター会話フレームに
-  // そのまま乗せ、演出・アクセシビリティ(全文表示後にのみボタンを描画)を統一する。
+  // 探索完了→解決への誘導(#52 Phase4.7/#71・T045、T047で会話オーバーレイに統合、追補で
+  // 解決画面遷移化): 「解決へ」の活性条件を満たした瞬間に橘が会話フレームで1回促す。
+  // #64のタイプライター会話フレームにそのまま乗せ、演出・アクセシビリティ(全文表示後にのみ
+  // ボタンを描画)を統一する。「わかった」は探索状態へ戻す表示切替ではなく、下の
+  // 「解決へ進む」ボタンと同じ handleEnterResolution をそのまま呼んで解決画面へ遷移する
+  // (DESIGN.md「探索シーン」節「探索完了→解決への誘導」)。
   // SceneExplorer側の会話オーバーレイ(調査結果・danger)が開いている間は出さない
   // (isExplorerConversationOpen。会話オーバーレイの2重表示を避けるため、上記コンポーネント
   // 冒頭コメント参照)。ボタン文言は SceneExplorer 側の会話オーバーレイの「閉じる」と
@@ -154,7 +158,7 @@ export function ExploreScreen() {
   // layout="overlay"のまま渡し、背景を保持したまま重ねる(DESIGN.md「会話オーバーレイの
   // レイアウト」節)。scenesが無い場合のみ、旧来のstacked layoutで本ファイルが直接描画する。
   const wrapUpPrompt =
-    canProceed && !wrapUpPromptDismissed && !isExplorerConversationOpen ? (
+    canProceed && !isExplorerConversationOpen ? (
       <ConversationFrame
         layout={hasScenes ? 'overlay' : 'stacked'}
         speaker="橘"
@@ -168,7 +172,7 @@ export function ExploreScreen() {
             type="button"
             variant="outline"
             className="h-12 min-w-12 px-6"
-            onClick={() => setWrapUpPromptDismissed(true)}
+            onClick={handleEnterResolution}
           >
             わかった
           </Button>

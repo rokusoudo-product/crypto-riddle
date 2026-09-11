@@ -161,21 +161,23 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
 
     // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
     // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
-    // 引き継ぐ)。一覧を確認する前に一旦それを閉じる。
+    // 引き継ぐ)。
     const wrapUpLine = 'そろそろ問題をまとめようか。'
     await expect(page.getByText(wrapUpLine)).toBeVisible()
     await skipTypewriter(page, wrapUpLine)
-    await page.getByRole('button', { name: 'わかった' }).click()
 
-    // 「調査ポイント一覧」トグルを開いて一覧側でも9/9件が調査済みとして共有されていることを
-    // 確認する(#66→T047でトグル化)。
+    // 右上の「調査ポイント一覧」トグルは会話状態でも常時表示されるため、「わかった」を押す前に
+    // 一覧側で9/9件が調査済みとして共有されていること・「解決へ進む」の活性化を確認できる
+    // (#66→T047でトグル化)。
     await page.getByRole('button', { name: '調査ポイント一覧' }).click()
     await expect(page.getByText('9/9 件調査済み')).toBeVisible()
     await expect(page.getByRole('button', { name: '調査する' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '解決へ進む' })).toBeEnabled()
+    await page.getByRole('button', { name: '調査ポイント一覧' }).click()
 
-    const enterResolution = page.getByRole('button', { name: '解決へ進む' })
-    await expect(enterResolution).toBeEnabled()
-    await enterResolution.click()
+    // 「わかった」は探索状態には戻らず、「解決へ進む」ボタンと同じ遷移で解決画面へ直接進む
+    // (#52 追補、DESIGN.md「探索シーン」節「探索完了→解決への誘導」)。
+    await page.getByRole('button', { name: 'わかった' }).click()
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
 
     // --- 解決(会話モード): q-entry-point → q-initial-response → q-response-policy の3問。 ---
