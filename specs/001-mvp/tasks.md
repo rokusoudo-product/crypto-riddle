@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-11 (#52 Phase 4.7 探索の会話フレーム化: T042-T044 新設・③''結果記録・量産ゲート更新・帳簿追随)
+updated: 2026-09-11 (#52 Phase 4.7: T042-T044 実装完了・③'''結果=クリア可＋ポリッシュ→T045 追加〔□赤/まとめ促し/サーバ室背景人物入り差し替え〕)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -396,7 +396,15 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   - E2E：背景シーン経由で調査結果が会話フレームで出る・タイプライター/スキップ・?ボタン・一覧フォールバックの各経路。
   - 完了条件: Vitest・Playwright e2e が CI で安定して通る／`npm run build:data` 成功
 
-**チェックポイント③'''**: 探索も会話フレームで S1 を通しプレイでき、代表が量産可と確認する（量産ゲート）
+**チェックポイント③'''（2026-09-11・結果=クリア可＋ポリッシュ要望）**: 探索も会話フレームで S1 をクリアまで通せた（タイプライター速度OK・#62 解消）。代表から仕上げ要望3点（①□マーカーを赤枠に ②探索完了時に霧島/橘が「問題をまとめようか」と解決へ促す ③情シス担当の位置が不自然→サーバ室背景を人物入りで再生成＋座標調整）が返り、**T045 で対応**。量産可の最終判断は T045 反映後の再確認（または代表判断で並行量産）。
+
+- [ ] **T045** Phase 4.7 仕上げ（③''' フィードバック反映）（依存: T044）
+  - **□マーカーの枠線を赤系トークン**にする（`scene-explorer.tsx`。DESIGN「探索シーン」節。カラーコード直書きしない）。
+  - **探索完了→解決の誘導**：必要な手がかりが揃い「解決へ」活性時に、霧島/橘が会話フレームで「そろそろ問題をまとめようか」と1回促す（spec §7.1・DESIGN）。
+  - **サーバ室背景を人物入り版へ差し替え済**（`assets/backgrounds/bg-s1-server.png`・DESIGN P-4）に合わせ、**情シス担当ホットスポットの座標を人物位置へ調整**（`scenarios/s1-targeted-email-intrusion.yaml`＋fixture）。
+  - 完了条件: 上記が反映され、Vitest・Playwright e2e・`npm run build:data` が通る。
+
+**チェックポイント③''''**: 上記仕上げ後、代表が量産可と確認する（量産ゲート）
 
 ---
 
@@ -464,7 +472,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#44](https://github.com/rokusoudo-product/crypto-riddle/issues/44) 会話モード core 実装 | closed（完了） | **T030・T031・T032** | zod スキーマ・判定エンジン・ステートマシンを会話モードへ改訂。S1/s0 は暫定機械移植のみ（本格移行は #46）。UI(resolve/result/fail-screen等)は型エラー解消の最小限に留めた（#45） |
 | [#45](https://github.com/rokusoudo-product/crypto-riddle/issues/45) 会話フレーム＋会話モードUI＋XP減算 | closed（完了・PR #48） | **T033・T034** | 会話フレーム/カードドロワー新設・dnd-kit 削除・⑥失敗解説廃止・XP減算 |
 | [#46](https://github.com/rokusoudo-product/crypto-riddle/issues/46) 会話モード データ本執筆・結線・E2E | closed（完了・PR #49） | **T035・T036** | S1 誤答肢 reply 本執筆・explanations 多段化・e2e 会話モード化。**Phase 4.5 完了** |
-| [#52](https://github.com/rokusoudo-product/crypto-riddle/issues/52) 探索を背景シーン＋クリック可能オブジェクトにする（探索刷新の umbrella） | open（Phase 4.6 完了・4.7 進行中。③''' 通過後に代表クローズ） | **Phase 4.6（T037〜T041）＋Phase 4.7（T042〜T044）** | T018/T018'' 由来。spec §7.1。Phase 4.6=背景シーン化（#55/#56/#57 マージ済・#60 背景）。Phase 4.7=会話フレーム化（docs 本PR→実装 Issue 分解）。#50 の探索④部分を統合 |
+| [#52](https://github.com/rokusoudo-product/crypto-riddle/issues/52) 探索を背景シーン＋クリック可能オブジェクトにする（探索刷新の umbrella） | open（Phase 4.6 完了・4.7 実装完了・③''' 仕上げ T045 対応中。③'''' 通過後に代表クローズ） | **Phase 4.6（T037〜T041）＋Phase 4.7（T042〜T045）** | T018/T018''/T018''' 由来。spec §7.1。Phase 4.6=背景シーン化（#55/#56/#57/#60 マージ済）。Phase 4.7=会話フレーム化（#63 docs／#64/#65/#66 実装マージ済）＋仕上げ T045（□赤・まとめ促し・サーバ室背景人物入り差し替え）。#50 の探索④部分を統合 |
 | [#55](https://github.com/rokusoudo-product/crypto-riddle/issues/55) 探索スキーマ scenes[]（0.4.0） | closed（完了・PR #58） | **T037** | scenes/hotspots/actions の zod・schema 0.4.0 |
 | [#56](https://github.com/rokusoudo-product/crypto-riddle/issues/56) 探索UI 背景シーン＋ホットスポット | closed（完了・PR #59） | **T038** | 背景シーン＋一覧フォールバック。#50 探索④を統合 |
 | [#57](https://github.com/rokusoudo-product/crypto-riddle/issues/57) S1/s0 scenes データ＋探索E2E | closed（完了・PR #61） | **T040＋T041** | S1 に2シーン投入・s0 は省略でフォールバック検証。T039 背景は #60 |
