@@ -257,7 +257,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await expect(serverTab).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByRole('img', { name: 'サーバ室の背景' })).toBeVisible()
 
-    // device(プロキシサーバ・メールサーバ)・pc(解析用端末)は単一action=即実行。
+    // device(プロキシサーバ・メールサーバ)は単一action=即実行。
     await page.getByRole('button', { name: 'プロキシサーバ（機器）', exact: true }).click()
     const proxyLine =
       '深夜帯、中野のPCから見覚えのない海外IPアドレスへ、約30分間隔で通信が続いている。典型的なビーコン通信のパターンだ。'
@@ -268,17 +268,33 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
       '問題のメールを確認した。取引先名を騙った件名で、送信元は正規ドメインによく似た別ドメインだ。手口としては典型的だが、手が込んでいる。'
     await skipCollectResultAndClose(page, mailLine)
 
-    await page.getByRole('button', { name: '解析用端末（PC）', exact: true }).click()
+    // person(サーバ管理者。旧・解析用端末(pc)＋旧・情シス担当(person)を統合したホットスポット、
+    // #78・T046-ui-data)。複数collect＋noopのためアクションシート経由になり、見出しには
+    // promptの挨拶台詞が出る。
+    const adminHotspot = page.getByRole('button', { name: 'サーバ管理者（人物）' })
+    await adminHotspot.click()
+    const adminSheet = page.getByRole('group', { name: 'サーバ管理者の操作' })
+    await expect(adminSheet).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: 'サーバ管理者「どうしましたか？」' }),
+    ).toBeVisible()
+
+    await page.getByRole('button', { name: 'PCを確認する' }).click()
+    await expect(adminSheet).toBeHidden()
     const sandboxLine =
       '回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加のプログラムを取得し、プロキシログと同じ宛先へビーコン通信している。IoCとして他端末の調査にも使える。'
     await skipCollectResultAndClose(page, sandboxLine)
 
-    // person(情シス担当。単一action=即実行)。調査結果は証言ベースの台詞のみで、対策カードの
-    // 本文は表示されない(#62回帰確認は別テストで独立確認する)。
-    await page.getByRole('button', { name: '情シス担当（人物）' }).click()
+    // 調査結果は証言ベースの台詞のみで、対策カードの本文は表示されない(#62回帰確認は
+    // 別テストで独立確認する)。
+    await adminHotspot.click()
+    await expect(adminSheet).toBeVisible()
+    await page.getByRole('button', { name: '話を聞く' }).click()
+    await expect(adminSheet).toBeHidden()
     const itStaffLine =
       '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。'
     await skipCollectResultAndClose(page, itStaffLine)
+    await expect(adminHotspot).toHaveAccessibleName('サーバ管理者（人物）・調査済み')
 
     // 一覧側(常に併設)でも9/9件が調査済みとして共有されている。
     await expect(page.getByText('9/9 件調査済み')).toBeVisible()
@@ -289,6 +305,33 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await expect(enterResolution).toBeEnabled()
     await enterResolution.click()
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
+  })
+
+  test('ドア(object_type: door)でも執務室↔サーバ室を移動でき、シーンタブと併用できる(#78・T046-ui-data)', async ({
+    page,
+  }) => {
+    await page.getByRole('link', { name: 'つづきから' }).click()
+    await page.getByRole('button', { name: 'マップを選ぶ' }).click()
+    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
+
+    const officeTab = page.getByRole('tab', { name: '執務室' })
+    const serverTab = page.getByRole('tab', { name: 'サーバ室' })
+    await expect(officeTab).toHaveAttribute('aria-selected', 'true')
+
+    // 執務室のドア(単一goto=即実行)でサーバ室へ移動する。
+    await page.getByRole('button', { name: 'サーバ室への扉（扉）' }).click()
+    await expect(serverTab).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('button', { name: 'サーバ管理者（人物）' })).toBeVisible()
+
+    // サーバ室のドアで執務室へ戻る(ドアの往復)。
+    await page.getByRole('button', { name: '執務室への扉（扉）' }).click()
+    await expect(officeTab).toHaveAttribute('aria-selected', 'true')
+
+    // シーンタブでも同じ移動ができる(ドアとタブの併用)。
+    await serverTab.click()
+    await expect(serverTab).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('button', { name: '執務室への扉（扉）' })).toBeVisible()
   })
 
   test('調査結果の会話フレーム上の?ボタンで、獲得済みの手持ちカードを無料で閲覧できる(#66)', async ({
@@ -327,7 +370,9 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await page.getByRole('tab', { name: 'サーバ室' }).click()
 
-    await page.getByRole('button', { name: '情シス担当（人物）' }).click()
+    // #78・T046-ui-dataで「サーバ管理者」に統合されたホットスポット経由(複数action=シート)。
+    await page.getByRole('button', { name: 'サーバ管理者（人物）' }).click()
+    await page.getByRole('button', { name: '話を聞く' }).click()
     const itStaffLine =
       '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。'
     await expect(page.getByText(itStaffLine, { exact: false })).toBeVisible()

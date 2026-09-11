@@ -193,6 +193,12 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
             },
           ],
         },
+        {
+          object_type: 'door',
+          position: [0.95, 0.5],
+          label: 'サーバ室への扉',
+          actions: [{ kind: 'goto', scene_id: 'scene-server', label: 'サーバ室へ移動する' }],
+        },
       ],
     },
     {
@@ -229,32 +235,33 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
           ],
         },
         {
-          object_type: 'pc',
-          position: [0.5, 0.55],
-          label: '解析用端末',
-          actions: [
-            {
-              kind: 'collect',
-              investigation_point_id: 'ip-sandbox-analysis',
-              label: 'サンドボックスでの検体解析結果を確認する',
-              line: '回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加のプログラムを取得し、プロキシログと同じ宛先へビーコン通信している。IoCとして他端末の調査にも使える。',
-              speaker: '霧島',
-            },
-          ],
-        },
-        {
           object_type: 'person',
           position: [0.51, 0.43],
-          label: '情シス担当',
+          label: 'サーバ管理者',
+          prompt: 'サーバ管理者「どうしましたか？」',
           actions: [
             {
               kind: 'collect',
               investigation_point_id: 'ip-witness-itstaff',
-              label: '情シス担当に話を聞く',
+              label: '話を聞く',
               line: '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。',
               speaker: '橘',
             },
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-sandbox-analysis',
+              label: 'PCを確認する',
+              line: '回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加のプログラムを取得し、プロキシログと同じ宛先へビーコン通信している。IoCとして他端末の調査にも使える。',
+              speaker: '霧島',
+            },
+            { kind: 'noop', label: '何でもない' },
           ],
+        },
+        {
+          object_type: 'door',
+          position: [0.5, 0.9],
+          label: '執務室への扉',
+          actions: [{ kind: 'goto', scene_id: 'scene-office', label: '執務室へ移動する' }],
         },
       ],
     },

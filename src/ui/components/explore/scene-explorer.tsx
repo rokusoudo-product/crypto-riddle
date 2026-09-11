@@ -1,9 +1,12 @@
 // src/ui/components/explore/scene-explorer.tsx — 探索④の背景シーン表示(#52/#56・T038、
-// 調査結果の会話フレーム化・不可視ホットスポット化は#52 Phase4.7/#66・T044)。
+// 調査結果の会話フレーム化・不可視ホットスポット化は#52 Phase4.7/#66・T044、
+// ドア移動UI・prompt見出しは#52 Phase4.7 追補/#78・T046-ui-data)。
 //
 // DESIGN.md「探索シーン」節が正: 背景シーン(16:9・モバイル縦はレターボックス)の上に
 // クリック可能なホットスポット(実<button>・48px以上・aria-label・フォーカス可視)を重ね、
-// タップして調べる。シーンタブでシーン切替(キーボード到達可能)。
+// タップして調べる。シーンタブでシーン切替(キーボード到達可能)に加え、背景内のドア
+// (object_type: door・goto アクション)でもシーン移動できる(タブ・ドアの両方で移動可、
+// #78・T046-ui-data)。
 //
 // scenario.scenes が無い場合(省略時)は呼び出し側(explore-screen.tsx)が本コンポーネントを
 // レンダーしないことで一覧表示にフォールバックする(docs/scenario_schema.md §2.5)。
@@ -27,9 +30,17 @@
 //   dispatchは一切呼ばないため、電源を落とした後も同じホットスポットは何度でも操作できる。
 //   従来どおりアクションシート内のテキストで表示する(会話フレーム化はしない、#66スコープ外)。
 // - noop: 何もせず閉じる。
+// - goto: シーン移動(#78・T046-ui-data)。investigation_pointを参照しないためonCollectは
+//   呼ばず、setActiveSceneIdで移動先シーンへ切り替えたうえで移動先のシーンタブへ
+//   フォーカスを移す(gotoScene参照。シーンタブと併用可能=どちらでも移動できる)。
 // - 1ホットスポットのactionsが1件のみの場合はアクションシートを出さず、即座にそのactionを
 //   実行する(spec本文「PC等で複数actionがあるものはアクションシートで選ばせる」の裏返しで、
-//   1件のみ=personの「話を聞く」等は選ぶ余地が無いため即実行にする)。
+//   1件のみ=personの「話を聞く」・doorの「〜へ移動する」等は選ぶ余地が無いため即実行にする)。
+//
+// アクションシートの見出し(#78・T046-ui-data): ホットスポットの省略可能な prompt(挨拶台詞、
+// 例: サーバ管理者「どうしましたか？」)を見出しに表示し、省略時はラベルのみ(現行どおり)。
+// 系統をまたぐ統合ホットスポット(人＋機器を1つに束ねた複数collect＋noop)で、何用の操作かを
+// 挨拶台詞で示す(DESIGN.md「探索シーン」節)。
 //
 // 調査結果の会話フレーム提示(#52 Phase4.7・T044、#62 吸収):
 // 人物の証言だけでなく、PC のログ・書籍の文献も含めて種別を問わず同じ経路で会話フレームに
@@ -68,8 +79,9 @@ const BACKGROUND_SRC: Record<string, string> = {
 
 // 色だけに頼らず種別をaria-label(常時保持)でも示す(DESIGN.md「探索シーン」節・WCAG 1.4.1)。
 // 通常表示ではアイコン・可視ラベルを一切出さないため、UI上の用途は aria-label の組み立てのみ。
-// door(T046・0.6.0でスキーマに追加)は aria-label 組み立てのみ対応(コンパイル成立のための
-// 最小追随)。goto action の実際のシーン遷移挙動(runAction 等)の実装は T046-ui-data の範囲。
+// door(T046・0.6.0でスキーマに追加)も他object_typeと同じ組み立てにする(例:
+// 「サーバ室への扉（扉）」)。goto action の実際のシーン遷移挙動は runAction/gotoScene参照
+// (#78・T046-ui-data)。
 const OBJECT_TYPE_LABEL: Record<SceneHotspot['object_type'], string> = {
   pc: 'PC',
   person: '人物',
@@ -211,6 +223,20 @@ export function SceneExplorer({
     closeOverlays()
   }
 
+  /**
+   * ドアの goto アクションでシーンを移動する(#78・T046-ui-data)。シーンタブと併用可能にする
+   * ため、実体はシーンタブ選択(selectScene)と同じ setActiveSceneId+closeOverlays を行い、
+   * さらに移動先のシーンタブへフォーカスを移す(タブはscenes全件を常時描画しているため
+   * targetIndexのtabRefsは既に有効。handleTabKeyDownの矢印キー移動と同じ考え方)。
+   */
+  function gotoScene(sceneId: string) {
+    const targetIndex = scenes.findIndex((s) => s.id === sceneId)
+    if (targetIndex < 0) return
+    setActiveSceneId(sceneId)
+    closeOverlays()
+    tabRefs.current[targetIndex]?.focus()
+  }
+
   function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return
     event.preventDefault()
@@ -235,6 +261,12 @@ export function SceneExplorer({
       setDangerFeedback(action.feedback)
       return
     }
+    if (action.kind === 'goto') {
+      // ドアでのシーン移動(#78・T046-ui-data)。investigation_pointを参照しないため
+      // onCollectは呼ばない。移動先のシーンタブへフォーカスを移す(gotoScene参照)。
+      gotoScene(action.scene_id)
+      return
+    }
     // noop: 何もせず閉じる。
     setOpenHotspotIndex(null)
     setDangerFeedback(null)
@@ -248,11 +280,13 @@ export function SceneExplorer({
   ) {
     returnFocusRef.current = trigger
     setCollectResult(null)
-    // 単一actionのショートカット即実行は「collectのみ」の場合に限る(例: personの「話を聞く」)。
+    // 単一actionのショートカット即実行は「collectまたはgoto」の場合に限る(例: personの
+    // 「話を聞く」、doorの「〜へ移動する」)。いずれも選ぶ余地が無い1択のため、アクションシートを
+    // 経由させず即座に実行する(#78・T046-ui-data。goto単独=door標準形をここに含めた)。
     // danger/noop単独の場合はアクションシートを経由させ、教育的フィードバックの表示先
     // (アクションシート内)を確保する(danger単独ホットスポットでもfeedbackが必ず表示される)。
     const onlyAction = hotspot.actions.length === 1 ? hotspot.actions[0] : null
-    if (onlyAction && onlyAction.kind === 'collect') {
+    if (onlyAction && (onlyAction.kind === 'collect' || onlyAction.kind === 'goto')) {
       runAction(hotspot, onlyAction)
       return
     }
@@ -369,7 +403,10 @@ export function SceneExplorer({
             className="border-primary bg-card flex flex-col gap-3 rounded-lg border-t-4 p-4"
           >
             <div className="flex items-center justify-between gap-2">
-              <h2 className="font-heading text-base">{openHotspot.label}</h2>
+              {/* 見出し=挨拶台詞(prompt、#78・T046-ui-data)。省略時はラベルのみ(現行どおり)。
+                  系統をまたぐ統合ホットスポット(人＋機器を1つに束ねる)で、何用の操作かを
+                  挨拶台詞で示す(DESIGN.md「探索シーン」節)。 */}
+              <h2 className="font-heading text-base">{openHotspot.prompt ?? openHotspot.label}</h2>
               <Button
                 type="button"
                 variant="ghost"
