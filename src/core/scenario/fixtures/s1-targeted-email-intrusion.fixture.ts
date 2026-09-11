@@ -244,7 +244,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.5, 0.8],
+          position: [0.51, 0.43],
           label: '情シス担当',
           actions: [
             {
