@@ -21,7 +21,11 @@
 // s0-sample(スキーマ演習用サンプル。暗号を含む点も含めて S1 とは意図的に別内容)から
 // 既定シナリオを S1 に差し替えた。`scenarios` は「マップ選択に表示する選択可能なシナリオ一覧」
 // (T016: マップ選択に S1 を出す)を持たせるための配列で、S2〜S3 が実装される Phase 5 以降で
-// 要素が増える想定(現時点は S1 の1本のみ)。
+// 要素が増える想定。
+//
+// Issue #74(#6量産1本目)で S2「VPN装置の脆弱性放置とランサムウェア感染」が実データとして
+// 揃ったため、`scenarios` に追加した(マップ選択で両方選べる)。DEFAULT_SCENARIO(初回起動時の
+// 既定プレイ対象)は引き続き S1 のまま変更しない(#74 の実装範囲はマップ追加のみ)。
 import { create } from 'zustand'
 
 import type { SaveData, Scenario } from '@/core/model'
@@ -33,6 +37,7 @@ import {
   type ScenarioProgressState,
 } from '@/core/scenario'
 import { s1TargetedEmailIntrusionFixture } from '@/core/scenario/fixtures/s1-targeted-email-intrusion.fixture'
+import { s2VpnRansomwareFixture } from '@/core/scenario/fixtures/s2-vpn-ransomware.fixture'
 
 import {
   applyClearToSaveData,
@@ -92,7 +97,7 @@ async function persistProgress(
 }
 
 export const useGameStore = create<GameStoreState>()((set, get) => ({
-  scenarios: [DEFAULT_SCENARIO],
+  scenarios: [DEFAULT_SCENARIO, s2VpnRansomwareFixture],
   scenario: DEFAULT_SCENARIO,
   progress: createInitialScenarioState(DEFAULT_SCENARIO),
   saveData: null,
