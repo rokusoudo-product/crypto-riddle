@@ -8,10 +8,11 @@ import { Button } from '@/ui/components/ui/button'
 import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
 
-// Issue #74(#6量産1本目)で S2「VPN装置の脆弱性放置とランサムウェア感染」が実データとして
-// store.scenarios(T016)に加わったため、プレースホルダから除いた。S3 以降が実装される
+// Issue #74(#6量産1本目)で S2「VPN装置の脆弱性放置とランサムウェア感染」が、
+// Issue #75(#6量産2本目)で S3「ECサイトのカード情報漏洩」が実データとして
+// store.scenarios(T016)に加わったため、プレースホルダから除いた。S4 以降が実装される
 // Phase 5 以降で、量産の進捗にあわせて残りのプレースホルダも順次外していく想定。
-const UNAVAILABLE_MAPS = ['S3 (未確定)']
+const UNAVAILABLE_MAPS: string[] = []
 
 // ②マップ選択（ライト文脈）。目的=事例選択／主要アクション=「マップを選ぶ」。
 export function MapSelectScreen() {
