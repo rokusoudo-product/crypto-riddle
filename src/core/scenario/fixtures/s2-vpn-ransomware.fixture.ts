@@ -94,7 +94,7 @@ export const s2VpnRansomwareFixture: Scenario = {
       id: 'ip-witness-itstaff',
       category: '人に聞く',
       label: '情シス担当への聞き取り',
-      description: 'VPN装置の管理状況と発覚直後の対応を本人に確認する。',
+      description: 'VPN装置の資産管理・更新運用の実態を本人に確認する。',
     },
     {
       id: 'ip-witness-manager',

@@ -224,4 +224,66 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
       page.getByText('本シナリオは以下を参考に作成したオリジナルの創作です。'),
     ).toBeVisible()
   })
+
+  // 上のテストは背景シーン(ホットスポット)経由の探索のみを通る。タスク指示の「背景／一覧の
+  // 両経路」を満たすため、こちらは一覧側(常に併設・WCAGの背景非依存要件)の「調査する」だけで
+  // 全9件を調査し、正解ルート(誤答・相談なし)でクリアすることを確認する
+  // (e2e/s1-playthrough.spec.ts の playThroughExplorationToResolution と対の経路)。
+  test('マップ選択からS2を選び、調査ポイント一覧経由の探索→解決(3問とも正答)→結果まで進行し、満額のXPが表示される', async ({
+    page,
+  }) => {
+    await page.getByRole('link', { name: 'つづきから' }).click()
+    await selectS2Map(page)
+    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
+
+    // 一覧側の「調査する」だけで全9箇所を調査する(背景シーンのホットスポットには触れない)。
+    let investigateButton = page.getByRole('button', { name: '調査する' }).first()
+    while (await investigateButton.count()) {
+      await investigateButton.click()
+      investigateButton = page.getByRole('button', { name: '調査する' }).first()
+    }
+    await expect(page.getByRole('button', { name: '調査する' })).toHaveCount(0)
+    await expect(page.getByText('9/9 件調査済み')).toBeVisible()
+
+    const enterResolution = page.getByRole('button', { name: '解決へ進む' })
+    await expect(enterResolution).toBeEnabled()
+    await enterResolution.click()
+    await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
+
+    const entryPrompt = '今回の侵入、どこから入られたと見る？'
+    await skipTypewriter(page, entryPrompt)
+    await page
+      .getByRole('button', {
+        name: '境界に設置されたVPN装置の、更新されていなかった深刻な脆弱性を突かれた不正アクセス',
+      })
+      .click()
+
+    const initialResponsePrompt =
+      'ランサムウェアによる暗号化が確認された状況で、感染したサーバへの初動対応は？'
+    await expect(page.getByText(initialResponsePrompt)).toBeVisible()
+    await skipTypewriter(page, initialResponsePrompt)
+    await page
+      .getByRole('button', {
+        name: 'サーバをネットワークから論理的に切り離し、電源は落とさずメモリ・ディスクの証拠を保全した上で被害範囲を特定する',
+      })
+      .click()
+
+    const policyPrompt =
+      'バックアップも暗号化され、復旧の目処が立たない状況です。今後の対応方針は？'
+    await expect(page.getByText(policyPrompt)).toBeVisible()
+    await skipTypewriter(page, policyPrompt)
+    await page
+      .getByRole('button', {
+        name: '身代金は支払わず、警察・専門家と連携しながら復旧を進め、個人データの漏えいのおそれがある以上、個人情報保護委員会への報告要否を速やかに判断する',
+      })
+      .click()
+
+    await expect(page.getByRole('heading', { name: '結果' })).toBeVisible()
+
+    // FR-6/FR-11: 誤答・相談なしでクリアしたので満額のXPが加算・表示される(S1テストと対)。
+    await expect(page.getByText('誤答: 0回 / 相談: 0回')).toBeVisible()
+    await expect(page.getByText('獲得XP: +100')).toBeVisible()
+    await expect(page.getByText('累計XP: 100')).toBeVisible()
+  })
 })
