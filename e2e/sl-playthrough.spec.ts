@@ -69,15 +69,15 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await page.getByRole('button', { name: '委託契約書(監督条項)を確認する' }).click()
     const contractLine =
       '委託契約書を確認しました。委託先に対し、安全管理措置の実施状況を定期的に報告させ、必要な指示を行うことができる監督条項が明記されています。'
-    await skipTypewriter(page, contractLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, contractLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: contractLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     await bookHotspot.click()
     await page.getByRole('button', { name: '個人情報保護法ガイドラインを確認する' }).click()
     const guidelineLine =
       'ガイドラインを確認しました。個人データの取扱いを委託する場合、委託元は委託先に対して必要かつ適切な監督を行う義務を負い、委託先の監督が不十分であったことに起因する漏えい等は、委託元の義務違反として問題になり得るとされています。'
-    await skipTypewriter(page, guidelineLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, guidelineLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: guidelineLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(bookHotspot).toHaveAccessibleName('委託契約書棚（書籍）・調査済み')
 
     // --- 執務室: PC(委託先の一次報告を受けた端末。collect/danger/noopの3action=アクションシート) ---
@@ -102,8 +102,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     // 会話オーバーレイを閉じると探索状態に戻り、同じホットスポットを再度開いて他のactionを
     // 選べる(危険操作の後も操作継続可=詰み防止)。ログをcollectできる。
-    await skipTypewriter(page, dangerLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, dangerLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: dangerLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await pcHotspot.click()
     await expect(
       page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' }),
@@ -113,8 +113,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     const reportLine =
       '委託先からの一次報告メールを確認した。クラウドストレージの共有設定を「限定公開」から誤って「リンクを知っていれば誰でも閲覧可能」に変更しており、外部からアクセスされた形跡があるとのことだった。'
     await expect(page.getByText(reportLine, { exact: false })).toBeVisible()
-    await skipTypewriter(page, reportLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, reportLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: reportLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(pcHotspot).toHaveAccessibleName('委託先の一次報告を受けた端末（PC）・調査済み')
 
     // --- シーンタブで委託先ブースへ移動する(#76 仕上げで採用した執務室の背景にはドアが
@@ -130,8 +130,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await deviceHotspot.click()
     const storageLogLine =
       '委託先のクラウドストレージのアクセスログを確認した。共有設定が変更された直後から、複数の見知らぬ外部IPアドレスから会員データの保管領域へ直接アクセスされた記録が残っている。'
-    await skipTypewriter(page, storageLogLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, storageLogLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: storageLogLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(deviceHotspot).toHaveAccessibleName('委託先のクラウドストレージ管理端末（機器）・調査済み')
 
     // --- 委託先ブース: person(委託先担当者。promptの挨拶が見出しに出る) ---
@@ -144,8 +144,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await page.getByRole('button', { name: '委託先担当者に話を聞く' }).click()
     const testimonyLine =
       '委託先担当者に聞きました。クラウドストレージの公開範囲の設定を、定期点検の作業中に誤って変更してしまったとのことでした。契約で定められていた定期点検も、人員不足で直近は実施できていなかったそうです。'
-    await skipTypewriter(page, testimonyLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, testimonyLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: testimonyLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(vendorHotspot).toHaveAccessibleName('委託先担当者（人物）・調査済み')
 
     // --- 委託先ブース: book(委託先の安全管理措置報告書。単一action=即実行) ---
@@ -153,8 +153,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await safetyBookHotspot.click()
     const safetyLine =
       '委託先が提出した安全管理措置の報告書を確認した。アクセス権限の設定手順は定められているが、変更後の設定内容を第三者が確認するダブルチェック体制までは整備されていなかった。'
-    await skipTypewriter(page, safetyLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, safetyLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: safetyLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     // これが6件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
     // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を

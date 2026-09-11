@@ -285,9 +285,10 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
   })
 
   /**
-   * 調査結果の会話フレーム(#52 Phase4.7/#66・T044)を、指定した台詞(line)でスキップして
-   * 閉じる共通手順。台詞そのものがタイプライターのスキップボタンのaccessible nameになる
-   * (#64/T042)ため、それをタップしてから「閉じる」を押す。
+   * 調査結果の会話ウィンドウ(#52 Phase4.7/#66・T044)を、指定した台詞(line)でスキップして
+   * 閉じる共通手順。会話ウィンドウは専用の「閉じる」ボタンを持たず、ウィンドウ全体が
+   * 1つの操作領域になる(T048)。accessible nameは会話文(line)のまま変わらないため、
+   * 同じ`getByRole('button', {name: line})`を1回目=スキップ・2回目=閉じるに使い回す。
    */
   async function skipCollectResultAndClose(
     user: ReturnType<typeof userEvent.setup>,
@@ -295,7 +296,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
   ): Promise<void> {
     expect(await screen.findByText(line)).toBeInTheDocument()
     await skipTypewriterByClick(user, line)
-    await user.click(screen.getByRole('button', { name: '閉じる' }))
+    await user.click(screen.getByRole('button', { name: line }))
   }
 
   it(
@@ -337,11 +338,13 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       expect(await screen.findByText(dangerLine)).toBeInTheDocument()
       expect(useGameStore.getState().progress).toBe(progressBeforeDanger)
 
-      // 会話オーバーレイを閉じると探索状態に戻り、同じホットスポットを再度開いて他のactionを
-      // 選べる(電源を落とした後も操作継続可=詰み防止)。EDRログをcollectすると、シートは閉じ、
-      // 調査結果が会話オーバーレイで台詞提示される(#66/T044、話者=霧島=ログ系の既定)。
+      // 会話ウィンドウをクリックで閉じると探索状態に戻り、同じホットスポットを再度開いて
+      // 他のactionを選べる(電源を落とした後も操作継続可=詰み防止)。会話ウィンドウには専用の
+      // 「閉じる」ボタンは無いため、同じaccessible name(line)の要素を1回目=スキップ・
+      // 2回目=閉じるに使い回す(T048)。EDRログをcollectすると、シートは閉じ、調査結果が
+      // 会話オーバーレイで台詞提示される(#66/T044、話者=霧島=ログ系の既定)。
       await skipTypewriterByClick(user, dangerLine)
-      await user.click(screen.getByRole('button', { name: '閉じる' }))
+      await user.click(screen.getByRole('button', { name: dangerLine }))
       await user.click(getPcHotspot())
       expect(
         await screen.findByRole('group', { name: '経理部 中野の端末の操作' }),
