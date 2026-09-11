@@ -50,14 +50,11 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
     await expect(page.getByText('決済関連データベースの監査')).toBeVisible()
 
-    // 執務室(背景未生成のためプレースホルダ表示。scene-explorer.tsx の BACKGROUND_SRC
-    // フォールバック=コード変更なしで動作することの確認を兼ねる)。
+    // 執務室(#88で bg-s3-office を BACKGROUND_SRC に登録済み。実背景<img>が表示される)。
     const officeTab = page.getByRole('tab', { name: '執務室' })
     const opsRoomTab = page.getByRole('tab', { name: 'システム運用ルーム' })
     await expect(officeTab).toHaveAttribute('aria-selected', 'true')
-    await expect(
-      page.getByRole('img', { name: '執務室の背景（画像は準備中のためプレースホルダ表示）' }),
-    ).toBeVisible()
+    await expect(page.getByRole('img', { name: '執務室の背景' })).toBeVisible()
 
     // --- 執務室: PC(EC運営担当者の端末。collect×2/danger/noopの4action=アクションシート) ---
     const pcHotspot = page.getByRole('button', { name: 'EC運営担当者の端末（PC）' })
@@ -66,7 +63,9 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
 
     // dangerを先に選ぶ: 教育的フィードバックのみが表示され、シートは閉じない(詰み防止)。
     await page
-      .getByRole('button', { name: '改ざんに気づいた決済ページのファイルを、証拠を残さずすぐに元へ書き戻す' })
+      .getByRole('button', {
+        name: '改ざんに気づいた決済ページのファイルを、証拠を残さずすぐに元へ書き戻す',
+      })
       .click()
     await expect(page.getByText('手がかりが失われます', { exact: false })).toBeVisible()
     await expect(page.getByRole('group', { name: 'EC運営担当者の端末の操作' })).toBeVisible()
@@ -111,7 +110,9 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await page.getByRole('button', { name: '閉じる' }).click()
 
     await bookHotspot.click()
-    await page.getByRole('button', { name: 'フォームジャッキングに関する注意喚起を確認する' }).click()
+    await page
+      .getByRole('button', { name: 'フォームジャッキングに関する注意喚起を確認する' })
+      .click()
     const advisoryLine =
       '注意喚起を確認した。決済ページのスクリプトを改ざんし、入力中のカード情報を確定前にブラウザから外部のサーバへ直接送信させる、フォームジャッキング(Webスキミング)と呼ばれる手口が全国的に報告されている。今回の型に近い。'
     await skipTypewriter(page, advisoryLine)
@@ -121,9 +122,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     // --- ドア(door)でシステム運用ルームへ移動する(タブと併用可能・#78/T046-ui-dataと同じ結線) ---
     await page.getByRole('button', { name: 'システム運用ルームへの扉（扉）' }).click()
     await expect(opsRoomTab).toHaveAttribute('aria-selected', 'true')
-    await expect(
-      page.getByRole('img', { name: 'システム運用ルームの背景（画像は準備中のためプレースホルダ表示）' }),
-    ).toBeVisible()
+    await expect(page.getByRole('img', { name: 'システム運用ルームの背景' })).toBeVisible()
 
     // --- システム運用ルーム: device(運用監視端末。collectを2件持つ) ---
     const deviceHotspot = page.getByRole('button', { name: '運用監視端末（機器）' })
@@ -168,7 +167,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
 
     // --- 解決(会話モード): q-entry-point → q-immediate-response → q-response-policy の3問。 ---
-    const entryPrompt = 'カード情報は自社のデータベースに保存していなかった。それなのになぜ漏れたと見る？'
+    const entryPrompt =
+      'カード情報は自社のデータベースに保存していなかった。それなのになぜ漏れたと見る？'
     await expect(page.getByText(entryPrompt)).toBeVisible()
     await skipTypewriter(page, entryPrompt)
 
@@ -253,7 +253,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await enterResolution.click()
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
 
-    const entryPrompt = 'カード情報は自社のデータベースに保存していなかった。それなのになぜ漏れたと見る？'
+    const entryPrompt =
+      'カード情報は自社のデータベースに保存していなかった。それなのになぜ漏れたと見る？'
     await skipTypewriter(page, entryPrompt)
     await page
       .getByRole('button', {

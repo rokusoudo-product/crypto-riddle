@@ -11,11 +11,12 @@
 // scenario.scenes が無い場合(省略時)は呼び出し側(explore-screen.tsx)が本コンポーネントを
 // レンダーしないことで一覧表示にフォールバックする(docs/scenario_schema.md §2.5)。
 //
-// 背景画像(#57/T040・T039で生成済みの assets/backgrounds/bg-s1-*.png)は BACKGROUND_SRC に
-// 実データがある場合のみ<img>で読み込む。無い場合(テスト専用フィクスチャの `bg-test-*` 等、
-// 実背景が未生成のシーン)はトークン色のプレースホルダ(単色地+シーン名ラベル)にフォールバック
-// する(#56 実装方針を維持。立ち絵と同じくrepoルートの assets/ を相対importする、
-// conversation-frame.tsx と同じパターン)。
+// 背景画像(#57/T040・T039で生成済みの assets/backgrounds/bg-s1-*.png、以降 bg-s2-*(#82)・
+// bg-s3-*(#84)・bg-sl-*(#87)を追加。いずれも BACKGROUND_SRC への import＋登録が必要、
+// #88で bg-s2-*/bg-s3-* の登録漏れを是正)は BACKGROUND_SRC に実データがある場合のみ<img>で
+// 読み込む。無い場合(テスト専用フィクスチャの `bg-test-*` 等、実背景が未生成のシーン)は
+// トークン色のプレースホルダ(単色地+シーン名ラベル)にフォールバックする(#56 実装方針を維持。
+// 立ち絵と同じくrepoルートの assets/ を相対importする、conversation-frame.tsx と同じパターン)。
 //
 // ホットスポットの見せ方(#52 Phase4.7・T018''代表決定): 通常はアイコンも名前ラベルも
 // 表示しない(背景の絵に溶け込ませる)。ホバー/キーボードフォーカス時にのみ□マーカー(矩形の
@@ -70,15 +71,25 @@ import { cn } from '@/ui/lib/utils'
 
 import bgS1Office from '../../../../assets/backgrounds/bg-s1-office.png'
 import bgS1Server from '../../../../assets/backgrounds/bg-s1-server.png'
+import bgS2Office from '../../../../assets/backgrounds/bg-s2-office.png'
+import bgS2Server from '../../../../assets/backgrounds/bg-s2-server.png'
+import bgS3Office from '../../../../assets/backgrounds/bg-s3-office.png'
+import bgS3OpsRoom from '../../../../assets/backgrounds/bg-s3-ops-room.png'
 import bgSlOffice from '../../../../assets/backgrounds/bg-sl-office.png'
 import bgSlVendor from '../../../../assets/backgrounds/bg-sl-vendor.png'
 
 /** 生成済み背景アセットのID→importの対応。無いIDはプレースホルダ表示にフォールバックする。
- * bg-s2 系・bg-s3 系はアセットPNG自体は追加済みだが本マップ未登録のままの既存ギャップ
- * (#76 仕上げでの発見。別Issueで解消予定・本PRのスコープ外)。 */
+ * 【量産時の注意・#88】新しいマップの背景PNGを assets/backgrounds/ に追加したら、
+ * 必ずこのタイミングで import 文＋このマップにもエントリを追加すること。
+ * PNG追加だけでは自動配線されず、bg-s2系・bg-s3系のように「PNGは存在するのに
+ * ここへの登録漏れでプレースホルダ表示のまま」という既発生の不具合(#88)を繰り返す。 */
 const BACKGROUND_SRC: Record<string, string> = {
   'bg-s1-office': bgS1Office,
   'bg-s1-server': bgS1Server,
+  'bg-s2-office': bgS2Office,
+  'bg-s2-server': bgS2Server,
+  'bg-s3-office': bgS3Office,
+  'bg-s3-ops-room': bgS3OpsRoom,
   'bg-sl-office': bgSlOffice,
   'bg-sl-vendor': bgSlVendor,
 }
