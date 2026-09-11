@@ -77,8 +77,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
 
     // 会話オーバーレイを閉じると探索状態に戻り、同じホットスポットを再度開いて他のactionを
     // 選べる(危険操作の後も操作継続可=詰み防止)。ログをcollectできる。
-    await skipTypewriter(page, dangerLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, dangerLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: dangerLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await pcHotspot.click()
     await expect(page.getByRole('group', { name: 'EC運営担当者の端末の操作' })).toBeVisible()
     await page.getByRole('button', { name: 'カード情報の保存状況を確認する' }).click()
@@ -86,29 +86,29 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     const dbLine =
       '決済まわりのデータベースを確認した。注文番号や配送先は記録されているが、カード番号や有効期限はどの列にも保存されていない。非保持化の運用は徹底されていたようだ。'
     await expect(page.getByText(dbLine, { exact: false })).toBeVisible()
-    await skipTypewriter(page, dbLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, dbLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: dbLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     await pcHotspot.click()
     await page.getByRole('button', { name: 'WAFのログを確認する' }).click()
     const wafLine =
       'WAFのログを確認した。決済ページ宛てにSQLインジェクションを試みたと見られるリクエストが複数記録されているが、いずれもブロックされている。ただしWAFは、ブラウザから外部への通信までは監視していない。'
-    await skipTypewriter(page, wafLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, wafLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: wafLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(pcHotspot).toHaveAccessibleName('EC運営担当者の端末（PC）・調査済み')
 
     // --- 執務室: person(EC運営担当者・管理部門長。単一action=即実行) ---
     await page.getByRole('button', { name: 'EC運営担当者（人物）', exact: true }).click()
     const ecStaffLine =
       'EC運営担当者に聞きました。最近サイトの見た目や決済画面に自分たちで手を加えた覚えはなく、CMSやプラグインのバージョン管理は開発委託先に任せきりだったそうです。'
-    await skipTypewriter(page, ecStaffLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, ecStaffLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: ecStaffLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     await page.getByRole('button', { name: '管理部門長（人物）', exact: true }).click()
     const managerLine =
       '管理部門長に伺いました。すでに複数の顧客から不正利用の申告が入っており、風評への影響を心配して、原因がはっきりするまで公表を控えたいという声も出ているそうです。'
-    await skipTypewriter(page, managerLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, managerLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: managerLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     // --- 執務室: book(資料棚。collectを2件持つ) ---
     const bookHotspot = page.getByRole('button', { name: '資料棚（書籍）' })
@@ -116,8 +116,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await page.getByRole('button', { name: 'PCI DSS・非保持化に関する資料を確認する' }).click()
     const pcidssLine =
       'PCI DSSに関する資料を確認しました。PCI DSSは法律ではなく、国際カードブランドが定める業界基準です。カード番号を自社で保持しない「非保持化」はこの基準の対象範囲を狭める有効な対策ですが、決済ページ自体が改ざんされる攻撃までは防げません。'
-    await skipTypewriter(page, pcidssLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, pcidssLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: pcidssLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     await bookHotspot.click()
     await page
@@ -125,8 +125,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
       .click()
     const advisoryLine =
       '注意喚起を確認した。決済ページのスクリプトを改ざんし、入力中のカード情報を確定前にブラウザから外部のサーバへ直接送信させる、フォームジャッキング(Webスキミング)と呼ばれる手口が全国的に報告されている。今回の型に近い。'
-    await skipTypewriter(page, advisoryLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, advisoryLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: advisoryLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(bookHotspot).toHaveAccessibleName('資料棚（書籍）・調査済み')
 
     // --- ドア(door)でシステム運用ルームへ移動する(タブと併用可能・#78/T046-ui-dataと同じ結線) ---
@@ -140,15 +140,15 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await page.getByRole('button', { name: 'Webサーバのアクセスログを確認する' }).click()
     const accessLine =
       'Webサーバのアクセスログを確認した。深夜、お知らせ機能で使っている更新の遅れたプラグインの管理画面宛てに、公表済みの脆弱性を突く典型的なリクエストパターンが記録されている。'
-    await skipTypewriter(page, accessLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, accessLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: accessLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     await deviceHotspot.click()
     await page.getByRole('button', { name: '決済ページの改ざん検知ログを確認する' }).click()
     const tamperLine =
       '決済ページのファイルを、正規のバックアップと比較した。スクリプトの末尾に見慣れないコードが追加されており、入力されたカード番号・有効期限・セキュリティコードを、フォーム送信前に外部の見知らぬドメインへ直接送っていた。'
-    await skipTypewriter(page, tamperLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, tamperLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: tamperLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(deviceHotspot).toHaveAccessibleName('運用監視端末（機器）・調査済み')
 
     // --- システム運用ルーム: person(開発委託先の担当者。promptの挨拶が見出しに出る) ---
@@ -163,8 +163,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await page.getByRole('button', { name: '開発委託先に話を聞く' }).click()
     const vendorLine =
       '開発委託先に聞きました。数か月前、お知らせ機能で使っているプラグインに深刻な脆弱性が公表され、更新を案内していたが、他の連携機能への影響確認に時間がかかり、適用が後回しになっていたそうです。'
-    await skipTypewriter(page, vendorLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, vendorLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: vendorLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(vendorHotspot).toHaveAccessibleName('開発委託先の担当者（人物）・調査済み')
 
     // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導

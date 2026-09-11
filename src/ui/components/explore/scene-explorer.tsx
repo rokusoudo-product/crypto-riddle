@@ -1,25 +1,36 @@
 // src/ui/components/explore/scene-explorer.tsx — 探索④の背景シーン表示(#52/#56・T038、
 // 調査結果の会話フレーム化・不可視ホットスポット化は#52 Phase4.7/#66・T044、
 // ドア移動UI・prompt見出しは#52 Phase4.7 追補/#78・T046-ui-data、
-// 会話オーバーレイ化(2状態)・調査ポイント一覧のトグル化は#52 Phase4.7 追補/T047)。
+// 会話オーバーレイ化(2状態)・調査ポイント一覧のトグル化は#52 Phase4.7 追補/T047、
+// 会話ウィンドウのクリック/タップ閉じ・右上ボタン群の不透明化とヒント確認の移設は
+// #52 Phase4.7 追補/T048)。
 //
 // DESIGN.md「探索シーン」節が正: 探索画面は「探索状態」と「会話状態」の2つを切り替える。
-// - 探索状態(既定): 背景シーン+ホットスポット(+シーンタブ+右上「調査ポイント一覧」トグル)
-//   のみを表示する。立ち絵も会話ウィンドウも表示しない(カーソルでのホットスポット探索を
-//   邪魔しないため。T018'''''代表モック確定 2026-09-11)。
+// - 探索状態(既定): 背景シーン+ホットスポット(+シーンタブ+右上のボタン群「ヒント確認」
+//   「調査ポイント一覧」)のみを表示する。立ち絵も会話ウィンドウも表示しない(カーソルでの
+//   ホットスポット探索を邪魔しないため。T018'''''代表モック確定 2026-09-11)。
 // - 会話状態(調査結果/人物証言/dangerの教育的フィードバックを見せる間): 背景シーンを暗転
 //   させず保持したまま、その上に会話UI(左右端の立ち絵+下部の会話ウィンドウ)を重ねる
-//   (`ConversationFrame` の `layout="overlay"`、conversation-frame.tsx 参照)。閉じると
-//   探索状態に戻り、立ち絵・会話ウィンドウは消える(=この間ホットスポットはDOMごと
-//   描画しない。会話中に隠れたホットスポットを誤って操作できないようにするため)。
-// - 右上「調査ポイント一覧」トグル: 探索状態・会話状態のどちらでも常時表示する(発見性の
-//   担保)。旧「常時併設リスト」「モバイルでは初期展開」はこのトグルに置き換えた(#66は
-//   本PRで置き換え)。開くと呼び出し側(explore-screen.tsx)から渡された`investigationList`を
-//   パネル表示する。一覧からは背景に頼らずキーボードのみで全ポイント調査→解決へ進められる。
+//   (`ConversationFrame` の `layout="overlay"`、conversation-frame.tsx 参照)。専用の
+//   「閉じる」ボタンは置かず、会話ウィンドウをクリック/タップ(またはEnter/Space/Escape)で
+//   閉じる(T048。タイプライター送出中はまずスキップ=全文表示、全文表示後の操作で閉じる
+//   2段階、`ConversationFrame`の`onDismiss` prop参照)。閉じると探索状態に戻り、
+//   立ち絵・会話ウィンドウは消える(=この間ホットスポットはDOMごと描画しない。会話中に
+//   隠れたホットスポットを誤って操作できないようにするため。会話を閉じる操作自体もこの
+//   非表示化のおかげでホットスポットと競合しない)。
+// - 右上のボタン群「ヒント確認」(左・手持ちカード閲覧=card-drawer)＋「調査ポイント一覧」
+//   (右・トグル): 探索状態・会話状態のどちらでも常時表示する(発見性の担保)。両方とも
+//   透過させず不透明の背景(bg-card+border)にする(T048。旧95%不透明だと背景に溶けて
+//   見えにくかったため)。「ヒント確認」は旧・会話ウィンドウ内の?カードボタンをここへ
+//   一本化したもの(T048でaria-label「手持ちカードを見る（無料）」は維持したまま移設)。
+//   「調査ポイント一覧」は旧「常時併設リスト」「モバイルでは初期展開」の置き換え(#66)。
+//   開くと呼び出し側(explore-screen.tsx)から渡された`investigationList`をパネル表示する。
+//   一覧からは背景に頼らずキーボードのみで全ポイント調査→解決へ進められる。
 // - 探索完了→解決への誘導(橘の「そろそろ問題をまとめようか」)も同じ会話オーバーレイに載せる
 //   ため、呼び出し側は`conversationSlot`にoverlay layoutの`ConversationFrame`要素を渡す
 //   (scenesが無いフォールバックでは`conversationSlot`を使わずstacked layoutのまま呼び出し側で
-//   直接描画する。explore-screen.tsx参照)。
+//   直接描画する。explore-screen.tsx参照。conversationSlot側は独自の「わかった」ボタンを
+//   持つため、こちらにはT048のonDismissクリック閉じは適用しない)。
 //
 // scenario.scenes が無い場合(省略時)は呼び出し側(explore-screen.tsx)が本コンポーネントを
 // レンダーしないことで一覧表示にフォールバックする(docs/scenario_schema.md §2.5)。
@@ -194,7 +205,7 @@ export interface SceneExplorerProps {
   /** scenario.scenes(呼び出し側で存在確認済みの非空配列)。 */
   scenes: readonly Scene[]
   investigatedPointIds: readonly string[]
-  /** 獲得済みカードid(会話オーバーレイ上の?ボタン=CardDrawerに渡す、探索で得た手持ちカードの無料閲覧用)。 */
+  /** 獲得済みカードid(右上の「ヒント確認」=CardDrawerに渡す、探索で得た手持ちカードの無料閲覧用。T048)。 */
   ownedCardIds: readonly string[]
   /** investigation_point_id を1件獲得する(既存のINVESTIGATEイベント配線先)。 */
   onCollect: (pointId: string) => void
@@ -262,7 +273,6 @@ export function SceneExplorer({
   // (ダイアログ/ディスクロージャの一般的なフォーカス管理。id経由でDOM要素を掴む方式にし、
   // Button コンポーネントの ref 転送有無に依存しないようにする)。
   const sheetFirstActionId = `${tabsId}-sheet-first-action`
-  const conversationCloseId = `${tabsId}-conversation-close`
   const listPanelId = `${tabsId}-investigation-list-panel`
   const conversationSlotId = `${tabsId}-conversation-slot`
 
@@ -412,7 +422,7 @@ export function SceneExplorer({
 
   const openHotspot =
     openHotspotIndex !== null ? (activeScene.hotspots[openHotspotIndex] ?? null) : null
-  // 会話オーバーレイ上に置く?ボタン(CardDrawer)へ渡す、探索で得た手持ちカード(#66)。
+  // 右上の「ヒント確認」(CardDrawer)へ渡す、探索で得た手持ちカード(#66、右上移設はT048)。
   const ownedCards = scenario.cards.filter((card) => ownedCardIds.includes(card.id))
   // 会話状態かどうか(DESIGN.md「探索シーン」節「2つの状態」)。自身のconversation(collect/danger)
   // に加え、呼び出し側から渡されたconversationSlot(探索完了→解決への誘導)も会話状態に含める。
@@ -484,21 +494,33 @@ export function SceneExplorer({
             </div>
           )}
 
-          {/* 「調査ポイント一覧」トグル(#66→T047でトグル化): 探索状態・会話状態のどちらでも
-              常時表示する(発見性の担保、DESIGN.md「探索シーン」節「一覧フォールバック」)。
-              キーボード到達順を「トグル→ホットスポット→(会話状態では会話ウィンドウ内)」に
-              するため、ホットスポット・会話オーバーレイより先にDOM上へ置く。背景画像の上に
-              常時視認できる必要があるため、ホットスポットとは逆にbg-card等で常時可視にする。 */}
-          <Button
-            type="button"
-            variant="outline"
-            aria-expanded={isListOpen}
-            aria-controls={listPanelId}
-            onClick={() => setIsListOpen((v) => !v)}
-            className="bg-card/95 hover:bg-card absolute top-2 right-2 z-20 h-12 min-w-12 px-3 text-sm font-medium shadow-sm"
-          >
-            調査ポイント一覧
-          </Button>
+          {/* 右上のボタン群(#52 Phase4.7 追補・T048): 「ヒント確認」(左・手持ちカード閲覧=
+              card-drawer)＋「調査ポイント一覧」(右・トグル)。探索状態・会話状態のどちらでも
+              常時表示する(発見性の担保、DESIGN.md「探索シーン」節「一覧フォールバック」
+              「右上のボタン群」)。キーボード到達順を「ヒント確認→調査ポイント一覧→
+              ホットスポット→(会話状態では会話ウィンドウ)」にするため、ホットスポット・
+              会話オーバーレイより先にDOM上へ置く。背景画像の上に常時視認できる必要があるため、
+              ホットスポットとは逆に不透明の背景(bg-card+border)で常時可視にする。
+              旧bg-card/95(95%不透明)だけでなく、探索画面はDarkLayoutで常時`.dark`文脈になる
+              ため、Buttonのoutline variant既定の`dark:bg-input/30`(--inputは元から15%alpha
+              なので実質4.5%alpha=ほぼ透明)がtailwind-mergeでは`bg-card`と衝突と見なされず
+              (variant違い)残ってしまい、それが背景に溶ける主因だった。`dark:bg-card`
+              `dark:hover:bg-muted`を明示して打ち消し、確実に不透明にする(T048)。
+              z-30はConversationFrame overlay(z-10)より確実に手前に出すため。旧: 会話ウィンドウ内の
+              ?カードボタンはここへ統合し廃止した(下記conversation内のコメント参照)。 */}
+          <div className="absolute top-2 right-2 z-30 flex items-start gap-2">
+            <CardDrawer cards={ownedCards} triggerVariant="label" />
+            <Button
+              type="button"
+              variant="outline"
+              aria-expanded={isListOpen}
+              aria-controls={listPanelId}
+              onClick={() => setIsListOpen((v) => !v)}
+              className="bg-card hover:bg-muted dark:bg-card dark:hover:bg-muted h-12 min-w-12 px-3 text-sm font-medium shadow-sm"
+            >
+              調査ポイント一覧
+            </Button>
+          </div>
 
           {/* 探索状態でのみホットスポットを描画する(会話状態では背景の下に隠さず、そもそも
               DOMに置かない=誤操作防止・キーボード到達順の単純化、DESIGN.md「探索シーン」節)。 */}
@@ -536,31 +558,25 @@ export function SceneExplorer({
               または呼び出し側の会話(conversationSlot、探索完了→解決への誘導)を排他的に
               重ねる。背景シーンは暗転させずそのまま保持する(DESIGN.md「探索シーン」節)。 */}
           {conversation ? (
+            // 「閉じる」ボタンは置かず、会話ウィンドウ全体をクリック/タップで閉じる
+            // (#52 Phase4.7 追補・T048、DESIGN.md「探索シーン」節「会話ウィンドウ」)。
+            // onDismissを指定すると、タイプライターの全文表示前のクリック/タップ/Enter/Spaceは
+            // スキップ、全文表示後の同操作でsetConversation(null)を呼ぶ(2段階、
+            // ConversationFrame側の実装参照)。Escapeは常に閉じる。カード閲覧(旧・会話ウィンドウ内の
+            // ?ボタン)は右上の「ヒント確認」に統合したため、children はもう調査結果の
+            // 文脈行のみで、操作要素を持たない(閉じる操作とホットスポット操作が競合しないよう、
+            // 会話状態ではホットスポット自体をそもそもDOMに置かない=上記の分岐と併せて安全)。
             <ConversationFrame
               layout="overlay"
               speaker={conversation.speaker}
               line={conversation.line}
-              onLineRevealed={() => document.getElementById(conversationCloseId)?.focus()}
+              onDismiss={() => setConversation(null)}
             >
               <p className="text-muted-foreground text-xs">
                 {conversation.kind === 'collect'
                   ? `${conversation.hotspotLabel}を調べた結果`
                   : `${conversation.hotspotLabel}を操作した結果`}
               </p>
-              <div className="flex items-center justify-between gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  id={conversationCloseId}
-                  className="h-12 min-w-12 px-6"
-                  onClick={() => setConversation(null)}
-                >
-                  閉じる
-                </Button>
-                {/* カード閲覧(無料)の?ボタン(DESIGN.md「探索シーン」節。解決の card-drawer と同じ、
-                    相談=回数消費とは別物)。 */}
-                <CardDrawer cards={ownedCards} triggerVariant="icon" />
-              </div>
             </ConversationFrame>
           ) : conversationSlot ? (
             // idはisWrapUpVisibleのuseEffectが最初の操作可能要素を探すためのフック

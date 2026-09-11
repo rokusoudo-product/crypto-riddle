@@ -198,16 +198,18 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
   })
 
   /**
-   * 調査結果の会話フレーム(#66)を指定した台詞でスキップして閉じる共通手順。
-   * 台詞そのものがタイプライターのスキップボタンのaccessible nameになる(#64/T042)。
+   * 調査結果の会話ウィンドウ(#66)を指定した台詞でスキップして閉じる共通手順。会話ウィンドウは
+   * 専用の「閉じる」ボタンを持たず、ウィンドウ全体が1つの操作領域になる(T048)。
+   * accessible nameは会話文(line)のまま変わらないため、同じクエリを1回目=スキップ・
+   * 2回目=閉じるに使い回す(#64/T042・T048)。
    */
   async function skipCollectResultAndClose(
     page: import('@playwright/test').Page,
     line: string,
   ): Promise<void> {
     await expect(page.getByText(line, { exact: false })).toBeVisible()
-    await skipTypewriter(page, line)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, line) // スキップ(全文表示)
+    await page.getByRole('button', { name: line, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
   }
 
   test('背景シーンのホットスポットのみで全9ポイントを調査でき、調査結果が会話フレームで台詞提示され、PCのdanger操作は教育的フィードバックのみで詰まずに解決へ進める', async ({
@@ -246,8 +248,8 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     // 会話オーバーレイを閉じると探索状態に戻り、同じホットスポットを再度開いて他のactionを
     // 選べる(電源を落とした後も操作継続可=詰み防止)。EDRログをcollectすると、シートは閉じ、
     // 調査結果が会話オーバーレイで台詞提示される(#66、話者=霧島の既定)。
-    await skipTypewriter(page, dangerLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, dangerLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: dangerLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await pcHotspot.click()
     await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeVisible()
     await page.getByRole('button', { name: 'EDRアラートを確認する' }).click()
@@ -380,12 +382,17 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await expect(page.getByRole('button', { name: '執務室への扉（扉）' })).toBeVisible()
   })
 
-  test('調査結果の会話フレーム上の?ボタンで、獲得済みの手持ちカードを無料で閲覧できる(#66)', async ({
+  test('右上の「ヒント確認」ボタンで、獲得済みの手持ちカードをいつでも無料で閲覧できる(#66→T048で右上へ移設)', async ({
     page,
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
     await selectS1Map(page)
     await page.getByRole('button', { name: 'タップで進行' }).click()
+
+    // 「ヒント確認」は右上のボタン群の一員として探索状態・会話状態のどちらでも常時表示される
+    // (T048。aria-labelは移設前と同じ固定文言「手持ちカードを見る（無料）」を維持)。
+    const cardDrawerButton = page.getByRole('button', { name: '手持ちカードを見る（無料）' })
+    await expect(cardDrawerButton).toBeVisible()
 
     await page.getByRole('button', { name: '経理部 中野の端末（PC）' }).click()
     // PCはcollect/danger/noopの3action=シート経由。「EDRアラートを確認する」を実行する。
@@ -393,12 +400,10 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
 
     const edrLine =
       '中野の端末でExcelのマクロ実行に続いて、見慣れないPowerShellプロセスが起動した記録がある。侵入の起点はここだろう。'
-    await skipTypewriter(page, edrLine)
+    await expect(page.getByText(edrLine, { exact: false })).toBeVisible()
 
-    // ?ボタンはaria-label固定文言・48px(DESIGN.md「探索シーン」節)。解決の card-drawer と
-    // 同じ無料閲覧の導線。
-    const cardDrawerButton = page.getByRole('button', { name: '手持ちカードを見る（無料）' })
-    await expect(cardDrawerButton).toBeVisible()
+    // タイプライターが進行中(スキップ前)でも「ヒント確認」は押せる(右上移設によりisComplete
+    // 状態に依存しない、T048)。
     await cardDrawerButton.click()
     await expect(page.getByRole('heading', { name: '手持ちカード' })).toBeVisible()
     await expect(

@@ -1,6 +1,7 @@
 // src/ui/components/conversation-frame.tsx — 会話フレーム共通コンポーネント(#42/T033、
 // タイプライター表示は#52 Phase4.7/#64/T042、探索の会話オーバーレイ化は#52 Phase4.7 追補/
-// T047・`layout` prop)。
+// T047・`layout` prop、会話ウィンドウのクリック/タップ閉じ化は#52 Phase4.7 追補/T048・
+// `onDismiss` prop)。
 //
 // DESIGN.md「会話フレーム(共通コンポーネント・#42で導入)」節が正本:
 // - レイアウト: 画面下部に会話ウィンドウ、ステージ中央の左右に立ち絵(霧島=左・橘=右で固定)。
@@ -25,6 +26,12 @@
 //   端寄せする(DESIGN.md「探索シーン」節「会話オーバーレイのレイアウト」)。タイプライター・
 //   フォーカス管理・children の表示タイミング等のロジックは stacked と完全に共有し、
 //   JSX の外枠だけを分岐する(scene-explorer.tsx 参照)。
+// - 会話ウィンドウのクリック/タップ閉じ(#52 Phase4.7 追補・T048): `onDismiss` を指定すると、
+//   専用の「閉じる」ボタンを置かず、会話ウィンドウ全体を1つの操作領域にする。全文表示前の
+//   クリック/タップ/Enter/Spaceはスキップ(全文表示)、全文表示後の同操作は`onDismiss`を呼ぶ
+//   (Escapeは常に`onDismiss`)。呼び出し側(scene-explorer.tsx)は調査結果/dangerの教育的
+//   フィードバックの会話オーバーレイにのみ指定し、探索完了への誘導(conversationSlot、
+//   独自の「わかった」ボタンを持つ)には指定しない。詳細は`onDismiss`のJSDoc参照。
 //
 // 導入(③)・探索の会話(④)・解決の会話モード(⑤)で共通して使う想定(DESIGN.md)。
 // 実際の配線は④探索(scene-explorer.tsx)・⑤解決(resolve-screen.tsx)のみ済み。
@@ -34,7 +41,14 @@
 // 立ち絵アセットは repo ルートの assets/(src/ 外)に置かれているため `@/*` エイリアスは使えず、
 // 相対パスで import する。vite/client.d.ts の `declare module '*.png'` により型定義は問題なく、
 // Vite・Vitest どちらの変換パイプラインでも文字列(URL)として解決される。
-import { type MouseEvent, type ReactNode, useEffect, useRef, useState } from 'react'
+import {
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import type { Character } from '@/core/model'
 import { cn } from '@/ui/lib/utils'
@@ -171,6 +185,19 @@ export interface ConversationFrameProps {
    * (例: scene-explorer.tsx の証言「閉じる」ボタンへの自動フォーカス)。
    */
   onLineRevealed?: () => void
+  /**
+   * 会話ウィンドウ全体を1つのクリック/タップ可能な操作領域にする(#52 Phase4.7 追補・T048)。
+   * 指定した場合のみ有効(既定は従来どおり、指定しなければ何も変わらない):
+   * - 全文表示前にクリック/タップ、またはEnter/Spaceで即全文表示(スキップ)。
+   * - 全文表示後にクリック/タップ、またはEnter/Spaceでこのコールバックを呼ぶ(呼び出し側が
+   *   会話を閉じる。DESIGN.md「探索シーン」節「会話ウィンドウ」=旧「閉じる」ボタンの代替)。
+   * - Escapeキーは全文表示の途中/後を問わず常にこのコールバックを呼ぶ(即座に閉じる)。
+   * 指定した場合、会話文はもうスキップ専用の内側の<button>では描画しない(操作領域が
+   * ウィンドウ全体=このコールバックに一本化されるため、ボタンの入れ子を避ける)。
+   * ウィンドウ自体をrole="button"にし、開いた瞬間(マウント時)にフォーカスを当てる
+   * (呼び出し側は開閉のたびに新規マウントする前提、scene-explorer.tsx参照)。
+   */
+  onDismiss?: () => void
 }
 
 /** 導入・探索の会話・解決の会話モードで共通して使う会話フレーム(DESIGN.md「会話フレーム」節)。 */
@@ -180,6 +207,7 @@ export function ConversationFrame({
   layout = 'stacked',
   children,
   onLineRevealed,
+  onDismiss,
 }: ConversationFrameProps) {
   const prefersReducedMotion = usePrefersReducedMotion()
 
@@ -249,7 +277,7 @@ export function ConversationFrame({
     }
   }, [isComplete])
 
-  /** タップ/Enterで即全文表示にする(DESIGN.md「タイプライター表示」節)。 */
+  /** タップ/Enterで即全文表示にする(DESIGN.md「タイプライター表示」節)。onDismiss未指定時のみ使う。 */
   function handleSkip(event: MouseEvent<HTMLButtonElement>) {
     if (isComplete) return
     // キーボード操作(Enter/Space)によるclickも含め、このボタン自身にフォーカスがある状態で
@@ -259,6 +287,52 @@ export function ConversationFrame({
     }
     setRevealedLength(line.length)
   }
+
+  // onDismiss指定時(#52 Phase4.7 追補・T048): ウィンドウ全体が1つの操作領域になる
+  // (全文表示前=スキップ、全文表示後=onDismiss呼び出し)。ConversationFrameインスタンスは
+  // 呼び出し側が開閉のたびに新規マウントする前提(scene-explorer.tsxのconversation state参照)
+  // のため、マウント時に一度だけウィンドウへフォーカスを当てる(依存配列は空=マウント時のみ)。
+  useEffect(() => {
+    if (onDismiss) windowRef.current?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function handleOverlayActivate() {
+    if (!isComplete) {
+      setRevealedLength(line.length)
+      return
+    }
+    onDismiss?.()
+  }
+
+  function handleOverlayKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    // Escapeは表示状態によらず常に閉じる(DESIGN.md「探索シーン」節「会話ウィンドウ」)。
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      onDismiss?.()
+      return
+    }
+    // role="button"の要素はEnter/Spaceを自動でclickへ変換しない(ネイティブbuttonと違う)ため、
+    // 明示的にハンドリングする。Spaceは既定でページスクロールを起こすためpreventDefaultする。
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      handleOverlayActivate()
+    }
+  }
+
+  // onDismiss指定時、ウィンドウ自体をrole="button"のクリック/タップ可能な操作領域にする
+  // (T048)。アクセシブルネームは会話文そのもの(line)に固定し、スキップ前後で変わらない
+  // ようにする(同じ要素を「スキップ→もう一度で閉じる」の2段階でそのまま使い回せる。
+  // 例: `getByRole('button', {name: line})` を1回目=スキップ・2回目=閉じるに使い回せる)。
+  const dismissWindowProps = onDismiss
+    ? {
+        role: 'button' as const,
+        tabIndex: 0,
+        'aria-label': line,
+        onClick: handleOverlayActivate,
+        onKeyDown: handleOverlayKeyDown,
+      }
+    : {}
 
   // 名札+会話文(タイプライター/全文)+children。stacked/overlay で共有する会話ウィンドウの
   // 中身(外枠のサイズ・配置だけがレイアウトごとに異なる、#52・T047)。
@@ -270,6 +344,14 @@ export function ConversationFrame({
         </span>
         {isComplete ? (
           <p className="font-heading text-base leading-relaxed sm:text-lg">{line}</p>
+        ) : onDismiss ? (
+          // onDismiss指定時(T048): ウィンドウ全体(windowRef側)が操作領域になるため、ここは
+          // 入れ子のbuttonにしない(role="button"の中にネイティブbuttonを入れないため)。
+          // 表示内容自体は従来と同じ(aria-hiddenの演出テキスト+sr-onlyの全文)。
+          <div className="font-heading min-h-12 w-full text-left text-base leading-relaxed sm:text-lg">
+            <span aria-hidden="true">{line.slice(0, revealedLength)}</span>
+            <span className="sr-only">{line}</span>
+          </div>
         ) : (
           // タイプライター演出中: 見た目は1文字ずつ増える部分文字列(aria-hidden、演出のみ)。
           // 支援技術には別途sr-onlyで全文を一度に渡す(1文字ずつ読み上げさせない、#64/T042)。
@@ -303,7 +385,12 @@ export function ConversationFrame({
               max-h+overflow-y-autoにする(カードドロワー展開時・長い台詞での見切れ対策)。 */}
           <div
             ref={windowRef}
-            className="border-primary bg-card flex max-h-[70%] min-w-0 flex-1 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:max-h-[75%] sm:gap-4 sm:p-6"
+            className={cn(
+              'border-primary bg-card flex max-h-[70%] min-w-0 flex-1 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:max-h-[75%] sm:gap-4 sm:p-6',
+              onDismiss &&
+                'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
+            )}
+            {...dismissWindowProps}
           >
             {windowContent}
           </div>
@@ -324,7 +411,12 @@ export function ConversationFrame({
       {/* 会話ウィンドウ: surface + 上辺に primary(ゴールド)のアクセント。 */}
       <div
         ref={windowRef}
-        className="border-primary bg-card flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6"
+        className={cn(
+          'border-primary bg-card flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
+          onDismiss &&
+            'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
+        )}
+        {...dismissWindowProps}
       >
         {windowContent}
       </div>

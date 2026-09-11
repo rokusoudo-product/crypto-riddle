@@ -71,8 +71,8 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
 
     // 会話オーバーレイを閉じると探索状態に戻り、同じホットスポットを再度開いて他のactionを
     // 選べる(危険操作の後も操作継続可=詰み防止)。ログをcollectできる。
-    await skipTypewriter(page, dangerLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, dangerLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: dangerLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await pcHotspot.click()
     await expect(page.getByRole('group', { name: '情シス管理端末の操作' })).toBeVisible()
     await page.getByRole('button', { name: '認証サーバのログを確認する' }).click()
@@ -80,29 +80,29 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
     const authLine =
       '深夜、経理システムの管理者アカウントを使って、数分の間に複数のサーバへ次々とログインした記録がある。パスワードそのものではなく認証情報のハッシュ値を使い回す、Pass-the-Hashによるラテラルムーブメントの典型的な挙動だ。'
     await expect(page.getByText(authLine, { exact: false })).toBeVisible()
-    await skipTypewriter(page, authLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, authLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: authLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     await pcHotspot.click()
     await page.getByRole('button', { name: 'ファイルサーバの暗号化状況を確認する' }).click()
     const fileserverLine =
       'ファイルサーバの共有フォルダを見た。数千件のファイルが短時間で見慣れない拡張子に置き換わっている。フォルダ直下には身代金を要求するメッセージファイルも置かれていた。ランサムウェアによる一括暗号化だ。'
-    await skipTypewriter(page, fileserverLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, fileserverLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: fileserverLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(pcHotspot).toHaveAccessibleName('情シス管理端末（PC）・調査済み')
 
     // --- 執務室: person(情シス担当・管理部門長。単一action=即実行) ---
     await page.getByRole('button', { name: '情シス担当（人物）', exact: true }).click()
     const itstaffLine =
       '情シス担当に聞きました。VPN装置は数年前に保守業者へ設置してもらったきりで、資産管理台帳には登録されておらず、ファームウェア更新の通知が来ていたことにも気づいていなかったそうです。'
-    await skipTypewriter(page, itstaffLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, itstaffLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: itstaffLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     await page.getByRole('button', { name: '管理部門長（人物）', exact: true }).click()
     const managerLine =
       '管理部門長に伺いました。すでに一部の生産ラインの稼働に影響が出ており、一刻も早い復旧のためなら身代金の支払いも検討すべきではないか、との声が社内で出ているそうです。'
-    await skipTypewriter(page, managerLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, managerLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: managerLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     // --- 執務室: book(資料棚。collectを2件持つ) ---
     const bookHotspot = page.getByRole('button', { name: '資料棚（書籍）' })
@@ -112,15 +112,15 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
       .click()
     const advisoryLine =
       '注意喚起を確認した。境界に設置されたVPN装置等の深刻な脆弱性が放置されると、そこを起点に社内ネットワークへ侵入され、認証情報の窃取や他端末への横展開に悪用される事例が全国的に報告されている。資産管理台帳で機器を把握し、深刻度の高い脆弱性から優先して更新するのが基本とされている。'
-    await skipTypewriter(page, advisoryLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, advisoryLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: advisoryLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     await bookHotspot.click()
     await page.getByRole('button', { name: 'バックアップ運用ガイドラインを確認する' }).click()
     const guidelineLine =
       'バックアップ運用ガイドラインを確認しました。バックアップは複数世代を保持し、本番環境とは別の媒体・別の場所に、ネットワークから切り離した状態でも保管すること(3-2-1ルール)。常時オンライン接続のバックアップは、侵入時に本体ごと暗号化される危険があるためです。'
-    await skipTypewriter(page, guidelineLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, guidelineLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: guidelineLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(bookHotspot).toHaveAccessibleName('資料棚（書籍）・調査済み')
 
     // --- ドア(door)でサーバ室へ移動する(タブと併用可能・#78・T046-ui-dataと同じ結線) ---
@@ -141,23 +141,23 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
     await page.getByRole('button', { name: 'VPN装置のログを確認する' }).click()
     const vpnLine =
       'VPN装置のログを確認した。深夜、海外のIPアドレスから、有効な社員アカウントを使った接続が記録されている。フィッシングの形跡はなく、パッチが未適用のまま放置されていた脆弱性を突かれて認証を突破された可能性が高い。'
-    await skipTypewriter(page, vpnLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, vpnLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: vpnLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     await vendorHotspot.click()
     await page.getByRole('button', { name: '保守業者に話を聞く' }).click()
     const vendorLine =
       '保守業者に聞きました。半年ほど前、VPN装置のファームウェアに重大な脆弱性が見つかったとして更新を案内するメールを送ったが、その後の返信も更新作業の依頼もなく、そのままになっていたそうです。'
-    await skipTypewriter(page, vendorLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, vendorLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: vendorLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(vendorHotspot).toHaveAccessibleName('保守業者（人物）・調査済み')
 
     // --- サーバ室: device(バックアップサーバ。単一action=即実行) ---
     await page.getByRole('button', { name: 'バックアップサーバ（機器）', exact: true }).click()
     const backupLine =
       'バックアップサーバを確認した。本番ネットワークに常時オンラインで接続されており、同じ管理者アカウントでアクセスできる状態だった。直近の世代のバックアップも、横展開の過程で他のファイルと同様に暗号化されており、そのままでは復旧に使えない。'
-    await skipTypewriter(page, backupLine)
-    await page.getByRole('button', { name: '閉じる' }).click()
+    await skipTypewriter(page, backupLine) // スキップ(全文表示)
+    await page.getByRole('button', { name: backupLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
 
     // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
     // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を

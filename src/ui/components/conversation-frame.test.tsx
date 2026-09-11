@@ -7,7 +7,7 @@
 // スキップ後に出る)が通る」を検証する。
 //
 // DESIGN.md「会話フレーム」節「タイプライター表示」小節が正本。
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -253,6 +253,97 @@ describe('ConversationFrame(#64/T042 タイプライター表示)', () => {
       })
       expect(screen.getByText(LINE).tagName).toBe('P')
       expect(screen.getByRole('button', { name: '閉じる' })).toBeInTheDocument()
+    })
+  })
+
+  describe('onDismiss(会話ウィンドウのクリック/タップ閉じ・#52 Phase4.7 追補・T048)', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('全文表示前のクリックはスキップのみでonDismissを呼ばず、全文表示後の同じ要素へのクリックでonDismissを呼ぶ(2段階)', () => {
+      const onDismiss = vi.fn()
+      render(<ConversationFrame speaker="橘" line={LINE} layout="overlay" onDismiss={onDismiss} />)
+
+      // accessible nameは会話文(line)のまま、スキップ前後で変わらない(T048)。
+      const conversationWindow = screen.getByRole('button', { name: LINE })
+
+      // 1回目: 全文表示前なのでスキップのみ(全文表示になるが、まだonDismissは呼ばれない)。
+      act(() => {
+        conversationWindow.click()
+      })
+      expect(onDismiss).not.toHaveBeenCalled()
+      expect(screen.getByText(LINE).tagName).toBe('P')
+
+      // 2回目: 全文表示後の同じ要素へのクリックでonDismissが呼ばれる(専用の「閉じる」ボタンは無い)。
+      act(() => {
+        conversationWindow.click()
+      })
+      expect(onDismiss).toHaveBeenCalledTimes(1)
+    })
+
+    it('Enter/Spaceキーでも同様にスキップ→もう一度で閉じる2段階になる', () => {
+      const onDismiss = vi.fn()
+      render(<ConversationFrame speaker="橘" line={LINE} layout="overlay" onDismiss={onDismiss} />)
+      const conversationWindow = screen.getByRole('button', { name: LINE })
+
+      fireEvent.keyDown(conversationWindow, { key: 'Enter' })
+      expect(onDismiss).not.toHaveBeenCalled()
+      expect(screen.getByText(LINE).tagName).toBe('P')
+
+      fireEvent.keyDown(conversationWindow, { key: ' ' })
+      expect(onDismiss).toHaveBeenCalledTimes(1)
+    })
+
+    it('Escapeキーは全文表示の途中でも完了後でも常にonDismissを呼ぶ', () => {
+      const onDismissDuringTyping = vi.fn()
+      const { unmount } = render(
+        <ConversationFrame
+          speaker="橘"
+          line={LINE}
+          layout="overlay"
+          onDismiss={onDismissDuringTyping}
+        />,
+      )
+      const windowDuringTyping = screen.getByRole('button', { name: LINE })
+      // まだ全文表示前(スキップしていない)状態でもEscapeは即座に閉じる。
+      fireEvent.keyDown(windowDuringTyping, { key: 'Escape' })
+      expect(onDismissDuringTyping).toHaveBeenCalledTimes(1)
+      unmount()
+
+      const onDismissAfterComplete = vi.fn()
+      render(
+        <ConversationFrame
+          speaker="橘"
+          line={LINE}
+          layout="overlay"
+          onDismiss={onDismissAfterComplete}
+        />,
+      )
+      const windowAfterComplete = screen.getByRole('button', { name: LINE })
+      act(() => {
+        vi.advanceTimersByTime(TYPEWRITER_CHAR_INTERVAL_MS * LINE.length)
+      })
+      expect(screen.getByText(LINE).tagName).toBe('P')
+      fireEvent.keyDown(windowAfterComplete, { key: 'Escape' })
+      expect(onDismissAfterComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('onDismiss指定時はマウント直後に会話ウィンドウ自体へ自動的にフォーカスが当たる', () => {
+      render(<ConversationFrame speaker="橘" line={LINE} layout="overlay" onDismiss={() => {}} />)
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: LINE }))
+    })
+
+    it('onDismissを指定しない場合は従来どおり(role="button"を持たず、windowはフォーカス対象にならない)', () => {
+      render(<ConversationFrame speaker="橘" line={LINE} layout="overlay" />)
+      // lineそのものが名前になるのは従来のスキップ用<button>のみ(入れ子ではなく単体)。
+      const skipButton = screen.getByRole('button', { name: LINE })
+      expect(skipButton.tagName).toBe('BUTTON')
+      expect(skipButton.closest('[role="button"]')).toBeNull()
     })
   })
 })

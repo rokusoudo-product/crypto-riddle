@@ -15,20 +15,11 @@
 // 方針を踏襲。表示すると解答が自明になる)。
 //
 // triggerVariant(#52 Phase4.7/#66・T044で追加): 既定の'text'は解決画面(resolve-screen.tsx)の
-// 文言ボタン。探索の会話フレーム(scene-explorer.tsx)は「？ボタン」(48px・アイコンのみ・
-// aria-label固定文言)で置く仕様のため'icon'を追加した(DESIGN.md「探索シーン」節)。
+// 文言ボタン。探索の会話フレーム(scene-explorer.tsx)は当初「？ボタン」(48px・アイコンのみ・
+// aria-label固定文言)の'icon'だったが、右上ボタン群への移設(#52 Phase4.7 追補・T048)に伴い
+// 'label'(「ヒント確認」の文言ボタン・aria-labelは同じ固定文言を維持)に置き換えた。
 // パネルの開閉ロジック・中身は共通(同じ無料閲覧の導線であることを実装でも保つ)。
-import {
-  CircleHelp,
-  FileText,
-  Key,
-  Lock,
-  Mail,
-  MessageCircle,
-  Newspaper,
-  ShieldCheck,
-  X,
-} from 'lucide-react'
+import { FileText, Key, Lock, Mail, MessageCircle, Newspaper, ShieldCheck, X } from 'lucide-react'
 import { useId, useState } from 'react'
 
 import type { Card, CardType } from '@/core/model'
@@ -50,10 +41,12 @@ export interface CardDrawerProps {
   cards: readonly Card[]
   /**
    * 開閉ボタンの見せ方。'text'(既定): 解決画面の文言ボタン(「手持ちカードを見る（無料・N枚）」)。
-   * 'icon': 探索の会話フレーム用の？ボタン(アイコンのみ・48px・aria-label固定文言、
-   * DESIGN.md「探索シーン」節)。
+   * 'label': 探索の会話オーバーレイ右上ボタン群用の「ヒント確認」文言ボタン(#52 Phase4.7 追補・
+   * T048。旧'icon'の後継。aria-labelは固定文言「手持ちカードを見る（無料）」を維持、
+   * DESIGN.md「探索シーン」節「右上のボタン群」)。展開パネルは背景シーンの箱
+   * (aspect-video・overflow-hidden)からはみ出さないよう幅・高さを制限しスクロールにする。
    */
-  triggerVariant?: 'text' | 'icon'
+  triggerVariant?: 'text' | 'label'
 }
 
 /** 手持ちカードを無料でいつでも閲覧できるドロワー(相談=回数消費とは異なることをラベルで明示)。 */
@@ -62,19 +55,24 @@ export function CardDrawer({ cards, triggerVariant = 'text' }: CardDrawerProps) 
   const panelId = useId()
 
   return (
-    <div className={cn('flex flex-col gap-2', triggerVariant === 'icon' && 'items-end')}>
-      {triggerVariant === 'icon' ? (
+    <div className={cn('flex flex-col gap-2', triggerVariant === 'label' && 'items-end')}>
+      {triggerVariant === 'label' ? (
+        // 右上ボタン群の一員(T048)。「調査ポイント一覧」ボタンと並ぶため、透過させず
+        // 同じ不透明の背景(bg-card+border、outline variant既定)で統一する。探索画面は
+        // 常時`.dark`文脈(DarkLayout)のため、outline variant既定の`dark:bg-input/30`
+        // (ほぼ透明)がtailwind-merge上`bg-card`と衝突と見なされず残ってしまう。
+        // `dark:bg-card`で明示的に打ち消す(scene-explorer.tsxの「調査ポイント一覧」
+        // ボタンと同じ対処、T048)。
         <Button
           type="button"
           variant="outline"
-          size="icon"
-          className="size-12"
+          className="bg-card hover:bg-muted dark:bg-card dark:hover:bg-muted h-12 min-w-12 px-3 text-sm font-medium shadow-sm"
           aria-expanded={open}
           aria-controls={panelId}
           aria-label="手持ちカードを見る（無料）"
           onClick={() => setOpen((v) => !v)}
         >
-          <CircleHelp aria-hidden="true" className="size-5" />
+          ヒント確認
         </Button>
       ) : (
         <Button
@@ -91,7 +89,10 @@ export function CardDrawer({ cards, triggerVariant = 'text' }: CardDrawerProps) 
       {open && (
         <div
           id={panelId}
-          className="border-border bg-background flex flex-col gap-2 rounded-lg border p-3"
+          className={cn(
+            'border-border bg-background flex flex-col gap-2 rounded-lg border p-3',
+            triggerVariant === 'label' && 'max-h-64 w-72 max-w-[85vw] overflow-y-auto',
+          )}
         >
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">手持ちカード</h2>
