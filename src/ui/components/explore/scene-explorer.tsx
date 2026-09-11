@@ -4,7 +4,8 @@
 // 会話オーバーレイ化(2状態)・調査ポイント一覧のトグル化は#52 Phase4.7 追補/T047、
 // 会話ウィンドウのクリック/タップ閉じ・右上ボタン群の不透明化とヒント確認の移設は
 // #52 Phase4.7 追補/T048、探索完了への誘導を「閉じて再探索も可・ロックしない」形にしたのは
-// PR#92追補・代表FB)。
+// PR#92追補・代表FB、アクションシート(ホットスポットの選択肢)を画面中央オーバーレイ・
+// 選択肢ボタン半透明80%・「戻る」選択肢の必須化にしたのは#52 追補・代表FB(2026-09-11))。
 //
 // DESIGN.md「探索シーン」節が正: 探索画面は「探索状態」と「会話状態」の2つを切り替える。
 // - 探索状態(既定): 背景シーン+ホットスポット(+シーンタブ+右上のボタン群「ヒント確認」
@@ -74,6 +75,25 @@
 // 例: サーバ管理者「どうしましたか？」)を見出しに表示し、省略時はラベルのみ(現行どおり)。
 // 系統をまたぐ統合ホットスポット(人＋機器を1つに束ねた複数collect＋noop)で、何用の操作かを
 // 挨拶台詞で示す(DESIGN.md「探索シーン」節)。
+//
+// アクションシートの表示位置・半透明化・「戻る」選択肢の必須化(#52 追補・代表FB 2026-09-11):
+// 旧・画面下部/ホットスポット近傍のパネル表示から、見出し(prompt/ラベル)＋2〜3個の選択肢を
+// 背景シーンの箱(aspect-video)の中央にオーバーレイ表示する形に変更した(会話オーバーレイと
+// 同じ`absolute inset-0`のコンテナに重ねる)。選択肢ボタンは不透明度80%程度の半透明にし
+// (`/80`のトークン、カラーコード直書きはしない)、背景シーンがうっすら透けて見えるようにする。
+// 右上の「ヒント確認」「調査ポイント一覧」は発見性のため従来どおり不透明のまま(別要件、
+// 半透明化の対象外)。外側のラッパーはpointer-events-noneにし、中央のカード自体にだけ
+// pointer-events-autoを付ける: ホットスポットは会話オーバーレイと違いアクションシート表示中も
+// DOMから消さない(返却フォーカス=returnFocusが同期的にhotspotDomId経由で探すため、
+// マウントされたままにする必要がある。下記returnFocus関数のコメント参照)ため、
+// 中央のカードの外側(=背景シーンの見えている部分)へのクリックを素通りさせないと、
+// 全画面を覆う透明な層がホットスポットへのクリックを奪ってしまう。
+// 「戻る」選択肢の必須化: データにnoop相当の選択肢(例「今は触らない」「何でもない」)が
+// 無いアクションシートには、UI側で「閉じる（何もしない）」をactions配列の末尾に補う
+// (hasNoopAction参照。既存の並び順は変えず、既にnoopがある場合は二重に足さない)。
+// キーボード: 各選択肢はTab/Shift+Tabで移動しEnter/Spaceで実行でき(ネイティブbutton)、
+// Escapeはグループ全体のkeydownで閉じる(closeActionSheet、下記参照。会話オーバーレイの
+// onDismiss/onOutsideDismissと同じくEscapeは常に閉じる挙動に揃える)。
 //
 // 調査結果の会話オーバーレイ提示(#52 Phase4.7/T044・#62 吸収、T047で重畳表示化):
 // 人物の証言だけでなく、PC のログ・書籍の文献も含めて種別を問わず同じ経路で会話オーバーレイに
@@ -153,6 +173,12 @@ function isHotspotInvestigated(
 ): boolean {
   const ids = collectActionsOf(hotspot).map((action) => action.investigation_point_id)
   return ids.length > 0 && ids.every((id) => investigatedPointIds.includes(id))
+}
+
+/** アクションシートがすでにnoop(「何もせず戻る」相当)を持つか(#52 追補・代表FB)。
+ * 持たない場合、UI側で「閉じる（何もしない）」をシートの末尾に補う(下記JSX参照)。 */
+function hasNoopAction(hotspot: SceneHotspot): boolean {
+  return hotspot.actions.some((action) => action.kind === 'noop')
 }
 
 /** 調査3系統(investigation_point.category)から話者の既定を導出する(ログを見る→霧島／
@@ -371,6 +397,13 @@ export function SceneExplorer({
     document.getElementById(hotspotDomId(index))?.focus()
   }
 
+  /** アクションシートを何もせず閉じる(X・Escape・補完した「閉じる（何もしない）」で共通、
+   * #52 追補・代表FB)。noopアクション実行時と同じ、ホットスポットへの同期フォーカス復帰を伴う。 */
+  function closeActionSheet() {
+    setOpenHotspotIndex(null)
+    returnFocus()
+  }
+
   function selectScene(index: number) {
     const scene = scenes[index]
     if (!scene) return
@@ -425,8 +458,7 @@ export function SceneExplorer({
       return
     }
     // noop: 何もせず閉じる。
-    setOpenHotspotIndex(null)
-    returnFocus()
+    closeActionSheet()
   }
 
   function handleHotspotActivate(hotspot: SceneHotspot, hotspotIndex: number) {
@@ -607,58 +639,89 @@ export function SceneExplorer({
             // (上記コメント参照)。
             <div id={conversationSlotId}>{conversationSlot}</div>
           ) : null}
-        </div>
 
-        {/* アクションシート: 複数actionを持つホットスポット用(固定順・並べ替えない)。
-            探索状態でのみ開き得る(danger/collectを選ぶと会話オーバーレイに切り替わってこのシートは
-            閉じるため、会話状態と同時に表示されることはない)。 */}
-        {openHotspot && (
-          <div
-            role="group"
-            aria-label={`${openHotspot.label}の操作`}
-            className="border-primary bg-card flex flex-col gap-3 rounded-lg border-t-4 p-4"
-          >
-            <div className="flex items-center justify-between gap-2">
-              {/* 見出し=挨拶台詞(prompt、#78・T046-ui-data)。省略時はラベルのみ(現行どおり)。
-                  系統をまたぐ統合ホットスポット(人＋機器を1つに束ねる)で、何用の操作かを
-                  挨拶台詞で示す(DESIGN.md「探索シーン」節)。 */}
-              <h2 className="font-heading text-base">{openHotspot.prompt ?? openHotspot.label}</h2>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="操作メニューを閉じる"
-                onClick={() => {
-                  setOpenHotspotIndex(null)
-                  returnFocus()
+          {/* アクションシート: 複数actionを持つホットスポット用(固定順・並べ替えない)。中央への
+              オーバーレイ化・選択肢ボタン半透明80%・「戻る」選択肢の必須化は#52 追補・代表FB
+              (ファイル冒頭コメント参照)。探索状態でのみ開き得る(danger/collectを選ぶと会話
+              オーバーレイに切り替わってこのシートは閉じるため、会話状態と同時に表示されることは
+              ない)。外側のラッパーはpointer-events-noneにし、中央のカードにだけpointer-events-autoを
+              付ける: ホットスポット自体は会話オーバーレイと違って表示中も非表示にしない
+              (returnFocus/closeActionSheetが同期的にDOM要素を探すため常にマウントされたままに
+              する必要がある)ため、中央のカードの外側(=背景シーンの見えている部分)へのクリックが
+              ホットスポットへ素通りするようにする。 */}
+          {openHotspot && (
+            <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center p-4">
+              <div
+                role="group"
+                aria-label={`${openHotspot.label}の操作`}
+                className="pointer-events-auto flex w-full max-w-sm flex-col gap-2"
+                onKeyDown={(event) => {
+                  // Escapeは常に閉じる(会話オーバーレイのonDismiss/onOutsideDismissと同じ挙動に
+                  // 揃える、#52 追補・代表FB「戻る手段を必ず用意」)。
+                  if (event.key !== 'Escape') return
+                  event.preventDefault()
+                  closeActionSheet()
                 }}
               >
-                <X aria-hidden="true" className="size-4" />
-              </Button>
+                <div className="bg-card/80 flex items-center justify-between gap-2 rounded-lg px-4 py-2 shadow-lg">
+                  {/* 見出し=挨拶台詞(prompt、#78・T046-ui-data)。省略時はラベルのみ(現行どおり)。
+                      系統をまたぐ統合ホットスポット(人＋機器を1つに束ねる)で、何用の操作かを
+                      挨拶台詞で示す(DESIGN.md「探索シーン」節)。 */}
+                  <h2 className="font-heading text-base">
+                    {openHotspot.prompt ?? openHotspot.label}
+                  </h2>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="操作メニューを閉じる"
+                    onClick={closeActionSheet}
+                  >
+                    <X aria-hidden="true" className="size-4" />
+                  </Button>
+                </div>
+                <ul className="flex flex-col gap-2">
+                  {openHotspot.actions.map((action, actionIndex) => {
+                    const done =
+                      action.kind === 'collect' &&
+                      investigatedPointIds.includes(action.investigation_point_id)
+                    return (
+                      <li key={actionIndex}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          id={actionIndex === 0 ? sheetFirstActionId : undefined}
+                          className="bg-card/80 hover:bg-muted/80 dark:bg-card/80 dark:hover:bg-muted/80 h-12 min-w-12 w-full justify-start px-4 text-left shadow-lg"
+                          onClick={() => runAction(openHotspot, action)}
+                        >
+                          {action.label}
+                          {done && (
+                            <span className="text-muted-foreground ml-auto text-xs">済</span>
+                          )}
+                        </Button>
+                      </li>
+                    )
+                  })}
+                  {/* データにnoop相当(「今は触らない」「何でもない」等)が無いアクションシートには、
+                      UI側で「閉じる（何もしない）」を末尾に補う(#52 追補・代表FB。既存の並び順は
+                      変えず後ろに追加し、既にnoopがある場合は二重に足さない。hasNoopAction参照)。 */}
+                  {!hasNoopAction(openHotspot) && (
+                    <li>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="bg-card/80 hover:bg-muted/80 dark:bg-card/80 dark:hover:bg-muted/80 h-12 min-w-12 w-full justify-start px-4 text-left shadow-lg"
+                        onClick={closeActionSheet}
+                      >
+                        閉じる（何もしない）
+                      </Button>
+                    </li>
+                  )}
+                </ul>
+              </div>
             </div>
-            <ul className="flex flex-col gap-2">
-              {openHotspot.actions.map((action, actionIndex) => {
-                const done =
-                  action.kind === 'collect' &&
-                  investigatedPointIds.includes(action.investigation_point_id)
-                return (
-                  <li key={actionIndex}>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      id={actionIndex === 0 ? sheetFirstActionId : undefined}
-                      className="h-12 min-w-12 w-full justify-start px-4 text-left"
-                      onClick={() => runAction(openHotspot, action)}
-                    >
-                      {action.label}
-                      {done && <span className="text-muted-foreground ml-auto text-xs">済</span>}
-                    </Button>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* 「調査ポイント一覧」トグルパネル(#66→T047でトグル化)。中身は呼び出し側

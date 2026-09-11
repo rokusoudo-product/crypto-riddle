@@ -29,6 +29,7 @@ import type { Scenario } from '@/core/model'
 import { s0SampleFixture } from '@/core/scenario/fixtures/s0-sample.fixture'
 
 import { exploreSceneDoorFixture } from './explore-scene-door.fixture'
+import { exploreSceneNoNoopFixture } from './explore-scene-no-noop.fixture'
 import { exploreSceneFixture } from './explore-scene.fixture'
 import { ExploreScreen } from './explore-screen'
 import { resetGameStoreForTests, useGameStore } from '@/ui/store/game-store'
@@ -647,6 +648,106 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       // (#52 追補、DESIGN.md「探索シーン」節「探索完了→解決への誘導」)。
       await user.click(screen.getByRole('button', { name: 'わかった' }))
       expect(useGameStore.getState().progress.part).toBe('resolution')
+    })
+  })
+
+  describe('アクションシートの中央オーバーレイ化・半透明・「戻る」選択肢の必須化(#52 追補・代表FB)', () => {
+    it('アクションシートは画面中央にオーバーレイ表示され、選択肢ボタンは不透明度80%相当の半透明トークンを持つ', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+
+      const pcHotspot = screen.getByRole('button', { name: /経理担当のPC（PC）/ })
+      pcHotspot.focus()
+      await user.keyboard('{Enter}')
+      const sheet = await screen.findByRole('group', { name: '経理担当のPCの操作' })
+
+      // 画面中央にオーバーレイ表示する外枠(absolute inset-0 + flex items-center justify-center、
+      // 会話オーバーレイと同じく背景シーンの箱に重ねる)。
+      const overlayWrapper = sheet.parentElement
+      expect(overlayWrapper?.className).toMatch(/absolute/)
+      expect(overlayWrapper?.className).toMatch(/inset-0/)
+      expect(overlayWrapper?.className).toMatch(/items-center/)
+      expect(overlayWrapper?.className).toMatch(/justify-center/)
+
+      // 選択肢ボタンは不透明度80%程度の半透明トークン(bg-card/80等、カラーコード直書きではない)。
+      const firstAction = within(sheet).getByRole('button', { name: 'ログを取る' })
+      expect(firstAction.className).toMatch(/bg-card\/80/)
+
+      // 右上の「ヒント確認」「調査ポイント一覧」は対象外(不透明のまま、別要件)。
+      const listToggle = screen.getByRole('button', { name: '調査ポイント一覧' })
+      expect(listToggle.className).not.toMatch(/\/80/)
+    })
+
+    it('Escapeキーでアクションシートを閉じ、フォーカスは元のホットスポットへ復帰する', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+
+      const pcHotspot = screen.getByRole('button', { name: /経理担当のPC（PC）/ })
+      pcHotspot.focus()
+      await user.keyboard('{Enter}')
+      await screen.findByRole('group', { name: '経理担当のPCの操作' })
+
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('group', { name: '経理担当のPCの操作' })).not.toBeInTheDocument()
+      expect(document.activeElement).toBe(pcHotspot)
+      // 何も実行されていない(noop相当・投資進捗・XPへの影響なし)。
+      expect(useGameStore.getState().progress.investigatedPointIds).not.toContain('ip-pc-log')
+    })
+
+    it('データにnoop相当が無いアクションシートには、UI側で「閉じる（何もしない）」が末尾に補われ、選ぶと何も獲得せずに閉じる', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneNoNoopFixture)
+
+      const bookHotspot = screen.getByRole('button', { name: /資料棚（書籍）/ })
+      bookHotspot.focus()
+      await user.keyboard('{Enter}')
+      const sheet = await screen.findByRole('group', { name: '資料棚の操作' })
+
+      // 元データの2つのcollectに加え、UI側で補った「閉じる（何もしない）」が末尾にある
+      // (既存の並び順は変えず後ろに追加する)。
+      // 見出し行の「操作メニューを閉じる」(Xアイコン、可視テキスト無し)は選択肢ではないため除く。
+      const buttons = within(sheet)
+        .getAllByRole('button')
+        .filter((b) => b.textContent !== '')
+      expect(buttons.map((b) => b.textContent)).toEqual([
+        '注意喚起情報を確認する',
+        '対応ガイドラインを確認する',
+        '閉じる（何もしない）',
+      ])
+
+      const closeButton = within(sheet).getByRole('button', { name: '閉じる（何もしない）' })
+      // 補った選択肢も他の選択肢と同じく半透明トークンを持つ。
+      expect(closeButton.className).toMatch(/bg-card\/80/)
+
+      await user.click(closeButton)
+      expect(screen.queryByRole('group', { name: '資料棚の操作' })).not.toBeInTheDocument()
+      // 何も獲得していない(投資進捗への影響なし)。
+      expect(useGameStore.getState().progress.investigatedPointIds).toEqual([])
+      // フォーカスは元のホットスポットへ復帰する(電源を落とす操作等と同じ、詰み防止と同じ設計)。
+      expect(document.activeElement).toBe(bookHotspot)
+    })
+
+    it('データに既にnoopがあるアクションシートには、「閉じる（何もしない）」を二重に足さない(回帰確認)', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+
+      const pcHotspot = screen.getByRole('button', { name: /経理担当のPC（PC）/ })
+      pcHotspot.focus()
+      await user.keyboard('{Enter}')
+      const sheet = await screen.findByRole('group', { name: '経理担当のPCの操作' })
+
+      // 見出し行の「操作メニューを閉じる」(Xアイコン、可視テキスト無し)は選択肢ではないため除く。
+      const buttons = within(sheet)
+        .getAllByRole('button')
+        .filter((b) => b.textContent !== '')
+      expect(buttons.map((b) => b.textContent)).toEqual([
+        'ログを取る',
+        '電源を落とす',
+        '今は触らない',
+      ])
+      expect(
+        within(sheet).queryByRole('button', { name: '閉じる（何もしない）' }),
+      ).not.toBeInTheDocument()
     })
   })
 })
