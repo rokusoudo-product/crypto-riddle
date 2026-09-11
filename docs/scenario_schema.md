@@ -163,10 +163,10 @@ resolution:
   `MAX_CONSULTS=3` は `src/core/scenario/state.ts` の core 定数として持ち、zod スキーマには持たせない）。
 - 旧 `attack_identification` / `countermeasure`（`required_card_ids` 方式）は廃止し、この `questions` に統合した（防衛策の問いは最後の `question`。`subject_tag` は法制度/インシデント対応など）。
 
-### 2.5 探索の背景シーン（`scenes[]`）〔#52・T037 実装済／Phase 4.7 で `line`/`speaker` 追加〕
+### 2.5 探索の背景シーン（`scenes[]`）〔#52・T037/T043 実装済／T046 で `goto`/`door`/`prompt` 追加〕
 
-> **実装状況**: `scenes[]`（背景・ホットスポット・collect/danger/noop）は **T037（PR #58）で zod 実装済・schema 0.4.0**。S1 のデータは T040（PR #61）で投入済。
-> **⚠️ Phase 4.7 の目標形（#52・T018'' 再プレイ反映）**: 調査結果を解決と同じ会話フレームで台詞提示するため、`collect` に**省略可能な `line`（台詞）と `speaker`** を追加する（`danger` の `feedback` と対称）。**zod 改訂は Phase 4.7 の T043**（schema 0.4.0 → 0.5.0）。下記 YAML の `line`/`speaker` は T043 マージ前の現行コードには無い（省略時＝カード本文にフォールバックのため既存データは有効）。
+> **実装状況**: `scenes[]`（背景・ホットスポット・collect/danger/noop）は **T037（PR #58）で zod 実装済・schema 0.4.0**。`collect` の `line`/`speaker` は **T043（PR #67）で実装済・schema 0.5.0**。S1 のデータ・台詞は T040/T044（PR #61/#69）で投入済。
+> **⚠️ T046 の目標形（#52・T018'''' 再プレイ反映）**: シーン移動のドアと、系統をまたぐ統合ホットスポットのため、アクション種別に **`goto`（シーン移動）** を、`object_type` に **`door`** を、ホットスポットに**省略可能な `prompt`（挨拶台詞）** を追加する。**zod 改訂は T046**（schema 0.5.0 → 0.6.0）。下記 YAML の `goto`/`door`/`prompt` は T046 マージ前の現行コードには無い（既存データは無改訂で有効）。
 
 - `investigation_points`（カードの出所・3系統）は**正のまま維持**。`scenes[]` は**表示層（省略可）**で、省略すると一覧表示にフォールバックする。
 - 目標フィールド構成:
@@ -195,14 +195,39 @@ scenes:
         label: 中野さん
         actions:
           - { kind: collect, investigation_point_id: ip-witness, label: 話を聞く }
+      # ドア＝シーン移動（#52 T046・0.6.0）。goto は investigation_point を参照しない。
+      - object_type: door             # pc | person | book | device | door
+        position: [0.92, 0.5]
+        label: サーバ室への扉
+        actions:
+          - { kind: goto, scene_id: scene-server, label: サーバ室へ移動する }
+  - id: scene-server
+    title: サーバ室
+    background: bg-s1-server
+    hotspots:
+      # 系統をまたぐ統合ホットスポット＋挨拶 prompt（#52 T046）。人と機器を1つに束ねる。
+      - object_type: person
+        position: [0.51, 0.43]
+        label: サーバ管理者
+        prompt: "サーバ管理者「どうしましたか？」"   # 省略可。アクションシート見出しに出す
+        actions:
+          - { kind: collect, investigation_point_id: ip-itstaff, label: 話を聞く, speaker: 橘 }
+          - { kind: collect, investigation_point_id: ip-sandbox, label: PCを確認する, speaker: 霧島 }
+          - { kind: noop,    label: 何でもない }
+      - object_type: door
+        position: [0.08, 0.5]
+        label: 執務室への扉
+        actions:
+          - { kind: goto, scene_id: scene-office, label: 執務室へ戻る }
 ```
 
-- **アクション種別**: `collect`（`investigation_point_id` を参照してカード獲得。**省略可能な `line`＝台詞・`speaker`＝話者**を持てる＝Phase 4.7/0.5.0）／`danger`（電源を落とす等＝`feedback` の教育的台詞のみ。**ペナルティなし・操作継続可**＝詰み防止、spec §8.4）／`noop`。
+- **アクション種別**: `collect`（`investigation_point_id` を参照してカード獲得。**省略可能な `line`＝台詞・`speaker`＝話者**を持てる＝Phase 4.7/0.5.0）／`danger`（電源を落とす等＝`feedback` の教育的台詞のみ。**ペナルティなし・操作継続可**＝詰み防止、spec §8.4）／`noop`／**`goto`（シーン移動。`scene_id` で移動先を指定＝T046/0.6.0）**。
 - **`collect` の `line`/`speaker`（Phase 4.7・省略可）**: 調査結果を会話フレームで台詞提示するための任意フィールド。**省略時は既定の導入文＋カード本文にフォールバック**（既存データは無改訂で有効）。`speaker` 省略時の既定は調査3系統から導出（①ログ→霧島／②人に聞く→橘／③文献→橘。技術文献の CVE 等は `speaker` を明示して霧島に振れる）。会話演出（タイプライター等）は DESIGN.md「会話フレーム」節。
-- **1オブジェクトが複数ポイントを束ねられる**（hotspot→point は 1:N。例: 1台のPCにメールログとEDRの2点）。
-- **整合性チェック（`scenes` があるとき）**: 各 `investigation_point` が**ちょうど1つの `collect` action** から参照されること（`superRefine`）。`scenes` 省略時はチェックしない。
+- **`goto`／`door`／`prompt`（T046・0.6.0）**: `goto` はシーン移動アクション（`scene_id` で移動先を指定・`investigation_point` は参照しない）。`object_type: door` はドア用の種別（不可視・□マーカーは共通・`aria-label` は「〜への扉」）。`prompt` はホットスポットの省略可能な挨拶台詞で、アクションシートの見出しに出す（省略時はラベルのみ）。**系統をまたぐ統合**（人＋機器を1ホットスポットに）は複数 `collect` を並べるだけで表現でき、スキーマ追加は不要。
+- **1オブジェクトが複数ポイントを束ねられる**（hotspot→point は 1:N。例: 1台のPCにメールログとEDRの2点／サーバ管理者に証言＋PCログ）。
+- **整合性チェック（`scenes` があるとき）**: ①各 `investigation_point` が**ちょうど1つの `collect` action** から参照されること。②各 **`goto.scene_id` が `scenes[]` に実在**し、かつ**自シーン以外**を指すこと（`superRefine`）。`scenes` 省略時はチェックしない。
 - **背景アセット**は image_agent 自作（16:9・アニメ調で立ち絵と統一。DESIGN.md「探索シーン」「アセット」節）。`background` はアセットIDで参照し、YAML にパスを直書きしない。
-- `scenes`/`hotspots`/`object_type`/座標系は **T037（0.4.0）で確定済**。`collect` の `line`/`speaker` は **T043（0.5.0）で確定**。
+- `scenes`/`hotspots`/`object_type`/座標系は **T037（0.4.0）で確定済**。`collect` の `line`/`speaker` は **T043（0.5.0）で確定**。`goto`/`door`/`prompt` は **T046（0.6.0）で確定**。
 
 ## 3. 出典表記（`references`）
 
