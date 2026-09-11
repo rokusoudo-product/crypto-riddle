@@ -130,6 +130,13 @@ export interface SceneExplorerProps {
   ownedCardIds: readonly string[]
   /** investigation_point_id を1件獲得する(既存のINVESTIGATEイベント配線先)。 */
   onCollect: (pointId: string) => void
+  /**
+   * 調査結果の会話フレーム(collectResult)の開閉が変わるたびに通知する(#71・T045)。
+   * 呼び出し側(explore-screen.tsx)が「探索完了→解決への誘導」の会話フレームを、この
+   * 調査結果パネルと同時に(=立ち絵ステージが2段重ねで)表示しないようにするための
+   * UI専用の配線で、coreの状態やactivation条件には一切関与しない。
+   */
+  onCollectResultOpenChange?: (isOpen: boolean) => void
 }
 
 /** 探索④「背景シーン＋ホットスポット」表示(#52/#56)。一覧フォールバックは呼び出し側が併設する。 */
@@ -139,6 +146,7 @@ export function SceneExplorer({
   investigatedPointIds,
   ownedCardIds,
   onCollect,
+  onCollectResultOpenChange,
 }: SceneExplorerProps) {
   const tabsId = useId()
   const [activeSceneId, setActiveSceneId] = useState(scenes[0].id)
@@ -172,6 +180,11 @@ export function SceneExplorer({
       document.getElementById(sheetFirstActionId)?.focus()
     }
   }, [openHotspotIndex, sheetFirstActionId])
+
+  // 調査結果パネルの開閉を呼び出し側へ通知する(#71・T045。上記コメント・SceneExplorerProps参照)。
+  useEffect(() => {
+    onCollectResultOpenChange?.(collectResult !== null)
+  }, [collectResult, onCollectResultOpenChange])
 
   // 調査結果パネルの「閉じる」はConversationFrameのchildrenのため、タイプライターの全文表示
   // (またはスキップ)が完了するまでDOMに存在しない(#64/T042)。以前のように collectResult が
@@ -330,9 +343,13 @@ export function SceneExplorer({
                 // 通常はアイコンも名前ラベルも表示しない(背景の絵に溶け込ませる、DESIGN.md
                 // 「探索シーン」節・T018''代表決定)。ホバー/キーボードフォーカス時にのみ
                 // □マーカー(矩形のアウトライン)を出し、位置と操作可能を示す。
+                // □マーカーの枠線は赤系(hotspot-highlightトークン、T018'''代表フィードバック
+                // #71・T045。危険操作のdestructive/warningとは別トークンとして src/index.css に
+                // 追加した)。フォーカス可視(WCAG 2.4.7)は□マーカーが兼ねるため、focus-visible
+                // でも同じ色にする(色だけでなく枠線の出現自体で操作可能性を示す)。
                 // aria-expanded:bg-mutedはButtonのghost variant既定のため、シートを開いた
                 // ホットスポットに常時の塗りが出ないよう打ち消す(不可視の原則を優先)。
-                className="absolute min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-transparent bg-transparent hover:border-ring hover:bg-transparent hover:ring-3 hover:ring-ring/50 focus-visible:border-ring aria-expanded:bg-transparent dark:hover:bg-transparent"
+                className="absolute min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-transparent bg-transparent hover:border-hotspot-highlight hover:bg-transparent hover:ring-3 hover:ring-hotspot-highlight/50 focus-visible:border-hotspot-highlight focus-visible:ring-hotspot-highlight/50 aria-expanded:bg-transparent dark:hover:bg-transparent"
                 onClick={(event) =>
                   handleHotspotActivate(hotspot, hotspotIndex, event.currentTarget)
                 }

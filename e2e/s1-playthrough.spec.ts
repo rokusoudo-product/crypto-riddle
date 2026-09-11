@@ -365,3 +365,46 @@ test.describe('S1「標的型メールからの侵入」タッチ端末での調
     await expect(page.getByText('インシデント対応ガイドラインの確認')).toBeVisible()
   })
 })
+
+// #52 Phase4.7/#71・T045: 探索完了(「解決へ」の活性条件を満たす)と同時に、橘が会話フレームで
+// 「そろそろ問題をまとめようか」と1回促す(spec §7.1・DESIGN.md「探索シーン」節)。
+// 一覧側から全件調査して活性条件を満たす経路(高速)でE2E確認する(背景シーン経由の等価な結線は
+// 上の describe で既に確認済みのため、ここでは誘導の有無・1回性・導線の明示のみに絞る)。
+test.describe('S1「標的型メールからの侵入」探索完了→解決への誘導(#71・T045)', () => {
+  test('「解決へ」の活性条件を満たした時点で促しが1回出て、閉じても「解決へ進む」導線は活性のまま残る', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await page.getByRole('link', { name: 'つづきから' }).click()
+    await page.getByRole('button', { name: 'マップを選ぶ' }).click()
+    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
+
+    const wrapUpLine = 'そろそろ問題をまとめようか。'
+    await expect(page.getByText(wrapUpLine)).toHaveCount(0)
+
+    // 一覧側(常に併設)から全9件を調査し、活性条件を満たす。
+    let investigateButton = page.getByRole('button', { name: '調査する' }).first()
+    while (await investigateButton.count()) {
+      await investigateButton.click()
+      investigateButton = page.getByRole('button', { name: '調査する' }).first()
+    }
+
+    // 促しが会話フレームで表示される(話者=橘)。
+    await expect(page.getByText(wrapUpLine)).toBeVisible()
+
+    const enterResolution = page.getByRole('button', { name: '解決へ進む' })
+    await expect(enterResolution).toBeEnabled()
+
+    // タイプライターをスキップして「わかった」を押すと促しは消えるが、「解決へ進む」の
+    // 導線(活性状態)は変わらない。ボタン文言は調査結果パネルの「閉じる」とわざと変えてあり
+    // (#71・T045)、両方の会話フレームが同時に開いてもアクセシブルネームが衝突しない。
+    await skipTypewriter(page, wrapUpLine)
+    await page.getByRole('button', { name: 'わかった' }).click()
+    await expect(page.getByText(wrapUpLine)).toHaveCount(0)
+    await expect(enterResolution).toBeEnabled()
+
+    await enterResolution.click()
+    await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
+  })
+})

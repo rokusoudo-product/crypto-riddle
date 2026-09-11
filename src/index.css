@@ -50,6 +50,7 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-hotspot-highlight: var(--hotspot-highlight);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -93,6 +94,10 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  /* 探索ホットスポット□マーカーの強調色(#71・T045)。危険操作(destructive/warning)とは別扱いの
+     赤系トークン(DESIGN.md「探索シーン」節)。destructiveより明度をやや上げ、ライト文脈の
+     surface上でも視認できるよう調整した仮値。 */
+  --hotspot-highlight: oklch(0.637 0.237 25.331);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -128,6 +133,9 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  /* ダーク文脈(探索は常時ダーク文脈、DESIGN.md基本方針)向け: 暗い背景シーン画像の上でも
+     視認できるよう、明度をより高めた赤にする(#71・T045)。 */
+  --hotspot-highlight: oklch(0.749 0.202 22.86);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);

@@ -60,9 +60,10 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
     // 種別・調査済みかは aria-label(getByRoleのname)だけで常に保持する(WCAG 2.4.7)。
     expect(pcHotspot).toHaveTextContent('')
     // ホバー/キーボードフォーカス時に□マーカー(枠線)を出すクラスを持つ(jsdomは疑似クラスを
-    // 評価しないため、クラス文字列の存在で確認する)。
-    expect(pcHotspot.className).toMatch(/hover:border-ring/)
-    expect(pcHotspot.className).toMatch(/focus-visible:border-ring/)
+    // 評価しないため、クラス文字列の存在で確認する)。枠線は赤系のhotspot-highlightトークン
+    // (危険操作系のdestructive/warningとは別トークン、#71・T045)。
+    expect(pcHotspot.className).toMatch(/hover:border-hotspot-highlight/)
+    expect(pcHotspot.className).toMatch(/focus-visible:border-hotspot-highlight/)
     const personHotspot = screen.getByRole('button', { name: /田中さん（人物）/ })
     expect(personHotspot).toHaveClass('min-h-12', 'min-w-12')
     expect(personHotspot).toHaveTextContent('')
@@ -207,6 +208,89 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
     expect(within(list).queryByRole('button', { name: '調査する' })).not.toBeInTheDocument()
     const enterResolution = screen.getByRole('button', { name: '解決へ進む' })
     expect(enterResolution).toBeEnabled()
+  })
+
+  describe('探索完了→解決への誘導(#52 Phase4.7/#71・T045)', () => {
+    const wrapUpLine = 'そろそろ問題をまとめようか。'
+
+    /** 一覧フォールバック側から全ポイントを調査し、「解決へ」の活性条件を満たす。 */
+    async function investigateAllViaList(user: ReturnType<typeof userEvent.setup>) {
+      const list = screen.getByRole('list', { name: '調査ポイント一覧' })
+      const investigateButtons = within(list).getAllByRole('button', { name: '調査する' })
+      for (const button of investigateButtons) {
+        await user.click(button)
+      }
+    }
+
+    it('「解決へ」の活性条件を満たした時点で、会話フレームで橘が「そろそろ問題をまとめようか」と促す', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+
+      // 活性条件を満たす前は促しが出ない。
+      expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
+
+      await investigateAllViaList(user)
+
+      // 会話フレーム(タイプライター)のsr-only全文は演出の進行に関わらず常に存在するため、
+      // getByTextでそのまま検証できる(他のcollectResultテストと同じ挙動)。
+      expect(await screen.findByText(wrapUpLine)).toBeInTheDocument()
+      // 話者の既定は橘(司令塔、DESIGN.md「探索シーン」節)。
+      expect(screen.getAllByText('橘').length).toBeGreaterThan(0)
+      // 促し後も「解決へ進む」自体は活性のまま(誘導が導線を隠さない)。
+      expect(screen.getByRole('button', { name: '解決へ進む' })).toBeEnabled()
+    })
+
+    it('促しは全文表示(またはスキップ)後に「わかった」で消せ、以降は再描画されても再表示されない(1回だけ)', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+
+      await investigateAllViaList(user)
+      await screen.findByText(wrapUpLine)
+
+      // タイプライターをスキップ(台詞そのものがスキップボタンのaccessible name、#64/T042)。
+      // ボタン文言は意図的に「わかった」(SceneExplorer側の調査結果パネルの「閉じる」との
+      // アクセシブルネーム衝突を避けるため、#71・T045)。
+      await user.click(screen.getByRole('button', { name: wrapUpLine }))
+      await user.click(screen.getByRole('button', { name: 'わかった' }))
+      expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
+
+      // シーンタブ切替で再描画させても、一度閉じた促しは再表示されない
+      // (=再調査のたびに毎回出すことはしない、DESIGN.md「探索シーン」節)。
+      await user.click(screen.getByRole('tab', { name: 'サーバ室' }))
+      expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
+    })
+
+    it('最後の1件をホットスポット経由で調べ終えても、調査結果の会話フレームが開いている間は促しを同時に出さず、閉じてから出す', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+
+      // 1件目(PC・3action=アクションシート)を先に調べて閉じておく。
+      const pcHotspot = screen.getByRole('button', { name: /経理担当のPC（PC）/ })
+      pcHotspot.focus()
+      await user.keyboard('{Enter}')
+      await user.keyboard('{Enter}')
+      const pcLine = '不審なプロセスの起動ログが残っている。マルウェア感染の可能性が高い。'
+      await screen.findByText(pcLine)
+      await user.click(screen.getByRole('button', { name: pcLine }))
+      await user.click(screen.getByRole('button', { name: '閉じる' }))
+      expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
+
+      // 2件目(person・単一action)を調べ終えた瞬間、「解決へ」の活性条件を満たすが、
+      // 調査結果の会話フレーム(collectResultの「閉じる」)が開いている間は促しを表示しない
+      // (会話フレームの2段重ね・「閉じる」ボタンの重複を避けるため、#71・T045)。
+      const personHotspot = screen.getByRole('button', { name: /田中さん（人物）/ })
+      await user.click(personHotspot)
+      const tanakaLine =
+        '田中さんに話を聞いた。「昼過ぎに画面の様子がおかしくなった」と田中さんは証言した。'
+      await screen.findByText(tanakaLine)
+      await user.click(screen.getByRole('button', { name: tanakaLine }))
+      expect(await screen.findByRole('button', { name: '閉じる' })).toBeInTheDocument()
+      expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
+
+      // 調査結果パネルを閉じると、入れ替わりで促しが表示される。
+      await user.click(screen.getByRole('button', { name: '閉じる' }))
+      expect(await screen.findByText(wrapUpLine)).toBeInTheDocument()
+    })
   })
 
   it('4状態(ローディング/空/エラー)をURLクエリで切り替えられる', () => {
