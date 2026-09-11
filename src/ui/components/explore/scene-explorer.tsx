@@ -3,7 +3,8 @@
 // ドア移動UI・prompt見出しは#52 Phase4.7 追補/#78・T046-ui-data、
 // 会話オーバーレイ化(2状態)・調査ポイント一覧のトグル化は#52 Phase4.7 追補/T047、
 // 会話ウィンドウのクリック/タップ閉じ・右上ボタン群の不透明化とヒント確認の移設は
-// #52 Phase4.7 追補/T048)。
+// #52 Phase4.7 追補/T048、探索完了への誘導を「閉じて再探索も可・ロックしない」形にしたのは
+// PR#92追補・代表FB)。
 //
 // DESIGN.md「探索シーン」節が正: 探索画面は「探索状態」と「会話状態」の2つを切り替える。
 // - 探索状態(既定): 背景シーン+ホットスポット(+シーンタブ+右上のボタン群「ヒント確認」
@@ -30,7 +31,11 @@
 //   ため、呼び出し側は`conversationSlot`にoverlay layoutの`ConversationFrame`要素を渡す
 //   (scenesが無いフォールバックでは`conversationSlot`を使わずstacked layoutのまま呼び出し側で
 //   直接描画する。explore-screen.tsx参照。conversationSlot側は独自の「わかった」ボタンを
-//   持つため、こちらにはT048のonDismissクリック閉じは適用しない)。
+//   持つため、T048のonDismissクリック閉じ(ウィンドウ自体が操作領域)は適用できない=ボタンの
+//   入れ子になってしまう。代わりにPR#92追補・代表FBで`onOutsideDismiss`(ウィンドウの外側の
+//   クリック/タップ・Escape)を導入し、閉じると探索状態に戻ってホットスポットを再探索できる
+//   =ロックしない。conversationSlotが閉じられて無くなった瞬間、下記のuseEffectで先頭
+//   ホットスポットへフォーカスを戻す)。
 //
 // scenario.scenes が無い場合(省略時)は呼び出し側(explore-screen.tsx)が本コンポーネントを
 // レンダーしないことで一覧表示にフォールバックする(docs/scenario_schema.md §2.5)。
@@ -327,6 +332,25 @@ export function SceneExplorer({
       ?.querySelector<HTMLElement>('button:not([disabled])')
       ?.focus()
   }, [isWrapUpVisible, conversationSlotId])
+
+  // 呼び出し側の会話(conversationSlot、探索完了への誘導)が外側クリック/Escapeで閉じられ、
+  // 自身のconversationも開いていない(=探索状態へ戻った)瞬間、フォーカスを迷子にしない
+  // ため先頭ホットスポットへ戻す(PR#92追補・代表FB「閉じて再探索も可」)。「わかった」経由
+  // (handleEnterResolution)の場合はexplore-screen.tsxが画面ごと差し替える(/resolveへ遷移)
+  // ため、この効果が発火する前に本コンポーネント自体がアンマウントされ無害。
+  // hadConversationSlotRefで「直前にconversationSlotがあったか」を覚えておき、
+  // true→falseに変わった回だけ発火させる(#71・T045の他のuseEffectと同じ設計)。
+  const hadConversationSlotRef = useRef(false)
+  useEffect(() => {
+    const hadConversationSlot = hadConversationSlotRef.current
+    hadConversationSlotRef.current = Boolean(conversationSlot)
+    if (hadConversationSlot && !conversationSlot && conversation === null) {
+      document.getElementById(hotspotDomId(0))?.focus()
+    }
+    // hotspotDomIdはtabsId(useIdで安定)のみに依存する純粋な文字列組み立て関数のため、
+    // 依存配列には含めない(他のuseEffectと同じ扱い)。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationSlot, conversation])
 
   function closeOverlays() {
     setOpenHotspotIndex(null)

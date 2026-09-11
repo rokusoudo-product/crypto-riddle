@@ -1,7 +1,8 @@
 // src/ui/components/conversation-frame.tsx — 会話フレーム共通コンポーネント(#42/T033、
 // タイプライター表示は#52 Phase4.7/#64/T042、探索の会話オーバーレイ化は#52 Phase4.7 追補/
 // T047・`layout` prop、会話ウィンドウのクリック/タップ閉じ化は#52 Phase4.7 追補/T048・
-// `onDismiss` prop)。
+// `onDismiss` prop、探索完了への誘導を「閉じて再探索も可・ロックしない」形にした
+// #92追補・代表FBで`onOutsideDismiss` propを追加)。
 //
 // DESIGN.md「会話フレーム(共通コンポーネント・#42で導入)」節が正本:
 // - レイアウト: 画面下部に会話ウィンドウ、ステージ中央の左右に立ち絵(霧島=左・橘=右で固定)。
@@ -198,6 +199,20 @@ export interface ConversationFrameProps {
    * (呼び出し側は開閉のたびに新規マウントする前提、scene-explorer.tsx参照)。
    */
   onDismiss?: () => void
+  /**
+   * 会話ウィンドウの**外側**(overlay layoutでは重なった背景シーンの見えている部分、
+   * stacked layoutでは立ち絵・ウィンドウの周囲の余白)をクリック/タップ、またはEscapeで
+   * 呼ばれる(#92追補・代表FB「探索完了への誘導は閉じて再探索も可・ロックしない」)。
+   * `onDismiss`(会話ウィンドウ**自体**をクリックで閉じる、調査結果/danger用)とは
+   * 独立した別の仕組みで、**併用しない**: 探索完了への誘導(scene-explorer.tsxの
+   * conversationSlot)は「わかった」という実 `<button>` を children に持つため、
+   * `onDismiss` のようにウィンドウ全体を1つの操作領域(role="button")にすると
+   * ボタンの入れ子(role="button"の中に実`<button>`)になってしまう。そのため
+   * ウィンドウの**外側**だけを閉じる操作領域にする。
+   * ポインター操作者向けの補助的な閉じ方であり、AT には公開しない(role・aria-labelは
+   * 付けない。キーボード操作者は Escape、または children 内の実ボタン=「わかった」を使う)。
+   */
+  onOutsideDismiss?: () => void
 }
 
 /** 導入・探索の会話・解決の会話モードで共通して使う会話フレーム(DESIGN.md「会話フレーム」節)。 */
@@ -208,6 +223,7 @@ export function ConversationFrame({
   children,
   onLineRevealed,
   onDismiss,
+  onOutsideDismiss,
 }: ConversationFrameProps) {
   const prefersReducedMotion = usePrefersReducedMotion()
 
@@ -320,6 +336,26 @@ export function ConversationFrame({
     }
   }
 
+  // onOutsideDismiss指定時(#92追補): ウィンドウの外側(overlayなら重なった背景、stackedなら
+  // 立ち絵・ウィンドウ周囲の余白)を1つの操作領域にする。onDismissと違いwindowRef自体には
+  // 付けない(children内の実`<button>`=「わかった」とのネスト回避のため、上記JSDoc参照)。
+  // ハンドラは呼び出し側(下記のoverlay/stackedそれぞれの一番外側の要素)に付け、
+  // `event.target === event.currentTarget` のときのみ発火させることで、内側の立ち絵・
+  // ウィンドウ(・その中の「わかった」ボタン)へのクリックがバブリングしてきても
+  // 誤って閉じないようにする(=クリックが実際に「外側の余白」に当たった場合のみ閉じる)。
+  function handleOutsideActivate(event: MouseEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) return
+    onOutsideDismiss?.()
+  }
+
+  // Escapeは(onDismiss同様)ウィンドウ内のどこにフォーカスがあっても常に閉じる
+  // (子孫要素からのキーイベントバブリングで届くため、target判定は不要)。
+  function handleOutsideKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'Escape') return
+    event.preventDefault()
+    onOutsideDismiss?.()
+  }
+
   // onDismiss指定時、ウィンドウ自体をrole="button"のクリック/タップ可能な操作領域にする
   // (T048)。アクセシブルネームは会話文そのもの(line)に固定し、スキップ前後で変わらない
   // ようにする(同じ要素を「スキップ→もう一度で閉じる」の2段階でそのまま使い回せる。
@@ -378,8 +414,15 @@ export function ConversationFrame({
     // 重ならないよう端寄せ)。行の高さを`h-full`で確定させることで、ウィンドウの
     // `max-h-[...]%`(下記コメント参照)がその高さを基準に計算されるようにしている。
     return (
-      <div className="absolute inset-0 z-10 flex flex-col justify-end p-2 sm:p-4">
-        <div className="flex h-full items-end justify-center gap-2 sm:gap-3">
+      <div
+        className="absolute inset-0 z-10 flex flex-col justify-end p-2 sm:p-4"
+        onKeyDown={onOutsideDismiss ? handleOutsideKeyDown : undefined}
+      >
+        <div
+          className="flex h-full items-end justify-center gap-2 sm:gap-3"
+          onClick={onOutsideDismiss ? handleOutsideActivate : undefined}
+          {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
+        >
           <Portrait character={PORTRAIT_ORDER[0]} speaking={PORTRAIT_ORDER[0] === speaker} compact />
           {/* 会話ウィンドウ(帯): 背景の箱(aspect-video・overflow-hidden)からはみ出さないよう
               max-h+overflow-y-autoにする(カードドロワー展開時・長い台詞での見切れ対策)。 */}
@@ -401,7 +444,12 @@ export function ConversationFrame({
   }
 
   return (
-    <div className="flex flex-col gap-0">
+    <div
+      className="flex flex-col gap-0"
+      onClick={onOutsideDismiss ? handleOutsideActivate : undefined}
+      onKeyDown={onOutsideDismiss ? handleOutsideKeyDown : undefined}
+      {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
+    >
       {/* ステージ: 中央左右に立ち絵(霧島=左・橘=右で固定)。主人公の立ち絵は出さない。 */}
       <div className="flex items-end justify-center gap-6 pb-4 sm:gap-12">
         {PORTRAIT_ORDER.map((character) => (

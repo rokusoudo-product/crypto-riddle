@@ -439,6 +439,67 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       await user.click(screen.getByRole('button', { name: tanakaLine }))
       expect(await screen.findByText(wrapUpLine)).toBeInTheDocument()
     })
+
+    it(
+      '会話ウィンドウの外側(背景の見えている部分)をクリックすると、誘導会話を閉じて探索状態に' +
+        '戻れ(ホットスポットが再び操作できる)、閉じた後は自動的に再表示されない。' +
+        '「解決へ進む」はそのまま活性のまま使える(PR#92追補・代表FB「ロックしない」)',
+      async () => {
+        const user = userEvent.setup()
+        renderExplore(exploreSceneFixture)
+
+        await investigateAllViaList(user)
+        await screen.findByText(wrapUpLine)
+        // 会話状態のためホットスポットはDOMごと描画されない(T047)。
+        expect(screen.queryByRole('button', { name: /経理担当のPC（PC）/ })).not.toBeInTheDocument()
+
+        // 会話ウィンドウ自体や「わかった」ボタンではなく、外側(onOutsideDismiss、
+        // conversation-frame.tsxのdata-testid)をクリックする。
+        await user.click(screen.getByTestId('conversation-overlay-backdrop'))
+        expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
+
+        // 探索状態に戻り、ホットスポットが再び操作できる(=ロックしない)。
+        expect(screen.getByRole('button', { name: /経理担当のPC（PC）/ })).toBeInTheDocument()
+        expect(screen.getByRole('button', { name: /田中さん（人物）/ })).toBeInTheDocument()
+
+        // 「解決へ進む」は誘導会話の表示状態と無関係に、canProceed成立中は活性のまま。
+        expect(screen.getByRole('button', { name: '解決へ進む' })).toBeEnabled()
+
+        // 再探索してもナグ防止のため誘導会話は自動的には再表示されない(dangerの教育的
+        // フィードバックを開いて閉じる、無関係な会話状態の出入りを経由させて確認する)。
+        const pcHotspot = screen.getByRole('button', { name: /経理担当のPC（PC）/ })
+        pcHotspot.focus()
+        await user.keyboard('{Enter}')
+        await user.keyboard('{Tab}')
+        expect(document.activeElement).toHaveTextContent('電源を落とす')
+        await user.keyboard('{Enter}')
+        const dangerLine = 'ここで電源を落とすと揮発性メモリの証拠が消えます。'
+        await screen.findByText(dangerLine)
+        await user.click(screen.getByRole('button', { name: dangerLine }))
+        await user.click(screen.getByRole('button', { name: dangerLine }))
+        expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
+
+        // 「解決へ進む」から直接解決パートへ進める(閉じた後もロックしない)。
+        await user.click(screen.getByRole('button', { name: '解決へ進む' }))
+        expect(useGameStore.getState().progress.part).toBe('resolution')
+      },
+    )
+
+    it('Escapeキーでも誘導会話を閉じて探索状態に戻れる(会話ウィンドウ自体やわかったボタンでの遷移とは独立、PR#92追補)', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+
+      await investigateAllViaList(user)
+      await screen.findByText(wrapUpLine)
+      // 表示された瞬間、内部の最初の操作可能要素(タイプライターのスキップ)へフォーカスが
+      // 自動的に移る(scene-explorer.tsxのisWrapUpVisible effect)。
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: wrapUpLine }))
+
+      await user.keyboard('{Escape}')
+      expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /経理担当のPC（PC）/ })).toBeInTheDocument()
+      expect(useGameStore.getState().progress.part).toBe('exploration')
+    })
   })
 
   it('4状態(ローディング/空/エラー)をURLクエリで切り替えられる', () => {
