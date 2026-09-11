@@ -103,7 +103,7 @@ export const slConsignmentBreachFixture: Scenario = {
       hotspots: [
         {
           object_type: 'book',
-          position: [0.6, 0.16],
+          position: [0.17, 0.32],
           label: '委託契約書棚',
           actions: [
             {
@@ -124,7 +124,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'pc',
-          position: [0.4, 0.65],
+          position: [0.56, 0.45],
           label: '委託先の一次報告を受けた端末',
           actions: [
             {
@@ -143,12 +143,6 @@ export const slConsignmentBreachFixture: Scenario = {
             { kind: 'noop', label: '今は触らない' },
           ],
         },
-        {
-          object_type: 'door',
-          position: [0.95, 0.5],
-          label: '委託先ブースへの扉',
-          actions: [{ kind: 'goto', scene_id: 'scene-vendor', label: '委託先ブースへ移動する' }],
-        },
       ],
     },
     {
@@ -158,7 +152,7 @@ export const slConsignmentBreachFixture: Scenario = {
       hotspots: [
         {
           object_type: 'device',
-          position: [0.18, 0.45],
+          position: [0.19, 0.68],
           label: '委託先のクラウドストレージ管理端末',
           actions: [
             {
@@ -172,7 +166,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.51, 0.43],
+          position: [0.44, 0.55],
           label: '委託先担当者',
           prompt: '委託先担当者「何かご質問はありますか？」',
           actions: [
@@ -188,7 +182,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'book',
-          position: [0.8, 0.3],
+          position: [0.84, 0.62],
           label: '委託先の安全管理措置報告書',
           actions: [
             {
@@ -202,7 +196,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: [0.5, 0.9],
+          position: [0.6, 0.5],
           label: '執務室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-office', label: '執務室へ移動する' }],
         },

@@ -70,11 +70,17 @@ import { cn } from '@/ui/lib/utils'
 
 import bgS1Office from '../../../../assets/backgrounds/bg-s1-office.png'
 import bgS1Server from '../../../../assets/backgrounds/bg-s1-server.png'
+import bgSlOffice from '../../../../assets/backgrounds/bg-sl-office.png'
+import bgSlVendor from '../../../../assets/backgrounds/bg-sl-vendor.png'
 
-/** 生成済み背景アセットのID→importの対応。無いIDはプレースホルダ表示にフォールバックする。 */
+/** 生成済み背景アセットのID→importの対応。無いIDはプレースホルダ表示にフォールバックする。
+ * bg-s2 系・bg-s3 系はアセットPNG自体は追加済みだが本マップ未登録のままの既存ギャップ
+ * (#76 仕上げでの発見。別Issueで解消予定・本PRのスコープ外)。 */
 const BACKGROUND_SRC: Record<string, string> = {
   'bg-s1-office': bgS1Office,
   'bg-s1-server': bgS1Server,
+  'bg-sl-office': bgSlOffice,
+  'bg-sl-vendor': bgSlVendor,
 }
 
 // 色だけに頼らず種別をaria-label(常時保持)でも示す(DESIGN.md「探索シーン」節・WCAG 1.4.1)。
