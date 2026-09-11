@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-11 (#52 Phase 4.7: T042-T044 実装完了・③'''結果=クリア可＋ポリッシュ→T045 追加〔□赤/まとめ促し/サーバ室背景人物入り差し替え〕)
+updated: 2026-09-11 (#52 Phase 4.7: T042-T045 実装完了・③''''=「MVPとしてOK」＝量産ゲート開放可／T046〔ドア動線 goto・管理者統合・schema 0.6.0〕を量産と並行で追加)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -404,13 +404,27 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   - **サーバ室背景を人物入り版へ差し替え済**（`assets/backgrounds/bg-s1-server.png`・DESIGN P-4）に合わせ、**情シス担当ホットスポットの座標を人物位置へ調整**（`scenarios/s1-targeted-email-intrusion.yaml`＋fixture）。
   - 完了条件: 上記が反映され、Vitest・Playwright e2e・`npm run build:data` が通る。
 
-**チェックポイント③''''**: 上記仕上げ後、代表が量産可と確認する（量産ゲート）
+**チェックポイント③''''（2026-09-11・結果=「MVPとしてはOK」）**: T045 反映後の再プレイで、□赤枠・情シス座標・まとめ促しOK、通しで **MVP としては OK** の評価。追加要望2点（①執務室への動線が分かりづらい→ドアでシーン移動 ②サーバ室のPCと人物の被り→サーバ管理者に統合）が返り、**T046 で対応**。**この「MVP OK」で量産ゲートは開けられる**（下記参照）。
+
+## Phase 4.7 追補: 探索の動線（ドア）と統合ホットスポット（#52・T018'''' 反映）
+
+> ③'''' 代表フィードバック。①背景のドア（`goto`/`door`）でシーン移動（タブと併用）②物理的に同じ場所の人と機器を1ホットスポットに統合（サーバ管理者＝証言＋PC・挨拶 `prompt`）。詳細は spec §7.1・DESIGN「探索シーン」節・plan §5・`docs/scenario_schema.md` §2.5。委譲条件「**スキーマ差分は commit 前に報告して停止**」を維持。
+
+- [ ] **T046-core** `goto`/`door`/`prompt` を追加（依存: T043）
+  - `collect`/`danger`/`noop` に **`goto`（`scene_id` 指定）** を追加、`object_type` に **`door`**、ホットスポットに**省略可能な `prompt`** を追加。整合性チェックに「`goto.scene_id` 実在＋自シーン以外」を追加。**schema_version 0.5.0 → 0.6.0**（版数追随は同手順）。
+  - 完了条件: zod 単体テスト（goto 正常・不正な scene_id reject・自シーン参照 reject・door・prompt 有無）が通り `npm run build:data` 成功。**スキーマ差分は commit 前に報告して停止**。
+- [ ] **T046-ui-data** ドア移動・管理者統合の UI＋S1 データ＋E2E（依存: T046-core, T044）
+  - `scene-explorer.tsx`：`goto` でシーン移動（タブと併用）、`prompt` をアクションシート見出しに表示、`door` の□マーカー・`aria-label`。
+  - S1 データ：執務室に「サーバ室への扉」（`goto scene-server`）、サーバ室に「執務室への扉」（`goto scene-office`）を追加。**サーバ室の 解析用端末(pc・ip-sandbox-analysis) と 情シス担当(person・ip-witness-itstaff) を「サーバ管理者」1ホットスポットに統合**（prompt「どうしましたか？」／話を聞く＝ip-witness-itstaff・橘／PCを確認する＝ip-sandbox-analysis・霧島／何でもない＝noop）。背景の再生成はしない。fixture 追随。
+  - 完了条件: ドア・タブ両方でシーン移動でき、管理者統合後も全ポイント調査→解決へ進める。Vitest・Playwright e2e・`npm run build:data` が通る。
+
+**チェックポイント③'''''**: ドア動線・管理者統合の反映後、代表が最終確認（任意。量産と並行可）。
 
 ---
 
 ## Phase 5: マップ量産（plan §11-5）= プロダクション
 
-> **⚠️ 量産ゲート（#42・#52）**: Phase 5 は **Phase 4.5（会話モード）・Phase 4.6（探索の背景シーン化）・Phase 4.7（探索の会話フレーム化）が main にマージされ、チェックポイント③'''で代表が量産可と確認するまで着手しない**。旧フォーマットで書いたシナリオ（`required_card_ids`／背景なし／台詞なし）は全て書き直しになるため、量産は会話モード schema 0.3.0＋探索 scenes 0.4.0＋collect 台詞 0.5.0 の確定後に開始する。各量産マップには**背景2〜3枚（IMAGE_WORKFLOW）**を各制作 Issue に含める。
+> **⚠️ 量産ゲート（#42・#52）**: **③''''（2026-09-11）の「MVP としては OK」で量産ゲートは開放可**。Phase 4.5（会話モード）・4.6（背景シーン化）・4.7（会話フレーム化）は main マージ済。**T046（ドア動線・管理者統合）は量産と並行**でよいが、**`goto` スキーマ（T046-core・0.6.0）は量産 YAML の執筆開始前に main へ入れる**（量産マップは複数シーンでドア移動を最初から使うため）。旧フォーマット（`required_card_ids`／背景なし／台詞なし）は全て書き直しになるため、量産は schema 0.6.0 確定後の様式で開始する。各量産マップには**背景2〜3枚（IMAGE_WORKFLOW）**を各制作 Issue に含める。着手可否（ゲートを開けるか）は代表判断。
 
 - [ ] **T019** S2 制作（依存: T018、**Issue #6**: フォーマット確定後に個別 Issue を切り出して進める）
 - [ ] **T020** S3 制作（依存: T019 と同条件）
@@ -472,7 +486,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#44](https://github.com/rokusoudo-product/crypto-riddle/issues/44) 会話モード core 実装 | closed（完了） | **T030・T031・T032** | zod スキーマ・判定エンジン・ステートマシンを会話モードへ改訂。S1/s0 は暫定機械移植のみ（本格移行は #46）。UI(resolve/result/fail-screen等)は型エラー解消の最小限に留めた（#45） |
 | [#45](https://github.com/rokusoudo-product/crypto-riddle/issues/45) 会話フレーム＋会話モードUI＋XP減算 | closed（完了・PR #48） | **T033・T034** | 会話フレーム/カードドロワー新設・dnd-kit 削除・⑥失敗解説廃止・XP減算 |
 | [#46](https://github.com/rokusoudo-product/crypto-riddle/issues/46) 会話モード データ本執筆・結線・E2E | closed（完了・PR #49） | **T035・T036** | S1 誤答肢 reply 本執筆・explanations 多段化・e2e 会話モード化。**Phase 4.5 完了** |
-| [#52](https://github.com/rokusoudo-product/crypto-riddle/issues/52) 探索を背景シーン＋クリック可能オブジェクトにする（探索刷新の umbrella） | open（Phase 4.6 完了・4.7 実装完了・③''' 仕上げ T045 対応中。③'''' 通過後に代表クローズ） | **Phase 4.6（T037〜T041）＋Phase 4.7（T042〜T045）** | T018/T018''/T018''' 由来。spec §7.1。Phase 4.6=背景シーン化（#55/#56/#57/#60 マージ済）。Phase 4.7=会話フレーム化（#63 docs／#64/#65/#66 実装マージ済）＋仕上げ T045（□赤・まとめ促し・サーバ室背景人物入り差し替え）。#50 の探索④部分を統合 |
+| [#52](https://github.com/rokusoudo-product/crypto-riddle/issues/52) 探索を背景シーン＋クリック可能オブジェクトにする（探索刷新の umbrella） | open（Phase 4.6＋4.7〔T042-T045〕マージ済・③''''=「MVPとしてOK」。追補 T046 対応中。量産ゲート開放可） | **Phase 4.6（T037〜T041）＋Phase 4.7（T042〜T046）** | T018/T018''/T018'''/T018'''' 由来。spec §7.1。Phase 4.6=背景シーン化。Phase 4.7=会話フレーム化＋仕上げ（□赤・まとめ促し・背景人物入り）＋T046（ドア動線 goto・管理者統合・schema 0.6.0）。#50 の探索④部分を統合。クローズは追補完了後に代表 |
 | [#55](https://github.com/rokusoudo-product/crypto-riddle/issues/55) 探索スキーマ scenes[]（0.4.0） | closed（完了・PR #58） | **T037** | scenes/hotspots/actions の zod・schema 0.4.0 |
 | [#56](https://github.com/rokusoudo-product/crypto-riddle/issues/56) 探索UI 背景シーン＋ホットスポット | closed（完了・PR #59） | **T038** | 背景シーン＋一覧フォールバック。#50 探索④を統合 |
 | [#57](https://github.com/rokusoudo-product/crypto-riddle/issues/57) S1/s0 scenes データ＋探索E2E | closed（完了・PR #61） | **T040＋T041** | S1 に2シーン投入・s0 は省略でフォールバック検証。T039 背景は #60 |
