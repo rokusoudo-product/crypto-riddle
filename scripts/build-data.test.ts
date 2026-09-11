@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { s1TargetedEmailIntrusionFixture } from '../src/core/scenario/fixtures/s1-targeted-email-intrusion.fixture.ts'
 import { s2VpnRansomwareFixture } from '../src/core/scenario/fixtures/s2-vpn-ransomware.fixture.ts'
 import { s3EcCardLeakFixture } from '../src/core/scenario/fixtures/s3-ec-card-leak.fixture.ts'
+import { slConsignmentBreachFixture } from '../src/core/scenario/fixtures/sl-consignment-breach.fixture.ts'
 
 import { runBuild } from './build-data.ts'
 
@@ -136,6 +137,15 @@ describe('runBuild — 実リポジトリのサンプルデータ', () => {
     const result = await runBuild(REPO_ROOT)
     const s3 = result.scenarios.find((s) => s.id === 's3-ec-card-leak')
     expect(s3).toEqual(s3EcCardLeakFixture)
+  })
+
+  // Issue #76(#6量産4本目・法務新規シナリオ): SLも同じ理由(src/ui/store/game-store.ts が既定データ等
+  // として使う TypeScript フィクスチャは scenarios/sl-consignment-breach.yaml の手書きの写し)で、
+  // 乖離検出の回帰テストを対にして追加する。
+  it('SL の YAML から生成した内容が sl-consignment-breach.fixture.ts と一致する', async () => {
+    const result = await runBuild(REPO_ROOT)
+    const sl = result.scenarios.find((s) => s.id === 'sl-consignment-breach')
+    expect(sl).toEqual(slConsignmentBreachFixture)
   })
 })
 

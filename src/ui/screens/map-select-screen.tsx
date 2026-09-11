@@ -9,9 +9,10 @@ import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
 
 // Issue #74(#6量産1本目)で S2「VPN装置の脆弱性放置とランサムウェア感染」が、
-// Issue #75(#6量産2本目)で S3「ECサイトのカード情報漏洩」が実データとして
-// store.scenarios(T016)に加わったため、プレースホルダから除いた。S4 以降が実装される
-// Phase 5 以降で、量産の進捗にあわせて残りのプレースホルダも順次外していく想定。
+// Issue #75(#6量産2本目)で S3「ECサイトのカード情報漏洩」が、
+// Issue #76(#6量産4本目・法務新規シナリオ)で SL「委託先クラウドストレージからの個人データ漏えい」が
+// 実データとして store.scenarios(T016)に加わったため、プレースホルダから除いた。残りの量産が
+// 実装される以降で、進捗にあわせて残りのプレースホルダも順次外していく想定。
 const UNAVAILABLE_MAPS: string[] = []
 
 // ②マップ選択（ライト文脈）。目的=事例選択／主要アクション=「マップを選ぶ」。
