@@ -96,6 +96,10 @@ async function playThroughExplorationToResolution(
 
   await user.click(screen.getByRole('button', { name: 'タップで進行' }))
   expect(await screen.findByRole('heading', { name: '探索' })).toBeInTheDocument()
+
+  // S1は背景シーン(#57/T040)を持つため、「調査ポイント一覧」はトグルを開くまで表示されない
+  // (#66→T047でトグル化)。
+  await user.click(screen.getByRole('button', { name: '調査ポイント一覧' }))
   expect(screen.getByText('プロキシログ')).toBeInTheDocument()
 
   for (const button of screen.getAllByRole('button', { name: '調査する' })) {
@@ -311,22 +315,37 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       expect(screen.getByRole('tab', { name: 'サーバ室' })).toBeInTheDocument()
 
       // --- 執務室: PC(経理部 中野の端末。collect/danger/noopの3action=アクションシート) ---
-      const pcHotspot = screen.getByRole('button', { name: '経理部 中野の端末（PC）' })
-      await user.click(pcHotspot)
+      // 会話オーバーレイが開くたびにホットスポットは一度アンマウント→再マウントされる(T047)ため、
+      // 変数を使い回さずその都度クエリし直す(取得済みの参照は古いDOMノードを指したままになる)。
+      // 名前の完全一致ではなく前方一致(正規表現)にする: 調査済みになると
+      // aria-labelに「・調査済み」が付与され、完全一致では引けなくなるため。
+      const getPcHotspot = () => screen.getByRole('button', { name: /^経理部 中野の端末（PC）/ })
+      await user.click(getPcHotspot())
       expect(
         await screen.findByRole('group', { name: '経理部 中野の端末の操作' }),
       ).toBeInTheDocument()
 
-      // dangerを先に選ぶ: 教育的フィードバックのみが表示され、シートは閉じない(詰み防止)。
-      // coreのprogressは参照レベルで完全に不変(=XP等への影響が一切無い)ことも確認する。
+      // dangerを先に選ぶ: アクションシートは閉じ、会話オーバーレイ(橘の台詞)で教育的
+      // フィードバックが提示される(T047。旧: シート内テキスト表示のまま維持)。探索では
+      // ペナルティにならない(詰み防止・spec §8.4)。coreのprogressは参照レベルで完全に
+      // 不変(=XP等への影響が一切無い)ことも確認する。
       const progressBeforeDanger = useGameStore.getState().progress
       await user.click(screen.getByRole('button', { name: '感染端末の電源を落とす' }))
-      expect(await screen.findByText(/揮発性メモリの証拠が消えてしまいます/)).toBeInTheDocument()
-      expect(screen.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: '経理部 中野の端末の操作' })).not.toBeInTheDocument()
+      const dangerLine =
+        'ここで電源を落とすと、動作中のプロセスや通信先の情報が乗った揮発性メモリの証拠が消えてしまいます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全してください。'
+      expect(await screen.findByText(dangerLine)).toBeInTheDocument()
       expect(useGameStore.getState().progress).toBe(progressBeforeDanger)
 
-      // 電源を落とした後も同じホットスポットを操作できる(詰み防止)。EDRログをcollectすると、
-      // シートは閉じ、調査結果が会話フレームで台詞提示される(#66/T044、話者=霧島=ログ系の既定)。
+      // 会話オーバーレイを閉じると探索状態に戻り、同じホットスポットを再度開いて他のactionを
+      // 選べる(電源を落とした後も操作継続可=詰み防止)。EDRログをcollectすると、シートは閉じ、
+      // 調査結果が会話オーバーレイで台詞提示される(#66/T044、話者=霧島=ログ系の既定)。
+      await skipTypewriterByClick(user, dangerLine)
+      await user.click(screen.getByRole('button', { name: '閉じる' }))
+      await user.click(getPcHotspot())
+      expect(
+        await screen.findByRole('group', { name: '経理部 中野の端末の操作' }),
+      ).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: 'EDRアラートを確認する' }))
       await waitFor(() => {
         expect(
@@ -337,7 +356,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       const edrLine =
         '中野の端末でExcelのマクロ実行に続いて、見慣れないPowerShellプロセスが起動した記録がある。侵入の起点はここだろう。'
       await skipCollectResultAndClose(user, edrLine)
-      expect(pcHotspot).toHaveAccessibleName('経理部 中野の端末（PC）・調査済み')
+      expect(getPcHotspot()).toHaveAccessibleName('経理部 中野の端末（PC）・調査済み')
 
       // --- 執務室: person(中野。単一action=即実行)。調査結果が会話フレーム(話者=橘)で表示される。 ---
       await user.click(screen.getByRole('button', { name: '中野（人物）' }))
@@ -402,8 +421,10 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       // person(サーバ管理者。旧・解析用端末(pc)＋旧・情シス担当(person)を統合したホットスポット、
       // #78・T046-ui-data)。複数collect＋noopのためアクションシート経由になり、見出しには
       // promptの挨拶台詞が出る。
-      const adminHotspot = screen.getByRole('button', { name: 'サーバ管理者（人物）' })
-      await user.click(adminHotspot)
+      // 名前の完全一致ではなく前方一致(正規表現)にする: 調査済みになると
+      // aria-labelに「・調査済み」が付与され、完全一致では引けなくなるため。
+      const getAdminHotspot = () => screen.getByRole('button', { name: /^サーバ管理者（人物）/ })
+      await user.click(getAdminHotspot())
       expect(await screen.findByRole('group', { name: 'サーバ管理者の操作' })).toBeInTheDocument()
       expect(
         screen.getByRole('heading', { name: 'サーバ管理者「どうしましたか？」' }),
@@ -420,15 +441,26 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       // ip-witness-itstaff には証言カードのほか対策カード2枚(正誤の別)も同時に紐づくが、
       // lineはYAMLで明示した証言ベースの台詞のみを提示する(#66でpickTestimonyCard=非ダミー
       // 優先の経路を廃止したため、対策カードの本文が誤って表示される不具合=#62は再現しない)。
-      await user.click(adminHotspot)
+      await user.click(getAdminHotspot())
       expect(await screen.findByRole('group', { name: 'サーバ管理者の操作' })).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: '話を聞く' }))
       const itStaffLine =
         '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。'
       await skipCollectResultAndClose(user, itStaffLine)
-      expect(adminHotspot).toHaveAccessibleName('サーバ管理者（人物）・調査済み')
 
-      // 一覧側(常に併設)でも9/9件が調査済みとして共有されている(scenes・一覧は同じ状態を共有)。
+      // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
+      // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
+      // 引き継ぐ)。ホットスポットの状態を確認する前に一旦それを閉じる。
+      const wrapUpLine = 'そろそろ問題をまとめようか。'
+      expect(await screen.findByText(wrapUpLine)).toBeInTheDocument()
+      await skipTypewriterByClick(user, wrapUpLine)
+      await user.click(screen.getByRole('button', { name: 'わかった' }))
+
+      expect(getAdminHotspot()).toHaveAccessibleName('サーバ管理者（人物）・調査済み')
+
+      // 「調査ポイント一覧」トグルを開いて一覧側でも9/9件が調査済みとして共有されていることを
+      // 確認する(#66→T047でトグル化。scenes・一覧は同じ状態を共有)。
+      await user.click(screen.getByRole('button', { name: '調査ポイント一覧' }))
       expect(screen.getByText('9/9 件調査済み')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: '調査する' })).not.toBeInTheDocument()
 

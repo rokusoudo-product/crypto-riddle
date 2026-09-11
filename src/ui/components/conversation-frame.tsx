@@ -1,5 +1,6 @@
 // src/ui/components/conversation-frame.tsx — 会話フレーム共通コンポーネント(#42/T033、
-// タイプライター表示は#52 Phase4.7/#64/T042)。
+// タイプライター表示は#52 Phase4.7/#64/T042、探索の会話オーバーレイ化は#52 Phase4.7 追補/
+// T047・`layout` prop)。
 //
 // DESIGN.md「会話フレーム(共通コンポーネント・#42で導入)」節が正本:
 // - レイアウト: 画面下部に会話ウィンドウ、ステージ中央の左右に立ち絵(霧島=左・橘=右で固定)。
@@ -17,6 +18,13 @@
 //   支援技術には全文を一度に渡す(演出中テキストはaria-hidden、全文はvisually-hiddenで提供)。
 //   選択肢・相談・カード閲覧等の操作要素(children)は全文表示(またはスキップ)後にのみ出す
 //   (送り途中の誤タップ防止)。詳細は下記の各関数コメントを参照。
+// - 探索の会話オーバーレイ(#52・T047): `layout="overlay"` を指定すると、従来の「縦に積む」
+//   表示(`layout="stacked"`、既定・resolve-screen.tsx/導入で使用)ではなく、絶対配置で
+//   呼び出し側のコンテナ(`position: relative` を持つ背景シーンの箱)に重ねる表示になる。
+//   左右端に縮小した立ち絵・下部に会話ウィンドウ(帯)を1行に並べ、背景中央と重ならないように
+//   端寄せする(DESIGN.md「探索シーン」節「会話オーバーレイのレイアウト」)。タイプライター・
+//   フォーカス管理・children の表示タイミング等のロジックは stacked と完全に共有し、
+//   JSX の外枠だけを分岐する(scene-explorer.tsx 参照)。
 //
 // 導入(③)・探索の会話(④)・解決の会話モード(⑤)で共通して使う想定(DESIGN.md)。
 // 実際の配線は④探索(scene-explorer.tsx)・⑤解決(resolve-screen.tsx)のみ済み。
@@ -81,6 +89,12 @@ const PORTRAIT_SRC: Record<Character, string> = {
 interface PortraitProps {
   character: Character
   speaking: boolean
+  /**
+   * 探索の会話オーバーレイ(#52・T047)用の縮小サイズ。背景シーンの箱(aspect-video)の中に
+   * 立ち絵を収めるため、stacked(既定)より一回り小さくする(DESIGN.md「会話オーバーレイの
+   * レイアウト」節「モバイルでも立ち絵は縮小して端に置く」はモバイルに限らずoverlay全般に適用)。
+   */
+  compact?: boolean
 }
 
 /**
@@ -88,14 +102,21 @@ interface PortraitProps {
  * 立ち絵アセットは切り抜き前(単色の無地背景, DESIGN.md「アセット」節「立ち絵の運用メモ」)のため
  * 現状は背景付きの矩形で表示される(切り抜きは別途 IMAGE_WORKFLOW 経由の工程。本PRのスコープ外)。
  */
-function Portrait({ character, speaking }: PortraitProps) {
+function Portrait({ character, speaking, compact = false }: PortraitProps) {
   return (
-    <div className={cn('flex flex-col items-center gap-2', speaking ? 'z-10' : 'z-0')}>
+    <div
+      className={cn(
+        'flex shrink-0 flex-col items-center',
+        compact ? 'gap-1' : 'gap-2',
+        speaking ? 'z-10' : 'z-0',
+      )}
+    >
       <img
         src={PORTRAIT_SRC[character]}
         alt={`${character}（${speaking ? '発話中' : '待機中'}）`}
         className={cn(
-          'h-32 w-24 rounded-lg object-cover object-top transition-all duration-200 sm:h-44 sm:w-32',
+          'rounded-lg object-cover object-top transition-all duration-200',
+          compact ? 'h-16 w-12 sm:h-28 sm:w-20' : 'h-32 w-24 sm:h-44 sm:w-32',
           speaking
             ? 'opacity-100 grayscale-0 saturate-100'
             : 'scale-95 opacity-60 grayscale saturate-0',
@@ -104,7 +125,8 @@ function Portrait({ character, speaking }: PortraitProps) {
       {/* 色だけに頼らず名札テキストで発話者を明示する(WCAG 1.4.1)。待機中も常に表示する。 */}
       <span
         className={cn(
-          'rounded-full px-3 py-0.5 text-xs font-semibold',
+          'rounded-full font-semibold',
+          compact ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-0.5 text-xs',
           speaking
             ? 'bg-primary text-primary-foreground'
             : 'bg-muted text-muted-foreground border-border border',
@@ -124,6 +146,14 @@ export interface ConversationFrameProps {
    * (呼び出し側は現状すべて文字列を渡している。scene-explorer.tsx / resolve-screen.tsx 参照)。
    */
   line: string
+  /**
+   * レイアウト種別(#52・T047)。既定の'stacked'は従来どおり画面下部に会話ウィンドウ・
+   * ステージ中央の左右に立ち絵を縦に積む表示(resolve-screen.tsx・導入で使用、非破壊)。
+   * 'overlay'は探索の会話オーバーレイ(scene-explorer.tsx)専用で、絶対配置(`absolute inset-0`)
+   * になり、呼び出し側が `position: relative` を持つコンテナに重ねて使うことを前提とする
+   * (DESIGN.md「探索シーン」節「会話オーバーレイのレイアウト」)。
+   */
+  layout?: 'stacked' | 'overlay'
   /**
    * 会話ウィンドウ内に載せる追加要素(選択肢・相談ボタン・カードドロワー等、DESIGN.md
    * 「解決の会話モードで会話フレーム上に載せる要素」)。
@@ -147,6 +177,7 @@ export interface ConversationFrameProps {
 export function ConversationFrame({
   speaker,
   line,
+  layout = 'stacked',
   children,
   onLineRevealed,
 }: ConversationFrameProps) {
@@ -229,6 +260,59 @@ export function ConversationFrame({
     setRevealedLength(line.length)
   }
 
+  // 名札+会話文(タイプライター/全文)+children。stacked/overlay で共有する会話ウィンドウの
+  // 中身(外枠のサイズ・配置だけがレイアウトごとに異なる、#52・T047)。
+  const windowContent = (
+    <>
+      <div className="flex flex-col gap-2">
+        <span className="bg-primary text-primary-foreground w-fit rounded-full px-3 py-1 text-xs font-semibold">
+          {speaker}
+        </span>
+        {isComplete ? (
+          <p className="font-heading text-base leading-relaxed sm:text-lg">{line}</p>
+        ) : (
+          // タイプライター演出中: 見た目は1文字ずつ増える部分文字列(aria-hidden、演出のみ)。
+          // 支援技術には別途sr-onlyで全文を一度に渡す(1文字ずつ読み上げさせない、#64/T042)。
+          // タップ/Enterでこのボタン自体が即全文表示のスキップ操作になる
+          // (children=選択肢等はisComplete後にしか出ないため、送り途中の誤タップも防げる)。
+          <button
+            type="button"
+            onClick={handleSkip}
+            className="font-heading focus-visible:ring-ring min-h-12 w-full rounded-md text-left text-base leading-relaxed focus-visible:ring-3 focus-visible:outline-none sm:text-lg"
+          >
+            <span aria-hidden="true">{line.slice(0, revealedLength)}</span>
+            <span className="sr-only">{line}</span>
+          </button>
+        )}
+      </div>
+      {isComplete && children}
+    </>
+  )
+
+  if (layout === 'overlay') {
+    // 探索の会話オーバーレイ(#52・T047・DESIGN.md「会話オーバーレイのレイアウト」節)。
+    // 呼び出し側(scene-explorer.tsx)の`position: relative`な背景シーンの箱に`absolute inset-0`
+    // で重ね、下端に立ち絵(左右端)+会話ウィンドウ(中央帯)を1行で並べる(背景中央の事件現場と
+    // 重ならないよう端寄せ)。行の高さを`h-full`で確定させることで、ウィンドウの
+    // `max-h-[...]%`(下記コメント参照)がその高さを基準に計算されるようにしている。
+    return (
+      <div className="absolute inset-0 z-10 flex flex-col justify-end p-2 sm:p-4">
+        <div className="flex h-full items-end justify-center gap-2 sm:gap-3">
+          <Portrait character={PORTRAIT_ORDER[0]} speaking={PORTRAIT_ORDER[0] === speaker} compact />
+          {/* 会話ウィンドウ(帯): 背景の箱(aspect-video・overflow-hidden)からはみ出さないよう
+              max-h+overflow-y-autoにする(カードドロワー展開時・長い台詞での見切れ対策)。 */}
+          <div
+            ref={windowRef}
+            className="border-primary bg-card flex max-h-[70%] min-w-0 flex-1 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:max-h-[75%] sm:gap-4 sm:p-6"
+          >
+            {windowContent}
+          </div>
+          <Portrait character={PORTRAIT_ORDER[1]} speaking={PORTRAIT_ORDER[1] === speaker} compact />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-0">
       {/* ステージ: 中央左右に立ち絵(霧島=左・橘=右で固定)。主人公の立ち絵は出さない。 */}
@@ -242,28 +326,7 @@ export function ConversationFrame({
         ref={windowRef}
         className="border-primary bg-card flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6"
       >
-        <div className="flex flex-col gap-2">
-          <span className="bg-primary text-primary-foreground w-fit rounded-full px-3 py-1 text-xs font-semibold">
-            {speaker}
-          </span>
-          {isComplete ? (
-            <p className="font-heading text-base leading-relaxed sm:text-lg">{line}</p>
-          ) : (
-            // タイプライター演出中: 見た目は1文字ずつ増える部分文字列(aria-hidden、演出のみ)。
-            // 支援技術には別途sr-onlyで全文を一度に渡す(1文字ずつ読み上げさせない、#64/T042)。
-            // タップ/Enterでこのボタン自体が即全文表示のスキップ操作になる
-            // (children=選択肢等はisComplete後にしか出ないため、送り途中の誤タップも防げる)。
-            <button
-              type="button"
-              onClick={handleSkip}
-              className="font-heading focus-visible:ring-ring min-h-12 w-full rounded-md text-left text-base leading-relaxed focus-visible:ring-3 focus-visible:outline-none sm:text-lg"
-            >
-              <span aria-hidden="true">{line.slice(0, revealedLength)}</span>
-              <span className="sr-only">{line}</span>
-            </button>
-          )}
-        </div>
-        {isComplete && children}
+        {windowContent}
       </div>
     </div>
   )

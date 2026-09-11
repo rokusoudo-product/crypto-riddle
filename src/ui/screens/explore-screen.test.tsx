@@ -1,8 +1,12 @@
 /** @vitest-environment jsdom */
-// src/ui/screens/explore-screen.test.tsx — 探索④の背景シーンUI(#52/#56・T038)の結線テスト。
+// src/ui/screens/explore-screen.test.tsx — 探索④の背景シーンUI(#52/#56・T038、
+// 会話オーバーレイ化(2状態)・調査ポイント一覧のトグル化は#52 Phase4.7 追補/T047)の結線テスト。
 //
 // Issue #56 完了条件: 「背景・一覧の両方で、キーボードのみで全ポイント調査→解決へ進める結線
 // テストが通る」「4状態(通常/ローディング=判定中/空=未調査/エラー)を満たす」。
+// T047完了条件: 「探索状態(背景+ホットスポットのみ)/会話状態(立ち絵+会話ウィンドウのオーバーレイ)
+// の2状態が切り替わる」「調査ポイント一覧はトグルで開閉し、キーボードのみで一覧経由の
+// 全ポイント調査→解決へ進められる」。
 //
 // 実データの scenarios/*.yaml には scenes を追加しない(#57/T040 の範囲・二重実装防止)ため、
 // scenes を持つ最小フィクスチャ(explore-scene.fixture.ts、このブランチ内のテスト専用)を使う。
@@ -35,18 +39,33 @@ function renderExplore(scenario: Scenario, initialEntry = '/explore') {
   )
 }
 
+/** 「調査ポイント一覧」トグルを開く(#66→T047でトグル化。scenesがある場合のみ存在する)。 */
+async function openInvestigationList(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: '調査ポイント一覧' }))
+}
+
 describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', () => {
   it('scenesが無いシナリオでは背景シーンUIを表示せず、一覧のみになる(既存動作の回帰)', () => {
     renderExplore(s0SampleFixture)
     expect(screen.queryByRole('tablist', { name: '探索シーンの切替' })).not.toBeInTheDocument()
+    // scenesが無い場合はトグルも無く、一覧は常時表示のまま(#66→T047の変更対象外)。
+    expect(screen.queryByRole('button', { name: '調査ポイント一覧' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '調査ポイント一覧' })).toBeInTheDocument()
   })
 
-  it('scenesがあるシナリオでは背景シーンと一覧の両方が併設される', () => {
+  it('scenesがあるシナリオでは背景シーンが表示され、一覧は「調査ポイント一覧」トグルを開くまで表示されない(#66→T047でトグル化)', async () => {
+    const user = userEvent.setup()
     renderExplore(exploreSceneFixture)
-    // 背景シーン(プレースホルダ、T039待ち)。
+    // 背景シーン(プレースホルダ、T039待ち)は探索状態で常時表示。
     expect(screen.getByRole('img', { name: /執務室の背景（画像は準備中/ })).toBeInTheDocument()
-    // 一覧フォールバックも常に併設される。
+
+    // 一覧はトグルボタン自体の常時表示で発見性を担保し、中身は開くまで出さない。
+    const toggle = screen.getByRole('button', { name: '調査ポイント一覧' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('heading', { name: '調査ポイント一覧' })).not.toBeInTheDocument()
+
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByRole('heading', { name: '調査ポイント一覧' })).toBeInTheDocument()
     expect(screen.getByText('経理担当PCのログ')).toBeInTheDocument()
     expect(screen.getByText('田中さんへの聞き取り')).toBeInTheDocument()
@@ -72,34 +91,49 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
 
   it(
     '背景シーン経由で、キーボードのみで全ポイント調査→解決へ進められる' +
-      '(danger操作は教育的フィードバックのみでペナルティ無し・操作継続可、調査結果は会話フレームで台詞提示される#66)',
+      '(danger操作は会話オーバーレイの教育的フィードバックのみでペナルティ無し・操作継続可、' +
+      '調査結果も会話オーバーレイで台詞提示される#66・T047)',
     async () => {
       const user = userEvent.setup()
       renderExplore(exploreSceneFixture)
+      const getPcHotspot = () => screen.getByRole('button', { name: /経理担当のPC（PC）/ })
 
       // PCホットスポットへフォーカスして開く(actionsが3件=アクションシート)。
       // 開いたシート内の最初のactionへ自動的にフォーカスが移る(ダイアログ的なフォーカス管理)。
-      const pcHotspot = screen.getByRole('button', { name: /経理担当のPC（PC）/ })
-      pcHotspot.focus()
+      getPcHotspot().focus()
       await user.keyboard('{Enter}')
       expect(await screen.findByRole('group', { name: '経理担当のPCの操作' })).toBeInTheDocument()
       expect(document.activeElement).toHaveTextContent('ログを取る')
 
-      // 「電源を落とす」(danger)へ1つ進んで選ぶ: 教育的フィードバックが出るが、
-      // 探索ではペナルティにならず、シートも閉じない(詰み防止・spec §8.4)。
+      // 「電源を落とす」(danger)へ1つ進んで選ぶ: アクションシートは閉じ、会話オーバーレイ
+      // (橘の台詞)で教育的フィードバックが提示される(T047。旧: シート内テキスト表示)。
+      // 探索ではペナルティにならない(詰み防止・spec §8.4)。
       const progressBeforeDanger = useGameStore.getState().progress
       await user.keyboard('{Tab}')
       expect(document.activeElement).toHaveTextContent('電源を落とす')
       await user.keyboard('{Enter}')
-      expect(await screen.findByText(/揮発性メモリの証拠が消えます/)).toBeInTheDocument()
-      // シートは開いたままで、他のactionを続けて選べる(電源を落とした後も操作継続可)。
-      expect(screen.getByRole('group', { name: '経理担当のPCの操作' })).toBeInTheDocument()
+      expect(screen.queryByRole('group', { name: '経理担当のPCの操作' })).not.toBeInTheDocument()
+      // 会話状態ではホットスポットをDOMごと描画しない(誤操作防止、T047)。
+      expect(screen.queryByRole('button', { name: /経理担当のPC（PC）/ })).not.toBeInTheDocument()
+      const dangerLine = 'ここで電源を落とすと揮発性メモリの証拠が消えます。'
+      expect(await screen.findByText(dangerLine)).toBeInTheDocument()
+      expect(screen.getAllByText('橘').length).toBeGreaterThan(0)
       // dangerはdispatchを一切呼ばない(coreのprogressが参照レベルで完全に不変=XP等への影響皆無)。
       expect(useGameStore.getState().progress).toBe(progressBeforeDanger)
 
-      // Shift+Tabで「ログを取る」(collect)へ戻り、カードを獲得する。
-      // シートは閉じ、調査結果が会話フレームで台詞提示される(#66/T044、PCのlineは明示済み)。
-      await user.keyboard('{Shift>}{Tab}{/Shift}')
+      // 会話オーバーレイを閉じると探索状態に戻り、フォーカスは元のホットスポットへ復帰する
+      // (電源を落とした後も同じホットスポットを再度開いて他のactionを選べる=詰み防止)。
+      screen.getByRole('button', { name: dangerLine }).focus()
+      await user.keyboard('{Enter}')
+      expect(document.activeElement).toHaveTextContent('閉じる')
+      await user.keyboard('{Enter}')
+      expect(screen.queryByText(dangerLine)).not.toBeInTheDocument()
+      expect(document.activeElement).toBe(getPcHotspot())
+
+      // 同じホットスポットを再度開き(フォーカス済みなのでEnterのみ)、「ログを取る」(collect)で
+      // カードを獲得する。会話オーバーレイに切り替わる。
+      await user.keyboard('{Enter}')
+      expect(await screen.findByRole('group', { name: '経理担当のPCの操作' })).toBeInTheDocument()
       expect(document.activeElement).toHaveTextContent('ログを取る')
       await user.keyboard('{Enter}')
       await waitFor(() => {
@@ -109,7 +143,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       const pcLine = '不審なプロセスの起動ログが残っている。マルウェア感染の可能性が高い。'
       expect(screen.getByText(pcLine)).toBeInTheDocument()
 
-      // 「閉じる」は会話フレームのchildrenのため、タイプライターの全文表示(またはスキップ)後に
+      // 「閉じる」は会話ウィンドウのchildrenのため、タイプライターの全文表示(またはスキップ)後に
       // しか出ない(#64/T042)。台詞そのものがスキップボタンのaccessible nameになるので、
       // それをフォーカスしてEnterでキーボードのみスキップする。スキップすると children 内の
       // 最初のフォーカス可能要素(=「閉じる」。?ボタンより先にDOM上へ置いている)へ
@@ -119,11 +153,11 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(document.activeElement).toHaveTextContent('閉じる')
       await user.keyboard('{Enter}')
       expect(screen.queryByText(pcLine)).not.toBeInTheDocument()
-      expect(document.activeElement).toBe(pcHotspot)
-      expect(pcHotspot).toHaveAccessibleName(/・調査済み/)
+      expect(document.activeElement).toBe(getPcHotspot())
+      expect(getPcHotspot()).toHaveAccessibleName(/・調査済み/)
 
       // 人物ホットスポット(person・単一action)。line/speakerを省略しているため、既定の
-      // 導入文＋カード本文へのフォールバックで会話フレームに表示される(話者既定=橘、#66)。
+      // 導入文＋カード本文へのフォールバックで会話オーバーレイに表示される(話者既定=橘、#66)。
       const personHotspot = screen.getByRole('button', { name: /田中さん（人物）/ })
       personHotspot.focus()
       await user.keyboard('{Enter}')
@@ -137,9 +171,25 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(document.activeElement).toHaveTextContent('閉じる')
       await user.keyboard('{Enter}')
       expect(screen.queryByText(tanakaLine)).not.toBeInTheDocument()
-      expect(document.activeElement).toBe(personHotspot)
 
-      // 一覧側でも両方調査済みになっている(scenes・一覧は同じ状態を共有する)。
+      // この2件目の調査で「解決へ」の活性条件を満たすため、探索完了への誘導(#71・T045)の
+      // 会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を引き継ぐため、
+      // 探索状態には戻らずホットスポットはまだ現れない)。入れ替わった瞬間、その最初の操作
+      // 可能要素(タイプライターのスキップボタン)へ自動的にフォーカスが移る(advisor指摘の
+      // 修正: 直前にホットスポットへ戻ったフォーカスが、この入れ替わりでホットスポットが
+      // 再アンマウントされて迷子にならないようにするため)。
+      const wrapUpLine = 'そろそろ問題をまとめようか。'
+      await screen.findByText(wrapUpLine)
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: wrapUpLine }))
+      await user.keyboard('{Enter}')
+      expect(document.activeElement).toHaveTextContent('わかった')
+      await user.keyboard('{Enter}')
+      // 閉じると探索状態に戻り、ホットスポットが再び操作できる。
+      expect(screen.getByRole('button', { name: /田中さん（人物）/ })).toBeInTheDocument()
+
+      // 「調査ポイント一覧」トグルを開いて、一覧側でも両方調査済みになっていることを確認する
+      // (scenes・一覧は同じ状態を共有する)。
+      await openInvestigationList(user)
       expect(screen.getByText('2/2 件調査済み')).toBeInTheDocument()
 
       // 「解決へ進む」が活性化し、キーボードで押せる(結線テストの完了条件)。
@@ -148,7 +198,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
     },
   )
 
-  it('調査結果の会話フレーム上の?ボタンで、獲得済みの手持ちカードを無料で閲覧できる(#66)', async () => {
+  it('調査結果の会話オーバーレイ上の?ボタンで、獲得済みの手持ちカードを無料で閲覧できる(#66)', async () => {
     const user = userEvent.setup()
     renderExplore(exploreSceneFixture)
 
@@ -193,9 +243,15 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
     expect(screen.queryByRole('button', { name: /経理担当のPC（PC）/ })).not.toBeInTheDocument()
   })
 
-  it('一覧フォールバックだけでも、背景に頼らずキーボードのみで全ポイント調査→解決へ進められる', async () => {
+  it('一覧フォールバックだけでも、背景に頼らずキーボードのみで全ポイント調査→解決へ進められる(#66→T047でトグル化)', async () => {
     const user = userEvent.setup()
     renderExplore(exploreSceneFixture)
+
+    // 「調査ポイント一覧」トグルをキーボードで開く。
+    const toggle = screen.getByRole('button', { name: '調査ポイント一覧' })
+    toggle.focus()
+    await user.keyboard('{Enter}')
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
 
     const list = screen.getByRole('list', { name: '調査ポイント一覧' })
     const investigateButtons = within(list).getAllByRole('button', { name: '調査する' })
@@ -211,11 +267,74 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
     expect(enterResolution).toBeEnabled()
   })
 
-  describe('探索完了→解決への誘導(#52 Phase4.7/#71・T045)', () => {
+  describe('探索状態/会話状態の2状態切り替え(#52・T047)', () => {
+    it('会話オーバーレイが開いている間はホットスポットを描画せず、閉じると探索状態に戻る(立ち絵・会話ウィンドウも連動して消える)', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+
+      // 探索状態(既定): 立ち絵も会話ウィンドウも無く、ホットスポットのみ操作できる。
+      expect(screen.queryByRole('button', { name: '閉じる' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /経理担当のPC（PC）/ })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /田中さん（人物）/ })).toBeInTheDocument()
+
+      // 田中さん(単一action)を調べて会話状態にする。
+      await user.click(screen.getByRole('button', { name: /田中さん（人物）/ }))
+      const tanakaLine =
+        '田中さんに話を聞いた。「昼過ぎに画面の様子がおかしくなった」と田中さんは証言した。'
+      await user.click(screen.getByRole('button', { name: tanakaLine }))
+
+      // 会話状態: ホットスポットはDOMに存在せず、立ち絵(名札)と閉じるボタンが出る。
+      expect(screen.queryByRole('button', { name: /経理担当のPC（PC）/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /田中さん（人物）/ })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '閉じる' })).toBeInTheDocument()
+      expect(screen.getAllByText('霧島').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('橘').length).toBeGreaterThan(0)
+      // 「調査ポイント一覧」トグルは探索・会話のどちらでも常時表示される(発見性の担保)。
+      expect(screen.getByRole('button', { name: '調査ポイント一覧' })).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: '閉じる' }))
+
+      // 探索状態に戻り、ホットスポットが再び現れ、立ち絵・閉じるボタンは消える。
+      expect(screen.queryByRole('button', { name: '閉じる' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /経理担当のPC（PC）/ })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /田中さん（人物）/ })).toBeInTheDocument()
+    })
+
+    it('会話オーバーレイを開いたままシーンタブを切り替えても、別シーンの無関係なホットスポットへフォーカスが誤って移らない', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneDoorFixture)
+
+      // scene-a(サーバ室)の先頭ホットスポット(index 0=サーバ管理者)で会話オーバーレイを開く。
+      await user.click(screen.getByRole('button', { name: /サーバ管理者（人物）/ }))
+      await user.click(screen.getByRole('button', { name: '話を聞く' }))
+      const witnessLine =
+        'サーバ管理者に話を聞いた。「昨夜からアラートが増えている」とサーバ管理者は証言した。'
+      expect(await screen.findByText(witnessLine)).toBeInTheDocument()
+      // 「閉じる」はタイプライターの全文表示(またはスキップ)後にしか出ない(#64/T042)。
+      await user.click(screen.getByRole('button', { name: witnessLine }))
+      expect(screen.getByRole('button', { name: '閉じる' })).toBeInTheDocument()
+
+      // 会話オーバーレイを開いたまま、シーンタブで執務室(scene-b)へ切り替える。scene-bの
+      // 先頭ホットスポット(index 0)はサーバ室へ戻るドアで、サーバ管理者(index 0)とは無関係。
+      // 戻り先indexが index という数値だけで管理されているため、シーン切替時に破棄しないと
+      // 無関係な要素へフォーカスが移ってしまう(scene-explorer.tsxのcloseOverlays参照)。
+      const officeTab = screen.getByRole('tab', { name: '執務室' })
+      await user.click(officeTab)
+
+      // 会話オーバーレイは閉じ、シーン切替自体は完了する。フォーカスはタブに残り、
+      // 執務室側の無関係なドアへ誤って移らない。
+      expect(screen.queryByText(witnessLine)).not.toBeInTheDocument()
+      expect(officeTab).toHaveAttribute('aria-selected', 'true')
+      expect(document.activeElement).toBe(officeTab)
+    })
+  })
+
+  describe('探索完了→解決への誘導(#52 Phase4.7/#71・T045、T047で会話オーバーレイに統合)', () => {
     const wrapUpLine = 'そろそろ問題をまとめようか。'
 
-    /** 一覧フォールバック側から全ポイントを調査し、「解決へ」の活性条件を満たす。 */
+    /** 「調査ポイント一覧」トグルを開き、一覧側から全ポイントを調査して「解決へ」の活性条件を満たす。 */
     async function investigateAllViaList(user: ReturnType<typeof userEvent.setup>) {
+      await openInvestigationList(user)
       const list = screen.getByRole('list', { name: '調査ポイント一覧' })
       const investigateButtons = within(list).getAllByRole('button', { name: '調査する' })
       for (const button of investigateButtons) {
@@ -223,7 +342,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       }
     }
 
-    it('「解決へ」の活性条件を満たした時点で、会話フレームで橘が「そろそろ問題をまとめようか」と促す', async () => {
+    it('「解決へ」の活性条件を満たした時点で、会話オーバーレイで橘が「そろそろ問題をまとめようか」と促す', async () => {
       const user = userEvent.setup()
       renderExplore(exploreSceneFixture)
 
@@ -233,7 +352,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       await investigateAllViaList(user)
 
       // 会話フレーム(タイプライター)のsr-only全文は演出の進行に関わらず常に存在するため、
-      // getByTextでそのまま検証できる(他のcollectResultテストと同じ挙動)。
+      // getByTextでそのまま検証できる(他の会話オーバーレイテストと同じ挙動)。
       expect(await screen.findByText(wrapUpLine)).toBeInTheDocument()
       // 話者の既定は橘(司令塔、DESIGN.md「探索シーン」節)。
       expect(screen.getAllByText('橘').length).toBeGreaterThan(0)
@@ -249,7 +368,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       await screen.findByText(wrapUpLine)
 
       // タイプライターをスキップ(台詞そのものがスキップボタンのaccessible name、#64/T042)。
-      // ボタン文言は意図的に「わかった」(SceneExplorer側の調査結果パネルの「閉じる」との
+      // ボタン文言は意図的に「わかった」(SceneExplorer側の会話オーバーレイの「閉じる」との
       // アクセシブルネーム衝突を避けるため、#71・T045)。
       await user.click(screen.getByRole('button', { name: wrapUpLine }))
       await user.click(screen.getByRole('button', { name: 'わかった' }))
@@ -261,7 +380,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
     })
 
-    it('最後の1件をホットスポット経由で調べ終えても、調査結果の会話フレームが開いている間は促しを同時に出さず、閉じてから出す', async () => {
+    it('最後の1件をホットスポット経由で調べ終えても、調査結果の会話オーバーレイが開いている間は促しを同時に出さず、閉じてから出す', async () => {
       const user = userEvent.setup()
       renderExplore(exploreSceneFixture)
 
@@ -277,8 +396,8 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
 
       // 2件目(person・単一action)を調べ終えた瞬間、「解決へ」の活性条件を満たすが、
-      // 調査結果の会話フレーム(collectResultの「閉じる」)が開いている間は促しを表示しない
-      // (会話フレームの2段重ね・「閉じる」ボタンの重複を避けるため、#71・T045)。
+      // 調査結果の会話オーバーレイ(「閉じる」)が開いている間は促しを表示しない
+      // (会話オーバーレイの2重表示・「閉じる」ボタンの重複を避けるため、#71・T045)。
       const personHotspot = screen.getByRole('button', { name: /田中さん（人物）/ })
       await user.click(personHotspot)
       const tanakaLine =
@@ -288,7 +407,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(await screen.findByRole('button', { name: '閉じる' })).toBeInTheDocument()
       expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
 
-      // 調査結果パネルを閉じると、入れ替わりで促しが表示される。
+      // 会話オーバーレイを閉じると、入れ替わりで促しが表示される。
       await user.click(screen.getByRole('button', { name: '閉じる' }))
       expect(await screen.findByText(wrapUpLine)).toBeInTheDocument()
     })
@@ -370,8 +489,11 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       const user = userEvent.setup()
       renderExplore(exploreSceneDoorFixture)
 
-      const admin = screen.getByRole('button', { name: /サーバ管理者（人物）/ })
-      admin.focus()
+      // 会話オーバーレイが開くたびにホットスポットは一度アンマウント→再マウントされる(T047)ため、
+      // 変数を使い回さずその都度クエリし直す(取得済みの参照は古いDOMノードを指したままになる)。
+      const getAdmin = () => screen.getByRole('button', { name: /サーバ管理者（人物）/ })
+
+      getAdmin().focus()
       await user.keyboard('{Enter}')
       const sheet = await screen.findByRole('group', { name: 'サーバ管理者の操作' })
       // 見出し=prompt(ラベルではない)。
@@ -390,10 +512,10 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       await user.click(screen.getByRole('button', { name: '閉じる' }))
       // 統合ホットスポットは束ねた全collectが調査済みになるまで「調査済み」を出さない
       // (isHotspotInvestigated=collect対象の全件一致、scene-explorer.tsx)。
-      expect(admin).not.toHaveAccessibleName(/・調査済み/)
+      expect(getAdmin()).not.toHaveAccessibleName(/・調査済み/)
 
       // 2つ目のcollect(PCを確認する・ログ・霧島)も独立して機能する。
-      admin.focus()
+      getAdmin().focus()
       await user.keyboard('{Enter}')
       const sheet2 = await screen.findByRole('group', { name: 'サーバ管理者の操作' })
       await user.click(within(sheet2).getByRole('button', { name: 'PCを確認する' }))
@@ -406,15 +528,24 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       await user.click(screen.getByRole('button', { name: logLine }))
       await user.click(screen.getByRole('button', { name: '閉じる' }))
 
+      // このフィクスチャの解決条件(ip-log・ip-witnessの両方)は今の2つ目のcollectで満たされる
+      // ため、探索完了への誘導(#71・T045)の会話オーバーレイが入れ替わりで自動的に開く
+      // (conversationSlotが会話状態を引き継ぐ)。ホットスポットへ戻る前に一旦それを閉じる。
+      const wrapUpLine = 'そろそろ問題をまとめようか。'
+      await screen.findByText(wrapUpLine)
+      await user.click(screen.getByRole('button', { name: wrapUpLine }))
+      await user.click(screen.getByRole('button', { name: 'わかった' }))
+
       // 両方調査済みになり、一覧側も2/2件になる(結線確認)。統合ホットスポット自体も
       // 両方のcollectが埋まったので「調査済み」になる。
-      expect(admin).toHaveAccessibleName(/・調査済み/)
+      expect(getAdmin()).toHaveAccessibleName(/・調査済み/)
+      await openInvestigationList(user)
       expect(screen.getByText('2/2 件調査済み')).toBeInTheDocument()
       const enterResolution = screen.getByRole('button', { name: '解決へ進む' })
       await waitFor(() => expect(enterResolution).toBeEnabled())
 
       // 「何でもない」(noop)はシートを閉じるだけで何も獲得しない。
-      admin.focus()
+      getAdmin().focus()
       await user.keyboard('{Enter}')
       const sheet3 = await screen.findByRole('group', { name: 'サーバ管理者の操作' })
       await user.click(within(sheet3).getByRole('button', { name: '何でもない' }))
