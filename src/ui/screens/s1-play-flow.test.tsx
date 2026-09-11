@@ -399,21 +399,34 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
         screen.getByRole('button', { name: 'メールサーバ（機器）・調査済み' }),
       ).toBeInTheDocument()
 
-      // pc(解析用端末。単一action=即実行。dangerは無いのでシートを経由せずcollectのみ)。
-      await user.click(screen.getByRole('button', { name: '解析用端末（PC）' }))
+      // person(サーバ管理者。旧・解析用端末(pc)＋旧・情シス担当(person)を統合したホットスポット、
+      // #78・T046-ui-data)。複数collect＋noopのためアクションシート経由になり、見出しには
+      // promptの挨拶台詞が出る。
+      const adminHotspot = screen.getByRole('button', { name: 'サーバ管理者（人物）' })
+      await user.click(adminHotspot)
+      expect(await screen.findByRole('group', { name: 'サーバ管理者の操作' })).toBeInTheDocument()
+      expect(
+        screen.getByRole('heading', { name: 'サーバ管理者「どうしましたか？」' }),
+      ).toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'PCを確認する' }))
+      await waitFor(() => {
+        expect(screen.queryByRole('group', { name: 'サーバ管理者の操作' })).not.toBeInTheDocument()
+      })
       const sandboxLine =
         '回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加のプログラムを取得し、プロキシログと同じ宛先へビーコン通信している。IoCとして他端末の調査にも使える。'
       await skipCollectResultAndClose(user, sandboxLine)
-      expect(screen.getByRole('button', { name: '解析用端末（PC）・調査済み' })).toBeInTheDocument()
 
-      // person(情シス担当。単一action=即実行)。調査結果が会話フレームで表示される。
       // ip-witness-itstaff には証言カードのほか対策カード2枚(正誤の別)も同時に紐づくが、
       // lineはYAMLで明示した証言ベースの台詞のみを提示する(#66でpickTestimonyCard=非ダミー
       // 優先の経路を廃止したため、対策カードの本文が誤って表示される不具合=#62は再現しない)。
-      await user.click(screen.getByRole('button', { name: '情シス担当（人物）' }))
+      await user.click(adminHotspot)
+      expect(await screen.findByRole('group', { name: 'サーバ管理者の操作' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: '話を聞く' }))
       const itStaffLine =
         '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。'
       await skipCollectResultAndClose(user, itStaffLine)
+      expect(adminHotspot).toHaveAccessibleName('サーバ管理者（人物）・調査済み')
 
       // 一覧側(常に併設)でも9/9件が調査済みとして共有されている(scenes・一覧は同じ状態を共有)。
       expect(screen.getByText('9/9 件調査済み')).toBeInTheDocument()
@@ -439,7 +452,9 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       await user.click(await screen.findByRole('button', { name: 'タップで進行' }))
       await user.click(screen.getByRole('tab', { name: 'サーバ室' }))
 
-      await user.click(screen.getByRole('button', { name: '情シス担当（人物）' }))
+      // #78・T046-ui-dataで「サーバ管理者」に統合されたホットスポット経由(複数action=シート)。
+      await user.click(screen.getByRole('button', { name: 'サーバ管理者（人物）' }))
+      await user.click(screen.getByRole('button', { name: '話を聞く' }))
       const itStaffLine =
         '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。'
       expect(await screen.findByText(itStaffLine)).toBeInTheDocument()

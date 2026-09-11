@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import type { Scenario } from '@/core/model'
 import { s0SampleFixture } from '@/core/scenario/fixtures/s0-sample.fixture'
 
+import { exploreSceneDoorFixture } from './explore-scene-door.fixture'
 import { exploreSceneFixture } from './explore-scene.fixture'
 import { ExploreScreen } from './explore-screen'
 import { resetGameStoreForTests, useGameStore } from '@/ui/store/game-store'
@@ -306,5 +307,119 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
 
     renderExplore(exploreSceneFixture, '/explore?state=error')
     expect(screen.getByRole('alert')).toHaveTextContent('エラーが発生しました。')
+  })
+
+  describe('ドア移動UI・アクションシート見出しのprompt・統合ホットスポット(#78・T046-ui-data)', () => {
+    it('promptが無いホットスポットは、従来どおりアクションシートの見出しにラベルのみを表示する(回帰確認)', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+
+      // 経理担当のPC(exploreSceneFixture)はpromptを持たないため、見出しはラベルのまま。
+      const pcHotspot = screen.getByRole('button', { name: /経理担当のPC（PC）/ })
+      pcHotspot.focus()
+      await user.keyboard('{Enter}')
+      const sheet = await screen.findByRole('group', { name: '経理担当のPCの操作' })
+      expect(within(sheet).getByRole('heading', { name: '経理担当のPC' })).toBeInTheDocument()
+    })
+
+    it('object_type: door のホットスポットは通常のホットスポットと同じく不可視で、aria-labelを常時保持する', () => {
+      renderExplore(exploreSceneDoorFixture)
+      const door = screen.getByRole('button', { name: /執務室への扉（扉）/ })
+      expect(door.tagName).toBe('BUTTON')
+      expect(door).toHaveClass('min-h-12', 'min-w-12')
+      expect(door).toHaveTextContent('')
+      // フォーカス可視の□マーカーは他object_typeと共通のtoken(hotspot-highlight)を流用する。
+      expect(door.className).toMatch(/hover:border-hotspot-highlight/)
+      expect(door.className).toMatch(/focus-visible:border-hotspot-highlight/)
+    })
+
+    it('ドア(door・単一gotoアクション)をキーボードで操作すると、アクションシートを経由せず即座に別シーンへ移動し、移動先のシーンタブへフォーカスが移る', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneDoorFixture)
+
+      expect(screen.getByRole('tab', { name: 'サーバ室' })).toHaveAttribute('aria-selected', 'true')
+      const door = screen.getByRole('button', { name: /執務室への扉（扉）/ })
+      door.focus()
+      await user.keyboard('{Enter}')
+
+      // アクションシートは経由しない(単一goto=1択のため即座に実行、#78)。
+      expect(screen.queryByRole('group')).not.toBeInTheDocument()
+      const officeTab = screen.getByRole('tab', { name: '執務室' })
+      expect(officeTab).toHaveAttribute('aria-selected', 'true')
+      expect(document.activeElement).toBe(officeTab)
+      // 移動先シーンのホットスポット(戻り用のドア)が表示される。
+      expect(screen.getByRole('button', { name: /サーバ室への扉（扉）/ })).toBeInTheDocument()
+    })
+
+    it('シーンタブでも同じ行き来ができる(ドアとタブは併用可能)', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneDoorFixture)
+
+      await user.click(screen.getByRole('tab', { name: '執務室' }))
+      expect(screen.getByRole('tab', { name: '執務室' })).toHaveAttribute('aria-selected', 'true')
+      expect(screen.getByRole('button', { name: /サーバ室への扉（扉）/ })).toBeInTheDocument()
+
+      // タブで戻ってから、今度はドアで再度執務室へ移動できる(併用の確認)。
+      await user.click(screen.getByRole('tab', { name: 'サーバ室' }))
+      const door = screen.getByRole('button', { name: /執務室への扉（扉）/ })
+      await user.click(door)
+      expect(screen.getByRole('tab', { name: '執務室' })).toHaveAttribute('aria-selected', 'true')
+    })
+
+    it('promptを持つ統合ホットスポット(複数collect＋noop)は、アクションシート見出しにpromptを表示し、各collectが独立して機能する', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneDoorFixture)
+
+      const admin = screen.getByRole('button', { name: /サーバ管理者（人物）/ })
+      admin.focus()
+      await user.keyboard('{Enter}')
+      const sheet = await screen.findByRole('group', { name: 'サーバ管理者の操作' })
+      // 見出し=prompt(ラベルではない)。
+      expect(
+        within(sheet).getByRole('heading', { name: 'サーバ管理者「どうしましたか？」' }),
+      ).toBeInTheDocument()
+      expect(within(sheet).queryByRole('heading', { name: 'サーバ管理者' })).not.toBeInTheDocument()
+
+      // 1つ目のcollect(話を聞く・証言・橘)を実行する。
+      await user.click(within(sheet).getByRole('button', { name: '話を聞く' }))
+      const witnessLine =
+        'サーバ管理者に話を聞いた。「昨夜からアラートが増えている」とサーバ管理者は証言した。'
+      expect(await screen.findByText(witnessLine)).toBeInTheDocument()
+      expect(screen.getAllByText('橘').length).toBeGreaterThan(0)
+      await user.click(screen.getByRole('button', { name: witnessLine }))
+      await user.click(screen.getByRole('button', { name: '閉じる' }))
+      // 統合ホットスポットは束ねた全collectが調査済みになるまで「調査済み」を出さない
+      // (isHotspotInvestigated=collect対象の全件一致、scene-explorer.tsx)。
+      expect(admin).not.toHaveAccessibleName(/・調査済み/)
+
+      // 2つ目のcollect(PCを確認する・ログ・霧島)も独立して機能する。
+      admin.focus()
+      await user.keyboard('{Enter}')
+      const sheet2 = await screen.findByRole('group', { name: 'サーバ管理者の操作' })
+      await user.click(within(sheet2).getByRole('button', { name: 'PCを確認する' }))
+      // resolveCollectPresentationのフォールバック導入文はhotspot.object_type(person)基準
+      // のため、機器を調べるcollectでも「〜に話を聞いた。」になる(意図どおり。線を明示すれば
+      // 任意の文言にできるが、本フィクスチャは明示speaker・省略lineのフォールバック経路を確認する)。
+      const logLine = 'サーバ管理者に話を聞いた。定期ジョブのログに異常は見られなかった。'
+      expect(await screen.findByText(logLine)).toBeInTheDocument()
+      expect(screen.getAllByText('霧島').length).toBeGreaterThan(0)
+      await user.click(screen.getByRole('button', { name: logLine }))
+      await user.click(screen.getByRole('button', { name: '閉じる' }))
+
+      // 両方調査済みになり、一覧側も2/2件になる(結線確認)。統合ホットスポット自体も
+      // 両方のcollectが埋まったので「調査済み」になる。
+      expect(admin).toHaveAccessibleName(/・調査済み/)
+      expect(screen.getByText('2/2 件調査済み')).toBeInTheDocument()
+      const enterResolution = screen.getByRole('button', { name: '解決へ進む' })
+      await waitFor(() => expect(enterResolution).toBeEnabled())
+
+      // 「何でもない」(noop)はシートを閉じるだけで何も獲得しない。
+      admin.focus()
+      await user.keyboard('{Enter}')
+      const sheet3 = await screen.findByRole('group', { name: 'サーバ管理者の操作' })
+      await user.click(within(sheet3).getByRole('button', { name: '何でもない' }))
+      expect(screen.queryByRole('group', { name: 'サーバ管理者の操作' })).not.toBeInTheDocument()
+      expect(screen.getByText('2/2 件調査済み')).toBeInTheDocument()
+    })
   })
 })
