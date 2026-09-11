@@ -228,4 +228,31 @@ describe('ConversationFrame(#64/T042 タイプライター表示)', () => {
       expect(visiblePartial).toHaveTextContent(LINE.slice(0, 2))
     })
   })
+
+  describe('layout="overlay"(探索の会話オーバーレイ・#52・T047)', () => {
+    it('絶対配置のオーバーレイとして両立ち絵と会話ウィンドウを描画し、タイプライター等の挙動はstackedと同じ', () => {
+      render(
+        <ConversationFrame speaker="橘" line={LINE} layout="overlay">
+          <button type="button">閉じる</button>
+        </ConversationFrame>,
+      )
+
+      // 絶対配置の外枠を持つ(scene-explorer.tsxの`position: relative`な背景の箱に重ねる前提)。
+      const skipButton = screen.getByRole('button', { name: LINE })
+      const overlayRoot = skipButton.closest('.absolute.inset-0')
+      expect(overlayRoot).not.toBeNull()
+
+      // 霧島=左・橘=右は変わらず、話者(橘)のみフルカラー・もう一方はグレーアウトのまま。
+      expect(screen.getByAltText('霧島（待機中）')).toBeInTheDocument()
+      expect(screen.getByAltText('橘（発話中）')).toBeInTheDocument()
+
+      // 全文表示(またはスキップ)まではchildrenを出さない挙動もstackedと共有する。
+      expect(screen.queryByRole('button', { name: '閉じる' })).not.toBeInTheDocument()
+      act(() => {
+        skipButton.click()
+      })
+      expect(screen.getByText(LINE).tagName).toBe('P')
+      expect(screen.getByRole('button', { name: '閉じる' })).toBeInTheDocument()
+    })
+  })
 })

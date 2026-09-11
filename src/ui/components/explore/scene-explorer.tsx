@@ -1,12 +1,25 @@
 // src/ui/components/explore/scene-explorer.tsx — 探索④の背景シーン表示(#52/#56・T038、
 // 調査結果の会話フレーム化・不可視ホットスポット化は#52 Phase4.7/#66・T044、
-// ドア移動UI・prompt見出しは#52 Phase4.7 追補/#78・T046-ui-data)。
+// ドア移動UI・prompt見出しは#52 Phase4.7 追補/#78・T046-ui-data、
+// 会話オーバーレイ化(2状態)・調査ポイント一覧のトグル化は#52 Phase4.7 追補/T047)。
 //
-// DESIGN.md「探索シーン」節が正: 背景シーン(16:9・モバイル縦はレターボックス)の上に
-// クリック可能なホットスポット(実<button>・48px以上・aria-label・フォーカス可視)を重ね、
-// タップして調べる。シーンタブでシーン切替(キーボード到達可能)に加え、背景内のドア
-// (object_type: door・goto アクション)でもシーン移動できる(タブ・ドアの両方で移動可、
-// #78・T046-ui-data)。
+// DESIGN.md「探索シーン」節が正: 探索画面は「探索状態」と「会話状態」の2つを切り替える。
+// - 探索状態(既定): 背景シーン+ホットスポット(+シーンタブ+右上「調査ポイント一覧」トグル)
+//   のみを表示する。立ち絵も会話ウィンドウも表示しない(カーソルでのホットスポット探索を
+//   邪魔しないため。T018'''''代表モック確定 2026-09-11)。
+// - 会話状態(調査結果/人物証言/dangerの教育的フィードバックを見せる間): 背景シーンを暗転
+//   させず保持したまま、その上に会話UI(左右端の立ち絵+下部の会話ウィンドウ)を重ねる
+//   (`ConversationFrame` の `layout="overlay"`、conversation-frame.tsx 参照)。閉じると
+//   探索状態に戻り、立ち絵・会話ウィンドウは消える(=この間ホットスポットはDOMごと
+//   描画しない。会話中に隠れたホットスポットを誤って操作できないようにするため)。
+// - 右上「調査ポイント一覧」トグル: 探索状態・会話状態のどちらでも常時表示する(発見性の
+//   担保)。旧「常時併設リスト」「モバイルでは初期展開」はこのトグルに置き換えた(#66は
+//   本PRで置き換え)。開くと呼び出し側(explore-screen.tsx)から渡された`investigationList`を
+//   パネル表示する。一覧からは背景に頼らずキーボードのみで全ポイント調査→解決へ進められる。
+// - 探索完了→解決への誘導(橘の「そろそろ問題をまとめようか」)も同じ会話オーバーレイに載せる
+//   ため、呼び出し側は`conversationSlot`にoverlay layoutの`ConversationFrame`要素を渡す
+//   (scenesが無いフォールバックでは`conversationSlot`を使わずstacked layoutのまま呼び出し側で
+//   直接描画する。explore-screen.tsx参照)。
 //
 // scenario.scenes が無い場合(省略時)は呼び出し側(explore-screen.tsx)が本コンポーネントを
 // レンダーしないことで一覧表示にフォールバックする(docs/scenario_schema.md §2.5)。
@@ -26,10 +39,11 @@
 // ホットスポットの動作(docs/scenario_schema.md §2.5・spec §8.4):
 // - collect: investigation_point_id のカードを獲得する(呼び出し側の onCollect 経由、
 //   既存のINVESTIGATEイベントに接続。coreの状態機械は変更しない)。獲得後は調査結果を
-//   会話フレームで台詞提示する(下記参照)。
-// - danger: feedback(教育的な台詞)を表示するのみ。ペナルティ無し・操作継続可(詰み防止)。
-//   dispatchは一切呼ばないため、電源を落とした後も同じホットスポットは何度でも操作できる。
-//   従来どおりアクションシート内のテキストで表示する(会話フレーム化はしない、#66スコープ外)。
+//   会話オーバーレイで台詞提示する(下記参照)。
+// - danger: feedback(教育的な台詞)を会話オーバーレイで提示する(T047で従来のアクションシート内
+//   テキスト表示から変更。DESIGN.md「PC操作メニュー」節「橘の台詞・会話フレーム」)。
+//   ペナルティ無し・操作継続可(詰み防止): dispatchは一切呼ばないため、閉じて同じホットスポットを
+//   再度開けば何度でも操作できる(電源を落とした後もPCの他のactionを選べる)。
 // - noop: 何もせず閉じる。
 // - goto: シーン移動(#78・T046-ui-data)。investigation_pointを参照しないためonCollectは
 //   呼ばず、setActiveSceneIdで移動先シーンへ切り替えたうえで移動先のシーンタブへ
@@ -37,23 +51,25 @@
 // - 1ホットスポットのactionsが1件のみの場合はアクションシートを出さず、即座にそのactionを
 //   実行する(spec本文「PC等で複数actionがあるものはアクションシートで選ばせる」の裏返しで、
 //   1件のみ=personの「話を聞く」・doorの「〜へ移動する」等は選ぶ余地が無いため即実行にする)。
+//   danger/noop単独の場合は従来どおりアクションシートを経由させる(この判定自体はT047で
+//   変更していない。変わったのは経由後にdangerが表示される先=会話オーバーレイだけ)。
 //
 // アクションシートの見出し(#78・T046-ui-data): ホットスポットの省略可能な prompt(挨拶台詞、
 // 例: サーバ管理者「どうしましたか？」)を見出しに表示し、省略時はラベルのみ(現行どおり)。
 // 系統をまたぐ統合ホットスポット(人＋機器を1つに束ねた複数collect＋noop)で、何用の操作かを
 // 挨拶台詞で示す(DESIGN.md「探索シーン」節)。
 //
-// 調査結果の会話フレーム提示(#52 Phase4.7・T044、#62 吸収):
-// 人物の証言だけでなく、PC のログ・書籍の文献も含めて種別を問わず同じ経路で会話フレームに
+// 調査結果の会話オーバーレイ提示(#52 Phase4.7/T044・#62 吸収、T047で重畳表示化):
+// 人物の証言だけでなく、PC のログ・書籍の文献も含めて種別を問わず同じ経路で会話オーバーレイに
 // 台詞提示する(旧: personのみ・かつ非ダミー先頭カードを選ぶpickTestimonyCardだったため、
 // 対策カードが証言として表示される不具合があった=#62。line/speakerの明示に一本化した
-// 本Issueで、その経路自体を廃止して構造的に解消する)。
+// #66で、その経路自体を廃止して構造的に解消済み)。
 // 台詞(line)は collect action の line(#65/T043)を使い、無ければ既定の導入文
 // (person:「{ラベル}に話を聞いた。」/それ以外:「{ラベル}を調べた。」)＋そのinvestigation_point
 // に紐づく先頭カードの本文にフォールバックする。話者(speaker)は action.speaker を優先し、
 // 無ければ investigation_point.category から既定を導出する(ログを見る→霧島／それ以外
 // (人に聞く・文献を引く)→橘。resolveCollectPresentation参照)。
-import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react'
+import { type KeyboardEvent, type ReactNode, useEffect, useId, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 
 import type {
@@ -108,6 +124,7 @@ const OBJECT_TYPE_LABEL: Record<SceneHotspot['object_type'], string> = {
 }
 
 type CollectAction = Extract<HotspotAction, { kind: 'collect' }>
+type DangerAction = Extract<HotspotAction, { kind: 'danger' }>
 
 function collectActionsOf(hotspot: SceneHotspot): CollectAction[] {
   return hotspot.actions.filter((action): action is CollectAction => action.kind === 'collect')
@@ -153,22 +170,56 @@ function resolveCollectPresentation(
   return { speaker, line: firstCardBody ? `${intro}${firstCardBody}` : intro }
 }
 
+// danger の feedback は scenarios/*.yaml・テストフィクスチャのいずれも「橘「〜」」という
+// 引用付きの形式で統一して書かれている(会話フレーム導入=#42より前からの記法)。会話オーバーレイの
+// 名札に既に「橘」を表示するため、この形式に一致する場合だけ引用符を剥がして本文のみを話者の
+// 台詞として使う(二重に名乗らせないため)。schema/YAMLの変更はしない防御的な後方互換パースで、
+// 一致しない(将来 橘 以外が話す等の)feedbackはそのまま使う。
+const QUOTED_TACHIBANA_FEEDBACK = /^橘「(.+)」$/
+function resolveDangerPresentation(action: DangerAction): { speaker: Character; line: string } {
+  const match = QUOTED_TACHIBANA_FEEDBACK.exec(action.feedback)
+  return { speaker: '橘', line: match ? match[1] : action.feedback }
+}
+
+/** 会話オーバーレイに載せる内容(調査結果=collect、danger の教育的フィードバックの2種類、T047)。 */
+interface ConversationContent {
+  kind: 'collect' | 'danger'
+  hotspotLabel: string
+  speaker: Character
+  line: string
+}
+
 export interface SceneExplorerProps {
   scenario: Scenario
   /** scenario.scenes(呼び出し側で存在確認済みの非空配列)。 */
   scenes: readonly Scene[]
   investigatedPointIds: readonly string[]
-  /** 獲得済みカードid(会話フレーム上の?ボタン=CardDrawerに渡す、探索で得た手持ちカードの無料閲覧用)。 */
+  /** 獲得済みカードid(会話オーバーレイ上の?ボタン=CardDrawerに渡す、探索で得た手持ちカードの無料閲覧用)。 */
   ownedCardIds: readonly string[]
   /** investigation_point_id を1件獲得する(既存のINVESTIGATEイベント配線先)。 */
   onCollect: (pointId: string) => void
   /**
-   * 調査結果の会話フレーム(collectResult)の開閉が変わるたびに通知する(#71・T045)。
-   * 呼び出し側(explore-screen.tsx)が「探索完了→解決への誘導」の会話フレームを、この
-   * 調査結果パネルと同時に(=立ち絵ステージが2段重ねで)表示しないようにするための
-   * UI専用の配線で、coreの状態やactivation条件には一切関与しない。
+   * 会話オーバーレイ(調査結果・danger)の開閉が変わるたびに通知する(#71・T045、
+   * dangerも会話オーバーレイ化したT047でdangerの開閉も対象に含めるよう拡張)。
+   * 呼び出し側(explore-screen.tsx)が「探索完了→解決への誘導」(conversationSlot)を、
+   * このコンポーネント自身の会話オーバーレイと同時に表示しないようにするためのUI専用の配線で、
+   * coreの状態やactivation条件には一切関与しない。
    */
-  onCollectResultOpenChange?: (isOpen: boolean) => void
+  onConversationOpenChange?: (isOpen: boolean) => void
+  /**
+   * 「調査ポイント一覧」トグルパネルの中身(#66→T047でトグル化)。呼び出し側が
+   * scenario.investigation_points/progressから組み立てたJSXをそのまま渡す(見出し・
+   * 件数・調査ボタンの一覧。中身の構築はexplore-screen.tsxの責務のまま変えない)。
+   * 一覧からは背景に頼らずキーボードのみで全ポイント調査→解決へ進められることを維持する。
+   */
+  investigationList: ReactNode
+  /**
+   * 会話オーバーレイの外部枠(T047)。呼び出し側の「探索完了→解決への誘導」等、
+   * このコンポーネント自身のcollect/danger以外の会話を同じオーバーレイ上に重ねたい場合に使う
+   * (`layout="overlay"`の`ConversationFrame`要素を渡すこと)。collect/dangerの会話が開いている
+   * 間は渡されていても表示しない(二重表示防止)。
+   */
+  conversationSlot?: ReactNode
 }
 
 /** 探索④「背景シーン＋ホットスポット」表示(#52/#56)。一覧フォールバックは呼び出し側が併設する。 */
@@ -178,7 +229,9 @@ export function SceneExplorer({
   investigatedPointIds,
   ownedCardIds,
   onCollect,
-  onCollectResultOpenChange,
+  onConversationOpenChange,
+  investigationList,
+  conversationSlot,
 }: SceneExplorerProps) {
   const tabsId = useId()
   const [activeSceneId, setActiveSceneId] = useState(scenes[0].id)
@@ -191,21 +244,32 @@ export function SceneExplorer({
   // 開いているアクションシート(複数actionを持つホットスポット用)。`${hotspotIndex}` で識別する
   // (シーン切替時にクリアするため、シーンIDを跨いだ一意化は不要)。
   const [openHotspotIndex, setOpenHotspotIndex] = useState<number | null>(null)
-  const [dangerFeedback, setDangerFeedback] = useState<string | null>(null)
-  // 調査結果の会話フレーム表示状態(#52 Phase4.7/T044)。人物の証言に限らずcollect全種で使う。
-  const [collectResult, setCollectResult] = useState<{
-    hotspotLabel: string
-    speaker: Character
-    line: string
-  } | null>(null)
+  // 会話オーバーレイの中身(調査結果=collect/danger、T047で統合。以前はcollectResult/
+  // dangerFeedbackの2つのstateだったが、どちらも「会話状態」として排他的に1つしか
+  // 表示されないため1つのstateにまとめた)。
+  const [conversation, setConversation] = useState<ConversationContent | null>(null)
+  // 「調査ポイント一覧」トグルパネルの開閉(#66→T047でトグル化)。シーン切替では閉じない
+  // (一覧はシーンをまたいだ全ポイントの一覧のため、シーン非依存で開閉を保持する)。
+  const [isListOpen, setIsListOpen] = useState(false)
 
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
-  const returnFocusRef = useRef<HTMLButtonElement | null>(null)
-  // アクションシート・調査結果パネルを開いたら、フォーカスを内部の最初の操作対象へ自動的に移す
+  // 会話オーバーレイ/アクションシートを閉じた後にフォーカスを戻す先のホットスポットindex。
+  // 会話オーバーレイ表示中はホットスポット自体をDOMごと描画しない(T047)ため、要素への直接refでは
+  // 閉じた瞬間に古い(アンマウント済みの)ノードを掴んでしまう。indexだけを覚えておき、
+  // 再マウント後にid経由(hotspotDomId)で探して.focus()する(下記のuseEffect参照)。
+  const returnFocusHotspotIndexRef = useRef<number | null>(null)
+  // アクションシート・会話オーバーレイを開いたら、フォーカスを内部の最初の操作対象へ自動的に移す
   // (ダイアログ/ディスクロージャの一般的なフォーカス管理。id経由でDOM要素を掴む方式にし、
   // Button コンポーネントの ref 転送有無に依存しないようにする)。
   const sheetFirstActionId = `${tabsId}-sheet-first-action`
-  const resultCloseId = `${tabsId}-result-close`
+  const conversationCloseId = `${tabsId}-conversation-close`
+  const listPanelId = `${tabsId}-investigation-list-panel`
+  const conversationSlotId = `${tabsId}-conversation-slot`
+
+  /** ホットスポットの実体<button>のdom id(会話オーバーレイを閉じた後のフォーカス復帰に使う)。 */
+  function hotspotDomId(hotspotIndex: number): string {
+    return `${tabsId}-hotspot-${hotspotIndex}`
+  }
 
   useEffect(() => {
     if (openHotspotIndex !== null) {
@@ -213,24 +277,64 @@ export function SceneExplorer({
     }
   }, [openHotspotIndex, sheetFirstActionId])
 
-  // 調査結果パネルの開閉を呼び出し側へ通知する(#71・T045。上記コメント・SceneExplorerProps参照)。
+  // 「調査ポイント一覧」トグルを開いた瞬間だけパネル自体へフォーカスを移す(依存配列は
+  // isListOpenのみ=開いた/閉じたの遷移でしか発火しないため、パネル内のボタン操作による
+  // 再レンダーのたびにフォーカスを奪い返すことはない。インラインのcallback refだと
+  // 毎レンダーで新しい関数として呼ばれ直しフォーカスを奪ってしまうため、useEffectにする)。
   useEffect(() => {
-    onCollectResultOpenChange?.(collectResult !== null)
-  }, [collectResult, onCollectResultOpenChange])
+    if (isListOpen) document.getElementById(listPanelId)?.focus()
+  }, [isListOpen, listPanelId])
 
-  // 調査結果パネルの「閉じる」はConversationFrameのchildrenのため、タイプライターの全文表示
-  // (またはスキップ)が完了するまでDOMに存在しない(#64/T042)。以前のように collectResult が
-  // 変わった直後にフォーカスしても閉じるボタンはまだ無く空振りするため、ConversationFrame の
-  // onLineRevealed(全文表示完了の通知)を経由してフォーカスする。
+  // 会話オーバーレイの開閉を呼び出し側へ通知する(#71・T045。上記コメント・SceneExplorerProps参照)。
+  useEffect(() => {
+    onConversationOpenChange?.(conversation !== null)
+  }, [conversation, onConversationOpenChange])
+
+  // 会話オーバーレイを閉じた瞬間、ホットスポットが再マウントされた後にフォーカスを戻す
+  // (T047・上記returnFocusHotspotIndexRefのコメント参照)。conversationがnullになる
+  // 遷移でのみ発火すればよいため依存配列はconversationのみにする(returnFocusHotspotIndexRefの
+  // 値自体はイベントハンドラ内で直接更新するrefのため、effectの再実行トリガーにはしない)。
+  useEffect(() => {
+    if (conversation !== null) return
+    const index = returnFocusHotspotIndexRef.current
+    if (index === null) return
+    document.getElementById(hotspotDomId(index))?.focus()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation])
+
+  // 呼び出し側の会話(conversationSlot、探索完了→解決への誘導)が自身のconversationと
+  // 入れ替わりで表示された瞬間、その内部の最初の操作可能要素(タイプライターのスキップボタン、
+  // またはprefers-reduced-motionなら「わかった」等)へフォーカスを移す(advisor指摘)。
+  // これが無いと、直前にホットスポットへ戻ったフォーカスが、この入れ替わり表示でホットスポットが
+  // 再度アンマウントされた瞬間にdocumentへ落ちてしまう(キーボード利用者が最後の手がかりを
+  // 調べ終えた直後に迷子になる)。isWrapUpVisibleはboolean(プリミティブ)のため、trueの間
+  // ずっと表示され続けても再発火はしない(false→trueの遷移でのみ発火、他のuseEffectと同じ設計)。
+  const isWrapUpVisible = conversation === null && Boolean(conversationSlot)
+  useEffect(() => {
+    if (!isWrapUpVisible) return
+    document
+      .getElementById(conversationSlotId)
+      ?.querySelector<HTMLElement>('button:not([disabled])')
+      ?.focus()
+  }, [isWrapUpVisible, conversationSlotId])
 
   function closeOverlays() {
     setOpenHotspotIndex(null)
-    setDangerFeedback(null)
-    setCollectResult(null)
+    // シーン切替(selectScene/gotoScene)で呼ばれるため、戻り先のホットスポットindexは
+    // 別シーンのものとして意味を失う。先にnullへ落としておかないと、下のuseEffectが
+    // 新しいシーンの同じindexのホットスポット(無関係な要素)へ誤ってフォーカスしてしまう
+    // (advisor指摘)。
+    returnFocusHotspotIndexRef.current = null
+    setConversation(null)
   }
 
+  /** アクションシートのX閉じる・noop選択時の、ホットスポットへのフォーカス復帰(同期)。
+   * この経路ではホットスポットは会話オーバーレイと違って常に描画されたままのため、
+   * 上のuseEffectを介さずその場でfocusしてよい。 */
   function returnFocus() {
-    returnFocusRef.current?.focus()
+    const index = returnFocusHotspotIndexRef.current
+    if (index === null) return
+    document.getElementById(hotspotDomId(index))?.focus()
   }
 
   function selectScene(index: number) {
@@ -266,16 +370,18 @@ export function SceneExplorer({
   function runAction(hotspot: SceneHotspot, action: HotspotAction) {
     if (action.kind === 'collect') {
       onCollect(action.investigation_point_id)
-      // 種別を問わず同じ経路で調査結果を会話フレームに台詞提示する(#62吸収、ファイル冒頭コメント参照)。
+      // 種別を問わず同じ経路で調査結果を会話オーバーレイに台詞提示する(#62吸収、ファイル冒頭コメント参照)。
       const { speaker, line } = resolveCollectPresentation(scenario, hotspot, action)
       setOpenHotspotIndex(null)
-      setDangerFeedback(null)
-      setCollectResult({ hotspotLabel: hotspot.label, speaker, line })
+      setConversation({ kind: 'collect', hotspotLabel: hotspot.label, speaker, line })
       return
     }
     if (action.kind === 'danger') {
-      // 教育的フィードバックのみ。dispatchしない=ペナルティ無し・操作継続可(詰み防止)。
-      setDangerFeedback(action.feedback)
+      // 教育的フィードバックを会話オーバーレイで提示する(T047。dispatchしない=ペナルティ無し・
+      // 操作継続可。詰み防止=閉じて同じホットスポットを再度開けば他のactionを選べる)。
+      const { speaker, line } = resolveDangerPresentation(action)
+      setOpenHotspotIndex(null)
+      setConversation({ kind: 'danger', hotspotLabel: hotspot.label, speaker, line })
       return
     }
     if (action.kind === 'goto') {
@@ -286,35 +392,31 @@ export function SceneExplorer({
     }
     // noop: 何もせず閉じる。
     setOpenHotspotIndex(null)
-    setDangerFeedback(null)
     returnFocus()
   }
 
-  function handleHotspotActivate(
-    hotspot: SceneHotspot,
-    hotspotIndex: number,
-    trigger: HTMLButtonElement,
-  ) {
-    returnFocusRef.current = trigger
-    setCollectResult(null)
+  function handleHotspotActivate(hotspot: SceneHotspot, hotspotIndex: number) {
+    returnFocusHotspotIndexRef.current = hotspotIndex
+    setConversation(null)
     // 単一actionのショートカット即実行は「collectまたはgoto」の場合に限る(例: personの
     // 「話を聞く」、doorの「〜へ移動する」)。いずれも選ぶ余地が無い1択のため、アクションシートを
     // 経由させず即座に実行する(#78・T046-ui-data。goto単独=door標準形をここに含めた)。
-    // danger/noop単独の場合はアクションシートを経由させ、教育的フィードバックの表示先
-    // (アクションシート内)を確保する(danger単独ホットスポットでもfeedbackが必ず表示される)。
+    // danger/noop単独の場合はアクションシートを経由させる(この判定はT047で変更していない)。
     const onlyAction = hotspot.actions.length === 1 ? hotspot.actions[0] : null
     if (onlyAction && (onlyAction.kind === 'collect' || onlyAction.kind === 'goto')) {
       runAction(hotspot, onlyAction)
       return
     }
-    setDangerFeedback(null)
     setOpenHotspotIndex(hotspotIndex)
   }
 
   const openHotspot =
     openHotspotIndex !== null ? (activeScene.hotspots[openHotspotIndex] ?? null) : null
-  // 調査結果の会話フレーム上に置く?ボタン(CardDrawer)へ渡す、探索で得た手持ちカード(#66)。
+  // 会話オーバーレイ上に置く?ボタン(CardDrawer)へ渡す、探索で得た手持ちカード(#66)。
   const ownedCards = scenario.cards.filter((card) => ownedCardIds.includes(card.id))
+  // 会話状態かどうか(DESIGN.md「探索シーン」節「2つの状態」)。自身のconversation(collect/danger)
+  // に加え、呼び出し側から渡されたconversationSlot(探索完了→解決への誘導)も会話状態に含める。
+  const isConversationActive = conversation !== null || Boolean(conversationSlot)
 
   return (
     <div className="flex flex-col gap-3">
@@ -381,38 +483,95 @@ export function SceneExplorer({
               </span>
             </div>
           )}
-          {activeScene.hotspots.map((hotspot, hotspotIndex) => {
-            const [x, y] = hotspot.position
-            const investigated = isHotspotInvestigated(hotspot, investigatedPointIds)
-            const needsSheet = hotspot.actions.length > 1
-            return (
-              <Button
-                key={hotspotIndex}
-                type="button"
-                variant="ghost"
-                aria-label={`${hotspot.label}（${OBJECT_TYPE_LABEL[hotspot.object_type]}）${investigated ? '・調査済み' : ''}`}
-                aria-expanded={needsSheet ? openHotspotIndex === hotspotIndex : undefined}
-                aria-haspopup={needsSheet ? 'true' : undefined}
-                style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
-                // 通常はアイコンも名前ラベルも表示しない(背景の絵に溶け込ませる、DESIGN.md
-                // 「探索シーン」節・T018''代表決定)。ホバー/キーボードフォーカス時にのみ
-                // □マーカー(矩形のアウトライン)を出し、位置と操作可能を示す。
-                // □マーカーの枠線は赤系(hotspot-highlightトークン、T018'''代表フィードバック
-                // #71・T045。危険操作のdestructive/warningとは別トークンとして src/index.css に
-                // 追加した)。フォーカス可視(WCAG 2.4.7)は□マーカーが兼ねるため、focus-visible
-                // でも同じ色にする(色だけでなく枠線の出現自体で操作可能性を示す)。
-                // aria-expanded:bg-mutedはButtonのghost variant既定のため、シートを開いた
-                // ホットスポットに常時の塗りが出ないよう打ち消す(不可視の原則を優先)。
-                className="absolute min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-transparent bg-transparent hover:border-hotspot-highlight hover:bg-transparent hover:ring-3 hover:ring-hotspot-highlight/50 focus-visible:border-hotspot-highlight focus-visible:ring-hotspot-highlight/50 aria-expanded:bg-transparent dark:hover:bg-transparent"
-                onClick={(event) =>
-                  handleHotspotActivate(hotspot, hotspotIndex, event.currentTarget)
-                }
-              />
-            )
-          })}
+
+          {/* 「調査ポイント一覧」トグル(#66→T047でトグル化): 探索状態・会話状態のどちらでも
+              常時表示する(発見性の担保、DESIGN.md「探索シーン」節「一覧フォールバック」)。
+              キーボード到達順を「トグル→ホットスポット→(会話状態では会話ウィンドウ内)」に
+              するため、ホットスポット・会話オーバーレイより先にDOM上へ置く。背景画像の上に
+              常時視認できる必要があるため、ホットスポットとは逆にbg-card等で常時可視にする。 */}
+          <Button
+            type="button"
+            variant="outline"
+            aria-expanded={isListOpen}
+            aria-controls={listPanelId}
+            onClick={() => setIsListOpen((v) => !v)}
+            className="bg-card/95 hover:bg-card absolute top-2 right-2 z-20 h-12 min-w-12 px-3 text-sm font-medium shadow-sm"
+          >
+            調査ポイント一覧
+          </Button>
+
+          {/* 探索状態でのみホットスポットを描画する(会話状態では背景の下に隠さず、そもそも
+              DOMに置かない=誤操作防止・キーボード到達順の単純化、DESIGN.md「探索シーン」節)。 */}
+          {!isConversationActive &&
+            activeScene.hotspots.map((hotspot, hotspotIndex) => {
+              const [x, y] = hotspot.position
+              const investigated = isHotspotInvestigated(hotspot, investigatedPointIds)
+              const needsSheet = hotspot.actions.length > 1
+              return (
+                <Button
+                  key={hotspotIndex}
+                  type="button"
+                  variant="ghost"
+                  id={hotspotDomId(hotspotIndex)}
+                  aria-label={`${hotspot.label}（${OBJECT_TYPE_LABEL[hotspot.object_type]}）${investigated ? '・調査済み' : ''}`}
+                  aria-expanded={needsSheet ? openHotspotIndex === hotspotIndex : undefined}
+                  aria-haspopup={needsSheet ? 'true' : undefined}
+                  style={{ left: `${x * 100}%`, top: `${y * 100}%` }}
+                  // 通常はアイコンも名前ラベルも表示しない(背景の絵に溶け込ませる、DESIGN.md
+                  // 「探索シーン」節・T018''代表決定)。ホバー/キーボードフォーカス時にのみ
+                  // □マーカー(矩形のアウトライン)を出し、位置と操作可能を示す。
+                  // □マーカーの枠線は赤系(hotspot-highlightトークン、T018'''代表フィードバック
+                  // #71・T045。危険操作のdestructive/warningとは別トークンとして src/index.css に
+                  // 追加した)。フォーカス可視(WCAG 2.4.7)は□マーカーが兼ねるため、focus-visible
+                  // でも同じ色にする(色だけでなく枠線の出現自体で操作可能性を示す)。
+                  // aria-expanded:bg-mutedはButtonのghost variant既定のため、シートを開いた
+                  // ホットスポットに常時の塗りが出ないよう打ち消す(不可視の原則を優先)。
+                  className="absolute min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-transparent bg-transparent hover:border-hotspot-highlight hover:bg-transparent hover:ring-3 hover:ring-hotspot-highlight/50 focus-visible:border-hotspot-highlight focus-visible:ring-hotspot-highlight/50 aria-expanded:bg-transparent dark:hover:bg-transparent"
+                  onClick={() => handleHotspotActivate(hotspot, hotspotIndex)}
+                />
+              )
+            })}
+
+          {/* 会話状態(T047): 調査結果/dangerの教育的フィードバック(自身のconversation)、
+              または呼び出し側の会話(conversationSlot、探索完了→解決への誘導)を排他的に
+              重ねる。背景シーンは暗転させずそのまま保持する(DESIGN.md「探索シーン」節)。 */}
+          {conversation ? (
+            <ConversationFrame
+              layout="overlay"
+              speaker={conversation.speaker}
+              line={conversation.line}
+              onLineRevealed={() => document.getElementById(conversationCloseId)?.focus()}
+            >
+              <p className="text-muted-foreground text-xs">
+                {conversation.kind === 'collect'
+                  ? `${conversation.hotspotLabel}を調べた結果`
+                  : `${conversation.hotspotLabel}を操作した結果`}
+              </p>
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  id={conversationCloseId}
+                  className="h-12 min-w-12 px-6"
+                  onClick={() => setConversation(null)}
+                >
+                  閉じる
+                </Button>
+                {/* カード閲覧(無料)の?ボタン(DESIGN.md「探索シーン」節。解決の card-drawer と同じ、
+                    相談=回数消費とは別物)。 */}
+                <CardDrawer cards={ownedCards} triggerVariant="icon" />
+              </div>
+            </ConversationFrame>
+          ) : conversationSlot ? (
+            // idはisWrapUpVisibleのuseEffectが最初の操作可能要素を探すためのフック
+            // (上記コメント参照)。
+            <div id={conversationSlotId}>{conversationSlot}</div>
+          ) : null}
         </div>
 
-        {/* アクションシート: 複数actionを持つホットスポット用(固定順・並べ替えない)。 */}
+        {/* アクションシート: 複数actionを持つホットスポット用(固定順・並べ替えない)。
+            探索状態でのみ開き得る(danger/collectを選ぶと会話オーバーレイに切り替わってこのシートは
+            閉じるため、会話状態と同時に表示されることはない)。 */}
         {openHotspot && (
           <div
             role="group"
@@ -431,7 +590,6 @@ export function SceneExplorer({
                 aria-label="操作メニューを閉じる"
                 onClick={() => {
                   setOpenHotspotIndex(null)
-                  setDangerFeedback(null)
                   returnFocus()
                 }}
               >
@@ -459,55 +617,23 @@ export function SceneExplorer({
                 )
               })}
             </ul>
-            {/* 電源を落とす等の教育的フィードバック。ペナルティ無し・操作継続可(詰み防止、spec §8.4)。
-                aria-live(role=alertにしない。緊急の警告ではないため resolve-screen.tsx と同方針)。 */}
-            {dangerFeedback && (
-              <div
-                aria-live="polite"
-                className="border-border bg-background rounded-lg border p-3 text-sm"
-              >
-                {dangerFeedback}
-              </div>
-            )}
           </div>
         )}
-
-        {/* 調査結果は種別を問わず会話フレームで台詞提示する(#52 Phase4.7/T044・#62吸収、
-            DESIGN.md「探索シーン」節。ファイル冒頭コメント参照)。
-            「閉じる」を?ボタン(CardDrawer)より先にDOM上へ置く: タイプライターのスキップ操作
-            (#64/T042)は完了後に children 内の最初のフォーカス可能要素へ自動的にフォーカスを
-            移すため、閉じるが先勝ちするようにしてホットスポットへのフォーカス復帰動線
-            (returnFocus)を保つ。?ボタンは視覚上は同じ行の右側に置く(flexのjustify-betweenで
-            並び順=視覚位置がそのまま合致するため、DOM順と見た目の両立を犠牲にしない)。 */}
-        {collectResult && (
-          <ConversationFrame
-            speaker={collectResult.speaker}
-            line={collectResult.line}
-            onLineRevealed={() => document.getElementById(resultCloseId)?.focus()}
-          >
-            <p className="text-muted-foreground text-xs">
-              {collectResult.hotspotLabel}を調べた結果
-            </p>
-            <div className="flex items-center justify-between gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                id={resultCloseId}
-                className="h-12 min-w-12 px-6"
-                onClick={() => {
-                  setCollectResult(null)
-                  returnFocus()
-                }}
-              >
-                閉じる
-              </Button>
-              {/* カード閲覧(無料)の?ボタン(DESIGN.md「探索シーン」節。解決の card-drawer と同じ、
-                  相談=回数消費とは別物)。 */}
-              <CardDrawer cards={ownedCards} triggerVariant="icon" />
-            </div>
-          </ConversationFrame>
-        )}
       </div>
+
+      {/* 「調査ポイント一覧」トグルパネル(#66→T047でトグル化)。中身は呼び出し側
+          (explore-screen.tsx)が組み立てたものをそのまま表示する。開いた瞬間にパネル自体へ
+          フォーカスを移し(tabIndex=-1)、ホットスポットを何度もTabで飛ばさずに一覧の
+          最初の操作へ到達できるようにする(WCAG、DESIGN.md「一覧フォールバック」節)。 */}
+      {isListOpen && (
+        <div
+          id={listPanelId}
+          tabIndex={-1}
+          className="border-border bg-card flex flex-col gap-3 rounded-lg border p-4 outline-none"
+        >
+          {investigationList}
+        </div>
+      )}
     </div>
   )
 }

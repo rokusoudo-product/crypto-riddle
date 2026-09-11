@@ -53,7 +53,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
-    await expect(page.getByText('委託契約書(監督条項)の確認')).toBeVisible()
+    // 「調査ポイント一覧」はトグルを開くまで表示されない(#66→T047でトグル化)ため、
+    // このテスト(背景シーン経由)ではここでは開かず、末尾で開いて件数を確認する。
 
     // 自社執務室(#76 仕上げで採用背景が確定し、scene-explorer.tsx の BACKGROUND_SRC に
     // 登録済み=実画像の<img>で表示される)。
@@ -84,16 +85,29 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await pcHotspot.click()
     await expect(page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' })).toBeVisible()
 
-    // dangerを先に選ぶ: 教育的フィードバックのみが表示され、シートは閉じない(詰み防止)。
+    // dangerを先に選ぶ: アクションシートは閉じ、会話オーバーレイ(橘の台詞)で教育的
+    // フィードバックが提示される(T047。旧: シート内テキスト表示)。探索ではペナルティに
+    // ならない(詰み防止・spec §8.4)。
     await page
       .getByRole('button', {
         name: '委託先からの一次報告メールを、事実関係の確認や公表判断を待たずにそのまま社内外へ転送する',
       })
       .click()
-    await expect(page.getByText('混乱と説明責任の問題を招きます', { exact: false })).toBeVisible()
-    await expect(page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' })).toBeVisible()
+    await expect(
+      page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' }),
+    ).toBeHidden()
+    const dangerLine =
+      '事実関係が固まる前に未確認の情報を広めると、後で内容が変わった場合に混乱と説明責任の問題を招きます。まずは委託先に詳細を確認し、社内の情報管理体制に沿って共有してください。'
+    await expect(page.getByText(dangerLine, { exact: false })).toBeVisible()
 
-    // 危険操作の後も同じホットスポットを操作でき、ログをcollectできる(詰み防止)。
+    // 会話オーバーレイを閉じると探索状態に戻り、同じホットスポットを再度開いて他のactionを
+    // 選べる(危険操作の後も操作継続可=詰み防止)。ログをcollectできる。
+    await skipTypewriter(page, dangerLine)
+    await page.getByRole('button', { name: '閉じる' }).click()
+    await pcHotspot.click()
+    await expect(
+      page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' }),
+    ).toBeVisible()
     await page.getByRole('button', { name: '委託先からの一次報告を確認する' }).click()
     await expect(page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' })).toBeHidden()
     const reportLine =
@@ -141,6 +155,14 @@ test.describe('SL「委託先クラウドストレージからの個人データ
       '委託先が提出した安全管理措置の報告書を確認した。アクセス権限の設定手順は定められているが、変更後の設定内容を第三者が確認するダブルチェック体制までは整備されていなかった。'
     await skipTypewriter(page, safetyLine)
     await page.getByRole('button', { name: '閉じる' }).click()
+
+    // これが6件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
+    // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
+    // 引き継ぐ)。ドア等のホットスポットを操作する前に一旦それを閉じる。
+    const wrapUpLine = 'そろそろ問題をまとめようか。'
+    await expect(page.getByText(wrapUpLine)).toBeVisible()
+    await skipTypewriter(page, wrapUpLine)
+    await page.getByRole('button', { name: 'わかった' }).click()
     await expect(safetyBookHotspot).toHaveAccessibleName('委託先の安全管理措置報告書（書籍）・調査済み')
 
     // --- ドア(door)で執務室へ戻る(委託先ブース側の door は削除しておらず、タブと併用可能な
@@ -153,7 +175,9 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await vendorTab.click()
     await expect(vendorTab).toHaveAttribute('aria-selected', 'true')
 
-    // 一覧側(常に併設)でも6/6件が調査済みとして共有されている。
+    // 「調査ポイント一覧」トグルを開いて一覧側でも6/6件が調査済みとして共有されていることを
+    // 確認する(#66→T047でトグル化)。
+    await page.getByRole('button', { name: '調査ポイント一覧' }).click()
     await expect(page.getByText('6/6 件調査済み')).toBeVisible()
     await expect(page.getByRole('button', { name: '調査する' })).toHaveCount(0)
 
@@ -233,7 +257,9 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
-    // 一覧側の「調査する」だけで全6箇所を調査する(背景シーンのホットスポットには触れない)。
+    // 「調査ポイント一覧」トグルを開き(#66→T047でトグル化)、一覧側の「調査する」だけで
+    // 全6箇所を調査する(背景シーンのホットスポットには触れない)。
+    await page.getByRole('button', { name: '調査ポイント一覧' }).click()
     let investigateButton = page.getByRole('button', { name: '調査する' }).first()
     while (await investigateButton.count()) {
       await investigateButton.click()

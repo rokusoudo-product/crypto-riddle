@@ -23,7 +23,17 @@
 // 文献も)を種別を問わず会話フレームで台詞提示する方式に刷新し、ホットスポットを常時不可視化した。
 // これに伴い下の「背景シーン経由の探索」describe を全面的に書き直し、#62(人物証言に対策
 // カードが表示される不具合)の回帰確認・タッチ端末での調査ポイント一覧の初期表示確認を
-// describe を追加して行う。
+// describe を追加して行った。
+//
+// 2026-09-11(#52 Phase4.7 追補・T047): 探索を「探索状態/会話状態」の2状態に刷新した
+// (DESIGN.md「探索シーン」節「2つの状態」)。danger操作も教育的フィードバックを会話オーバーレイで
+// 提示するようになった(旧: アクションシート内テキスト表示のまま)ため、danger選択後は
+// アクションシートが閉じる前提に書き直した。「調査ポイント一覧」は scenes があるマップでは
+// もはや常時併設ではなく、右上の「調査ポイント一覧」トグル(探索・会話状態とも常時表示)で
+// 開閉する(上記#66で追加した「タッチ端末での初期表示」describeは、この常時可視トグルへの
+// 置換に伴い書き直した)。全ポイント調査完了の直後は、探索完了への誘導(#71・T045)の会話
+// オーバーレイが入れ替わりで自動的に開くため、一部のテストは「わかった」で一度閉じてから
+// 一覧・ホットスポットの状態を確認する手順を挟んでいる。
 import { expect, test } from '@playwright/test'
 
 /**
@@ -61,6 +71,10 @@ async function playThroughExplorationToResolution(page: import('@playwright/test
 
   await page.getByRole('button', { name: 'タップで進行' }).click()
   await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
+
+  // S1は背景シーン(#57/T040)を持つため、「調査ポイント一覧」はトグルを開くまで表示されない
+  // (#66→T047でトグル化。トグル自体は探索・会話状態のどちらでも常時表示される)。
+  await page.getByRole('button', { name: '調査ポイント一覧' }).click()
   await expect(page.getByText('プロキシログ')).toBeVisible()
 
   // 全調査ポイントをタップで調査する(9箇所)。
@@ -220,15 +234,22 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await pcHotspot.click()
     await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeVisible()
 
-    // dangerを先に選ぶ: 教育的フィードバックのみが表示され、シートは閉じない(詰み防止)。
+    // dangerを先に選ぶ: アクションシートは閉じ、会話オーバーレイ(橘の台詞)で教育的
+    // フィードバックが提示される(T047。旧: シート内テキスト表示)。探索ではペナルティに
+    // ならない(詰み防止・spec §8.4)。
     await page.getByRole('button', { name: '感染端末の電源を落とす' }).click()
-    await expect(
-      page.getByText('揮発性メモリの証拠が消えてしまいます', { exact: false }),
-    ).toBeVisible()
-    await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeVisible()
+    await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeHidden()
+    const dangerLine =
+      'ここで電源を落とすと、動作中のプロセスや通信先の情報が乗った揮発性メモリの証拠が消えてしまいます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全してください。'
+    await expect(page.getByText(dangerLine, { exact: false })).toBeVisible()
 
-    // 電源を落とした後も同じホットスポットを操作でき、EDRログをcollectできる(詰み防止)。
-    // collectするとシートは閉じ、調査結果が会話フレームで台詞提示される(#66、話者=霧島の既定)。
+    // 会話オーバーレイを閉じると探索状態に戻り、同じホットスポットを再度開いて他のactionを
+    // 選べる(電源を落とした後も操作継続可=詰み防止)。EDRログをcollectすると、シートは閉じ、
+    // 調査結果が会話オーバーレイで台詞提示される(#66、話者=霧島の既定)。
+    await skipTypewriter(page, dangerLine)
+    await page.getByRole('button', { name: '閉じる' }).click()
+    await pcHotspot.click()
+    await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeVisible()
     await page.getByRole('button', { name: 'EDRアラートを確認する' }).click()
     await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeHidden()
     const edrLine =
@@ -308,9 +329,20 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     const itStaffLine =
       '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。'
     await skipCollectResultAndClose(page, itStaffLine)
+
+    // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
+    // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
+    // 引き継ぐ)。ホットスポットの状態を確認する前に一旦それを閉じる。
+    const wrapUpLine = 'そろそろ問題をまとめようか。'
+    await expect(page.getByText(wrapUpLine)).toBeVisible()
+    await skipTypewriter(page, wrapUpLine)
+    await page.getByRole('button', { name: 'わかった' }).click()
+
     await expect(adminHotspot).toHaveAccessibleName('サーバ管理者（人物）・調査済み')
 
-    // 一覧側(常に併設)でも9/9件が調査済みとして共有されている。
+    // 「調査ポイント一覧」トグルを開いて一覧側でも9/9件が調査済みとして共有されていることを
+    // 確認する(#66→T047でトグル化)。
+    await page.getByRole('button', { name: '調査ポイント一覧' }).click()
     await expect(page.getByText('9/9 件調査済み')).toBeVisible()
     await expect(page.getByRole('button', { name: '調査する' })).toHaveCount(0)
 
@@ -400,14 +432,15 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
   })
 })
 
-// #52 Phase4.7/#66・T044: ホットスポットを常時不可視にした補償として、タッチ端末(モバイル幅)
-// では「調査ポイント一覧」を折りたたまず初期表示することが完了条件になった(DESIGN.md
-// 「探索シーン」節)。explore-screen.tsx は元々折りたたみ機構を持たないため実装変更は不要だが、
-// 将来の回帰(例: モバイルで一覧を隠す最適化を誤って入れる)を防ぐためここで固定する。
-test.describe('S1「標的型メールからの侵入」タッチ端末での調査ポイント一覧の初期表示(#66)', () => {
+// #52 Phase4.7 追補・T047: 旧仕様(#66・タッチ端末では「調査ポイント一覧」を折りたたまず
+// 初期表示)を、右上の「調査ポイント一覧」トグル(探索・会話状態のどちらでも常時表示)に
+// 置き換えた(発見性はトグル自体の常時可視で担保する。DESIGN.md「探索シーン」節
+// 「一覧フォールバック」)。モバイル幅・タッチ端末でもトグルが常時見え、キーボードのみに
+// 頼らずタップだけで一覧を開閉できることを固定する。
+test.describe('S1「標的型メールからの侵入」タッチ端末での「調査ポイント一覧」トグル(#66→T047でトグル化)', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
 
-  test('モバイル幅・タッチ端末では、探索到達直後から「調査ポイント一覧」が折りたたまれず全件表示される', async ({
+  test('モバイル幅・タッチ端末でも「調査ポイント一覧」トグルは常時見え、開くと9件すべてが表示される', async ({
     page,
   }) => {
     await page.goto('/')
@@ -416,8 +449,13 @@ test.describe('S1「標的型メールからの侵入」タッチ端末での調
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
-    // 折りたたみ操作なしで、初期表示のまま9件すべての調査ポイントが見える(不可視ホットスポットの
-    // 補償。開閉トグル等は無いため、追加の操作をせずに visible であることそのものが完了条件)。
+    const toggle = page.getByRole('button', { name: '調査ポイント一覧' })
+    await expect(toggle).toBeVisible()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await expect(page.getByRole('heading', { name: '調査ポイント一覧' })).toHaveCount(0)
+
+    await toggle.click()
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true')
     await expect(page.getByRole('heading', { name: '調査ポイント一覧' })).toBeVisible()
     await expect(page.getByRole('button', { name: '調査する' })).toHaveCount(9)
     await expect(page.getByText('プロキシログ')).toBeVisible()
@@ -442,7 +480,9 @@ test.describe('S1「標的型メールからの侵入」探索完了→解決へ
     const wrapUpLine = 'そろそろ問題をまとめようか。'
     await expect(page.getByText(wrapUpLine)).toHaveCount(0)
 
-    // 一覧側(常に併設)から全9件を調査し、活性条件を満たす。
+    // 「調査ポイント一覧」トグルを開き(#66→T047でトグル化)、一覧側から全9件を調査して
+    // 活性条件を満たす。
+    await page.getByRole('button', { name: '調査ポイント一覧' }).click()
     let investigateButton = page.getByRole('button', { name: '調査する' }).first()
     while (await investigateButton.count()) {
       await investigateButton.click()

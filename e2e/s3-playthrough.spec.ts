@@ -48,7 +48,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
 
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
-    await expect(page.getByText('決済関連データベースの監査')).toBeVisible()
+    // 「調査ポイント一覧」はトグルを開くまで表示されない(#66→T047でトグル化)ため、
+    // このテスト(背景シーン経由)ではここでは開かず、末尾で開いて件数を確認する。
 
     // 執務室(#88で bg-s3-office を BACKGROUND_SRC に登録済み。実背景<img>が表示される)。
     const officeTab = page.getByRole('tab', { name: '執務室' })
@@ -61,16 +62,25 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await pcHotspot.click()
     await expect(page.getByRole('group', { name: 'EC運営担当者の端末の操作' })).toBeVisible()
 
-    // dangerを先に選ぶ: 教育的フィードバックのみが表示され、シートは閉じない(詰み防止)。
+    // dangerを先に選ぶ: アクションシートは閉じ、会話オーバーレイ(橘の台詞)で教育的
+    // フィードバックが提示される(T047。旧: シート内テキスト表示)。探索ではペナルティに
+    // ならない(詰み防止・spec §8.4)。
     await page
       .getByRole('button', {
         name: '改ざんに気づいた決済ページのファイルを、証拠を残さずすぐに元へ書き戻す',
       })
       .click()
-    await expect(page.getByText('手がかりが失われます', { exact: false })).toBeVisible()
-    await expect(page.getByRole('group', { name: 'EC運営担当者の端末の操作' })).toBeVisible()
+    await expect(page.getByRole('group', { name: 'EC運営担当者の端末の操作' })).toBeHidden()
+    const dangerLine =
+      '証拠を残さずに書き戻してしまうと、いつ・どのようにスクリプトが追加され、どこへデータが送られていたのかという手がかりが失われます。まず該当ページを一時停止し、改ざんされたファイルと通信先を保全してから対応してください。'
+    await expect(page.getByText(dangerLine, { exact: false })).toBeVisible()
 
-    // 危険操作の後も同じホットスポットを操作でき、ログをcollectできる(詰み防止)。
+    // 会話オーバーレイを閉じると探索状態に戻り、同じホットスポットを再度開いて他のactionを
+    // 選べる(危険操作の後も操作継続可=詰み防止)。ログをcollectできる。
+    await skipTypewriter(page, dangerLine)
+    await page.getByRole('button', { name: '閉じる' }).click()
+    await pcHotspot.click()
+    await expect(page.getByRole('group', { name: 'EC運営担当者の端末の操作' })).toBeVisible()
     await page.getByRole('button', { name: 'カード情報の保存状況を確認する' }).click()
     await expect(page.getByRole('group', { name: 'EC運営担当者の端末の操作' })).toBeHidden()
     const dbLine =
@@ -157,7 +167,17 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await page.getByRole('button', { name: '閉じる' }).click()
     await expect(vendorHotspot).toHaveAccessibleName('開発委託先の担当者（人物）・調査済み')
 
-    // 一覧側(常に併設)でも9/9件が調査済みとして共有されている。
+    // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
+    // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
+    // 引き継ぐ)。一覧を確認する前に一旦それを閉じる。
+    const wrapUpLine = 'そろそろ問題をまとめようか。'
+    await expect(page.getByText(wrapUpLine)).toBeVisible()
+    await skipTypewriter(page, wrapUpLine)
+    await page.getByRole('button', { name: 'わかった' }).click()
+
+    // 「調査ポイント一覧」トグルを開いて一覧側でも9/9件が調査済みとして共有されていることを
+    // 確認する(#66→T047でトグル化)。
+    await page.getByRole('button', { name: '調査ポイント一覧' }).click()
     await expect(page.getByText('9/9 件調査済み')).toBeVisible()
     await expect(page.getByRole('button', { name: '調査する' })).toHaveCount(0)
 
@@ -239,7 +259,9 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await page.getByRole('button', { name: 'タップで進行' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
-    // 一覧側の「調査する」だけで全9箇所を調査する(背景シーンのホットスポットには触れない)。
+    // 「調査ポイント一覧」トグルを開き(#66→T047でトグル化)、一覧側の「調査する」だけで
+    // 全9箇所を調査する(背景シーンのホットスポットには触れない)。
+    await page.getByRole('button', { name: '調査ポイント一覧' }).click()
     let investigateButton = page.getByRole('button', { name: '調査する' }).first()
     while (await investigateButton.count()) {
       await investigateButton.click()
