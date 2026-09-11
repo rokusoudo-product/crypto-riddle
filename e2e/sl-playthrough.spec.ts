@@ -148,6 +148,18 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await page.getByRole('button', { name: testimonyLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
     await expect(vendorHotspot).toHaveAccessibleName('委託先担当者（人物）・調査済み')
 
+    // --- ドア(door)で執務室へ戻る(委託先ブース側の door は削除しておらず、タブと併用可能な
+    // ことを引き続き確認する・#78/T046-ui-dataと同じ結線)。最後の調査(次段)より前に確認する:
+    // 「わかった」は#52追補で解決画面へ直接遷移するようになり、探索状態には戻らないため、
+    // ドア・タブの往復はまだ「解決へ」の活性条件を満たしていないこの時点で行う。 ---
+    await page.getByRole('button', { name: '執務室への扉（扉）' }).click()
+    await expect(officeTab).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('img', { name: '自社執務室の背景', exact: true })).toBeVisible()
+
+    // 一覧側の調査状況は保持されたまま、再度委託先ブースへ戻る。
+    await vendorTab.click()
+    await expect(vendorTab).toHaveAttribute('aria-selected', 'true')
+
     // --- 委託先ブース: book(委託先の安全管理措置報告書。単一action=即実行) ---
     const safetyBookHotspot = page.getByRole('button', { name: '委託先の安全管理措置報告書（書籍）' })
     await safetyBookHotspot.click()
@@ -158,32 +170,23 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     // これが6件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
     // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
-    // 引き継ぐ)。ドア等のホットスポットを操作する前に一旦それを閉じる。
+    // 引き継ぐ)。
     const wrapUpLine = 'そろそろ問題をまとめようか。'
     await expect(page.getByText(wrapUpLine)).toBeVisible()
     await skipTypewriter(page, wrapUpLine)
-    await page.getByRole('button', { name: 'わかった' }).click()
-    await expect(safetyBookHotspot).toHaveAccessibleName('委託先の安全管理措置報告書（書籍）・調査済み')
 
-    // --- ドア(door)で執務室へ戻る(委託先ブース側の door は削除しておらず、タブと併用可能な
-    // ことを引き続き確認する・#78/T046-ui-dataと同じ結線) ---
-    await page.getByRole('button', { name: '執務室への扉（扉）' }).click()
-    await expect(officeTab).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('img', { name: '自社執務室の背景', exact: true })).toBeVisible()
-
-    // 一覧側の調査状況は保持されたまま、再度委託先ブースへ戻る(以降は一覧経由で解決へ進む)。
-    await vendorTab.click()
-    await expect(vendorTab).toHaveAttribute('aria-selected', 'true')
-
-    // 「調査ポイント一覧」トグルを開いて一覧側でも6/6件が調査済みとして共有されていることを
-    // 確認する(#66→T047でトグル化)。
+    // 右上の「調査ポイント一覧」トグルは会話状態でも常時表示されるため、「わかった」を押す前に
+    // 一覧側で6/6件が調査済みとして共有されていること・「解決へ進む」の活性化を確認できる
+    // (#66→T047でトグル化)。
     await page.getByRole('button', { name: '調査ポイント一覧' }).click()
     await expect(page.getByText('6/6 件調査済み')).toBeVisible()
     await expect(page.getByRole('button', { name: '調査する' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '解決へ進む' })).toBeEnabled()
+    await page.getByRole('button', { name: '調査ポイント一覧' }).click()
 
-    const enterResolution = page.getByRole('button', { name: '解決へ進む' })
-    await expect(enterResolution).toBeEnabled()
-    await enterResolution.click()
+    // 「わかった」は探索状態には戻らず、「解決へ進む」ボタンと同じ遷移で解決画面へ直接進む
+    // (#52 追補、DESIGN.md「探索シーン」節「探索完了→解決への誘導」)。
+    await page.getByRole('button', { name: 'わかった' }).click()
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
 
     // --- 解決(会話モード): q-cause → q-report-duty → q-corrective-action の3問。 ---

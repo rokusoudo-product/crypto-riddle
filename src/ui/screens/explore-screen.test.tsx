@@ -195,18 +195,19 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(document.activeElement).toBe(screen.getByRole('button', { name: wrapUpLine }))
       await user.keyboard('{Enter}')
       expect(document.activeElement).toHaveTextContent('わかった')
-      await user.keyboard('{Enter}')
-      // 閉じると探索状態に戻り、ホットスポットが再び操作できる。
-      expect(screen.getByRole('button', { name: /田中さん（人物）/ })).toBeInTheDocument()
 
-      // 「調査ポイント一覧」トグルを開いて、一覧側でも両方調査済みになっていることを確認する
-      // (scenes・一覧は同じ状態を共有する)。
+      // 右上の「調査ポイント一覧」トグルは探索状態・会話状態のどちらでも常時表示されるため、
+      // 「わかった」を押す前に一覧側でも両方調査済みになっていること・「解決へ進む」が
+      // 活性化していることを確認できる(scenes・一覧は同じ状態を共有する)。
       await openInvestigationList(user)
       expect(screen.getByText('2/2 件調査済み')).toBeInTheDocument()
-
-      // 「解決へ進む」が活性化し、キーボードで押せる(結線テストの完了条件)。
       const enterResolution = screen.getByRole('button', { name: '解決へ進む' })
       await waitFor(() => expect(enterResolution).toBeEnabled())
+
+      // 「わかった」は探索状態には戻さず、「解決へ進む」ボタンと同じ遷移(handleEnterResolution)
+      // で解決パートへ直接進む(#52 追補、DESIGN.md「探索シーン」節)。
+      await user.click(screen.getByRole('button', { name: 'わかった' }))
+      expect(useGameStore.getState().progress.part).toBe('resolution')
     },
   )
 
@@ -382,7 +383,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(screen.getByRole('button', { name: '解決へ進む' })).toBeEnabled()
     })
 
-    it('促しは全文表示(またはスキップ)後に「わかった」で消せ、以降は再描画されても再表示されない(1回だけ)', async () => {
+    it('促しは全文表示(またはスキップ)後、「わかった」を押すと探索状態には戻らず解決パートへ直接進む(#52 追補)', async () => {
       const user = userEvent.setup()
       renderExplore(exploreSceneFixture)
 
@@ -393,13 +394,16 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       // ボタン文言は意図的に「わかった」(SceneExplorer側の会話オーバーレイの「閉じる」との
       // アクセシブルネーム衝突を避けるため、#71・T045)。
       await user.click(screen.getByRole('button', { name: wrapUpLine }))
-      await user.click(screen.getByRole('button', { name: 'わかった' }))
-      expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
+      expect(useGameStore.getState().progress.part).toBe('exploration')
 
-      // シーンタブ切替で再描画させても、一度閉じた促しは再表示されない
-      // (=再調査のたびに毎回出すことはしない、DESIGN.md「探索シーン」節)。
-      await user.click(screen.getByRole('tab', { name: 'サーバ室' }))
+      // 「わかった」は探索状態へ戻す表示切替(旧wrapUpPromptDismissed)ではなく、
+      // 「解決へ進む」ボタンと同じ遷移(handleEnterResolution)をそのまま呼ぶ
+      // (DESIGN.md「探索シーン」節「探索完了→解決への誘導」)。押すとdispatchで
+      // progress.partが'resolution'になり、探索画面自体が表示されなくなる。
+      await user.click(screen.getByRole('button', { name: 'わかった' }))
+      expect(useGameStore.getState().progress.part).toBe('resolution')
       expect(screen.queryByText(wrapUpLine)).not.toBeInTheDocument()
+      expect(screen.getByText('まだ探索パートではありません。')).toBeInTheDocument()
     })
 
     it('最後の1件をホットスポット経由で調べ終えても、調査結果の会話ウィンドウが開いている間は促しを同時に出さず、閉じてから出す', async () => {
@@ -526,8 +530,18 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       ).toBeInTheDocument()
       expect(within(sheet).queryByRole('heading', { name: 'サーバ管理者' })).not.toBeInTheDocument()
 
+      // 「何でもない」(noop)はシートを閉じるだけで何も獲得しない。このフィクスチャの解決条件
+      // (ip-log・ip-witness)は下記の2つのcollectで満たされ、満たした瞬間に探索完了への誘導
+      // (#71・T045)が自動的に開いてホットスポットが操作できなくなるため、noopは両collectより
+      // 前に確認しておく。
+      await user.click(within(sheet).getByRole('button', { name: '何でもない' }))
+      expect(screen.queryByRole('group', { name: 'サーバ管理者の操作' })).not.toBeInTheDocument()
+
       // 1つ目のcollect(話を聞く・証言・橘)を実行する。
-      await user.click(within(sheet).getByRole('button', { name: '話を聞く' }))
+      getAdmin().focus()
+      await user.keyboard('{Enter}')
+      const sheet1 = await screen.findByRole('group', { name: 'サーバ管理者の操作' })
+      await user.click(within(sheet1).getByRole('button', { name: '話を聞く' }))
       const witnessLine =
         'サーバ管理者に話を聞いた。「昨夜からアラートが増えている」とサーバ管理者は証言した。'
       expect(await screen.findByText(witnessLine)).toBeInTheDocument()
@@ -556,27 +570,22 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
 
       // このフィクスチャの解決条件(ip-log・ip-witnessの両方)は今の2つ目のcollectで満たされる
       // ため、探索完了への誘導(#71・T045)の会話オーバーレイが入れ替わりで自動的に開く
-      // (conversationSlotが会話状態を引き継ぐ)。ホットスポットへ戻る前に一旦それを閉じる。
+      // (conversationSlotが会話状態を引き継ぐ)。
       const wrapUpLine = 'そろそろ問題をまとめようか。'
       await screen.findByText(wrapUpLine)
       await user.click(screen.getByRole('button', { name: wrapUpLine }))
-      await user.click(screen.getByRole('button', { name: 'わかった' }))
 
-      // 両方調査済みになり、一覧側も2/2件になる(結線確認)。統合ホットスポット自体も
-      // 両方のcollectが埋まったので「調査済み」になる。
-      expect(getAdmin()).toHaveAccessibleName(/・調査済み/)
+      // 右上の「調査ポイント一覧」トグルは会話状態でも常時表示されるため、「わかった」を押す
+      // 前に一覧側で2/2件調査済み・「解決へ進む」活性化を確認できる(結線確認)。
       await openInvestigationList(user)
       expect(screen.getByText('2/2 件調査済み')).toBeInTheDocument()
       const enterResolution = screen.getByRole('button', { name: '解決へ進む' })
       await waitFor(() => expect(enterResolution).toBeEnabled())
 
-      // 「何でもない」(noop)はシートを閉じるだけで何も獲得しない。
-      getAdmin().focus()
-      await user.keyboard('{Enter}')
-      const sheet3 = await screen.findByRole('group', { name: 'サーバ管理者の操作' })
-      await user.click(within(sheet3).getByRole('button', { name: '何でもない' }))
-      expect(screen.queryByRole('group', { name: 'サーバ管理者の操作' })).not.toBeInTheDocument()
-      expect(screen.getByText('2/2 件調査済み')).toBeInTheDocument()
+      // 「わかった」は探索状態には戻らず、「解決へ進む」ボタンと同じ遷移で解決パートへ直接進む
+      // (#52 追補、DESIGN.md「探索シーン」節「探索完了→解決への誘導」)。
+      await user.click(screen.getByRole('button', { name: 'わかった' }))
+      expect(useGameStore.getState().progress.part).toBe('resolution')
     })
   })
 })

@@ -453,24 +453,22 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
 
       // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
       // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
-      // 引き継ぐ)。ホットスポットの状態を確認する前に一旦それを閉じる。
+      // 引き継ぐ)。
       const wrapUpLine = 'そろそろ問題をまとめようか。'
       expect(await screen.findByText(wrapUpLine)).toBeInTheDocument()
       await skipTypewriterByClick(user, wrapUpLine)
-      await user.click(screen.getByRole('button', { name: 'わかった' }))
 
-      expect(getAdminHotspot()).toHaveAccessibleName('サーバ管理者（人物）・調査済み')
-
-      // 「調査ポイント一覧」トグルを開いて一覧側でも9/9件が調査済みとして共有されていることを
-      // 確認する(#66→T047でトグル化。scenes・一覧は同じ状態を共有)。
+      // 「調査ポイント一覧」トグルは探索状態・会話状態のどちらでも常時表示されるため、
+      // 「わかった」を押す(=解決画面へ遷移する)前に一覧側でも9/9件が調査済みとして
+      // 共有されていることを確認できる(#66→T047でトグル化。scenes・一覧は同じ状態を共有)。
       await user.click(screen.getByRole('button', { name: '調査ポイント一覧' }))
       expect(screen.getByText('9/9 件調査済み')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: '調査する' })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: '調査ポイント一覧' }))
 
-      // 背景シーン経由だけで「解決へ進む」が活性化し、解決パートへ遷移できる。
-      const enterResolution = screen.getByRole('button', { name: '解決へ進む' })
-      expect(enterResolution).toBeEnabled()
-      await user.click(enterResolution)
+      // 「わかった」は探索状態へは戻らず、「解決へ進む」ボタンと同じ遷移で解決画面へ直接進む
+      // (#52 追補: 誘導会話からの直接遷移、DESIGN.md「探索シーン」節)。
+      await user.click(screen.getByRole('button', { name: 'わかった' }))
       expect(await screen.findByRole('heading', { name: '解決' })).toBeInTheDocument()
     },
   )

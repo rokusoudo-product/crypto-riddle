@@ -32,8 +32,13 @@
 // もはや常時併設ではなく、右上の「調査ポイント一覧」トグル(探索・会話状態とも常時表示)で
 // 開閉する(上記#66で追加した「タッチ端末での初期表示」describeは、この常時可視トグルへの
 // 置換に伴い書き直した)。全ポイント調査完了の直後は、探索完了への誘導(#71・T045)の会話
-// オーバーレイが入れ替わりで自動的に開くため、一部のテストは「わかった」で一度閉じてから
-// 一覧・ホットスポットの状態を確認する手順を挟んでいる。
+// オーバーレイが入れ替わりで自動的に開くため、一部のテストは一覧・ホットスポットの状態を
+// 確認する手順を挟んでいる。
+//
+// 2026-09-11(#52 追補): 誘導会話の「わかった」を押すと、探索状態には戻らず「解決へ進む」
+// ボタンと同じ遷移で解決画面へ直接進むようになった(DESIGN.md「探索シーン」節「探索完了→
+// 解決への誘導」)。そのため一覧・ホットスポットの状態確認は「わかった」を押す前(会話状態でも
+// 右上ボタン群は常時表示されるため確認できる)に行うよう書き直した。
 import { expect, test } from '@playwright/test'
 
 /**
@@ -334,24 +339,23 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
 
     // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
     // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
-    // 引き継ぐ)。ホットスポットの状態を確認する前に一旦それを閉じる。
+    // 引き継ぐ)。
     const wrapUpLine = 'そろそろ問題をまとめようか。'
     await expect(page.getByText(wrapUpLine)).toBeVisible()
     await skipTypewriter(page, wrapUpLine)
-    await page.getByRole('button', { name: 'わかった' }).click()
 
-    await expect(adminHotspot).toHaveAccessibleName('サーバ管理者（人物）・調査済み')
-
-    // 「調査ポイント一覧」トグルを開いて一覧側でも9/9件が調査済みとして共有されていることを
-    // 確認する(#66→T047でトグル化)。
+    // 右上の「調査ポイント一覧」トグルは会話状態でも常時表示されるため、「わかった」を押す前に
+    // 一覧側で9/9件が調査済みとして共有されていること・「解決へ進む」の活性化を確認できる
+    // (#66→T047でトグル化)。
     await page.getByRole('button', { name: '調査ポイント一覧' }).click()
     await expect(page.getByText('9/9 件調査済み')).toBeVisible()
     await expect(page.getByRole('button', { name: '調査する' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '解決へ進む' })).toBeEnabled()
+    await page.getByRole('button', { name: '調査ポイント一覧' }).click()
 
-    // 背景シーン経由だけで「解決へ進む」が活性化し、解決パートへ遷移できる。
-    const enterResolution = page.getByRole('button', { name: '解決へ進む' })
-    await expect(enterResolution).toBeEnabled()
-    await enterResolution.click()
+    // 「わかった」は探索状態には戻らず、「解決へ進む」ボタンと同じ遷移で解決画面へ直接進む
+    // (#52 追補、DESIGN.md「探索シーン」節「探索完了→解決への誘導」)。
+    await page.getByRole('button', { name: 'わかった' }).click()
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
   })
 
@@ -473,7 +477,7 @@ test.describe('S1「標的型メールからの侵入」タッチ端末での「
 // 一覧側から全件調査して活性条件を満たす経路(高速)でE2E確認する(背景シーン経由の等価な結線は
 // 上の describe で既に確認済みのため、ここでは誘導の有無・1回性・導線の明示のみに絞る)。
 test.describe('S1「標的型メールからの侵入」探索完了→解決への誘導(#71・T045)', () => {
-  test('「解決へ」の活性条件を満たした時点で促しが1回出て、閉じても「解決へ進む」導線は活性のまま残る', async ({
+  test('「解決へ」の活性条件を満たした時点で促しが1回出て、「わかった」を押すと解決画面へ直接進む(#52 追補)', async ({
     page,
   }) => {
     await page.goto('/')
@@ -500,15 +504,12 @@ test.describe('S1「標的型メールからの侵入」探索完了→解決へ
     const enterResolution = page.getByRole('button', { name: '解決へ進む' })
     await expect(enterResolution).toBeEnabled()
 
-    // タイプライターをスキップして「わかった」を押すと促しは消えるが、「解決へ進む」の
-    // 導線(活性状態)は変わらない。ボタン文言は調査結果パネルの「閉じる」とわざと変えてあり
-    // (#71・T045)、両方の会話フレームが同時に開いてもアクセシブルネームが衝突しない。
+    // タイプライターをスキップして「わかった」を押すと、探索状態には戻らず「解決へ進む」
+    // ボタンと同じ遷移で解決画面へ直接進む(#52 追補、DESIGN.md「探索シーン」節「探索完了→
+    // 解決への誘導」)。ボタン文言は調査結果パネルの「閉じる」とわざと変えてあり(#71・T045)、
+    // 両方の会話フレームが同時に開いてもアクセシブルネームが衝突しない。
     await skipTypewriter(page, wrapUpLine)
     await page.getByRole('button', { name: 'わかった' }).click()
-    await expect(page.getByText(wrapUpLine)).toHaveCount(0)
-    await expect(enterResolution).toBeEnabled()
-
-    await enterResolution.click()
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
   })
 })
