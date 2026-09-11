@@ -125,7 +125,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
       hotspots: [
         {
           object_type: 'pc',
-          position: [0.4, 0.68],
+          position: [0.52, 0.57],
           label: '経理部 中野の端末',
           actions: [
             {
@@ -146,7 +146,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.47, 0.42],
+          position: [0.53, 0.4],
           label: '中野',
           actions: [
             {
@@ -160,7 +160,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.87, 0.6],
+          position: [0.39, 0.27],
           label: '経理部長',
           actions: [
             {
@@ -174,7 +174,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'book',
-          position: [0.6, 0.16],
+          position: [0.62, 0.2],
           label: '資料棚',
           actions: [
             {
@@ -195,7 +195,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: [0.95, 0.5],
+          position: [0.84, 0.54],
           label: 'サーバ室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-server', label: 'サーバ室へ移動する' }],
         },
