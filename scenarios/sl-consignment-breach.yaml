@@ -26,12 +26,14 @@
 # - **これは代表監修前のドラフト**(Issue #76)。教育内容・法制度(委託先監督義務・報告義務)の
 #   正確性は断定を避け resolution.questions の選択肢＋explanations で扱い、最終確定は代表レビュー
 #   (#81)を経る前提で作成した。status: draft。
-# - 背景シーン(bg-sl-office / bg-sl-vendor)はまだ画像を生成していない(IMAGE_WORKFLOWの
-#   承認ゲート未実施)。アセットIDのみを参照し、実画像が無い間は
-#   src/ui/components/explore/scene-explorer.tsx の BACKGROUND_SRC 未登録時のプレースホルダ
-#   表示(トークン色+シーン名)にフォールバックする(コード変更不要)。ホットスポットの
-#   position はプレースホルダにつき仮の値で、実背景生成後に目視して調整すること(S1/S2/S3の
-#   position 決定コメント参照)。
+# - 背景シーン(bg-sl-office / bg-sl-vendor)は代表承認済みの採用画像を
+#   assets/backgrounds/bg-sl-office.png・bg-sl-vendor.png として確定した(#76 仕上げ・
+#   DESIGN.md P-9/P-10)。採用した bg-sl-office(執務室)はドアの無い構図のため、
+#   scene-office 側にあった委託先ブースへ移動する door ホットスポット(goto)は削除した。
+#   scene-vendor 側の「執務室への扉」door(scene-office への goto)はそのまま残しており、
+#   執務室→委託先はシーンタブ、委託先→執務室はドア＋シーンタブの両方で移動できる。
+#   各ホットスポットの position は採用背景を目視して調整済み(S1/S2/S3の position 決定
+#   コメント参照)。
 #
 # 注記: S1/S2/S3 と同じ理由(scripts/build-data.test.ts のフィクスチャ一致テストが折り返しの
 # 空白挿入を検出する)で、本文フィールド(body/description/line 等)は1行で記述している。
@@ -117,7 +119,7 @@ scenes:
     background: bg-sl-office
     hotspots:
       - object_type: book
-        position: [0.6, 0.16]
+        position: [0.17, 0.32]
         label: 委託契約書棚
         actions:
           - kind: collect
@@ -131,7 +133,7 @@ scenes:
             line: ガイドラインを確認しました。個人データの取扱いを委託する場合、委託元は委託先に対して必要かつ適切な監督を行う義務を負い、委託先の監督が不十分であったことに起因する漏えい等は、委託元の義務違反として問題になり得るとされています。
             speaker: 橘
       - object_type: pc
-        position: [0.4, 0.65]
+        position: [0.56, 0.45]
         label: 委託先の一次報告を受けた端末
         actions:
           - kind: collect
@@ -144,19 +146,12 @@ scenes:
             feedback: "橘「事実関係が固まる前に未確認の情報を広めると、後で内容が変わった場合に混乱と説明責任の問題を招きます。まずは委託先に詳細を確認し、社内の情報管理体制に沿って共有してください。」"
           - kind: noop
             label: 今は触らない
-      - object_type: door
-        position: [0.95, 0.5]
-        label: 委託先ブースへの扉
-        actions:
-          - kind: goto
-            scene_id: scene-vendor
-            label: 委託先ブースへ移動する
   - id: scene-vendor
     title: 委託先ブース(会議室)
     background: bg-sl-vendor
     hotspots:
       - object_type: device
-        position: [0.18, 0.45]
+        position: [0.19, 0.68]
         label: 委託先のクラウドストレージ管理端末
         actions:
           - kind: collect
@@ -165,7 +160,7 @@ scenes:
             line: 委託先のクラウドストレージのアクセスログを確認した。共有設定が変更された直後から、複数の見知らぬ外部IPアドレスから会員データの保管領域へ直接アクセスされた記録が残っている。
             speaker: 霧島
       - object_type: person
-        position: [0.51, 0.43]
+        position: [0.44, 0.55]
         label: 委託先担当者
         prompt: "委託先担当者「何かご質問はありますか？」"
         actions:
@@ -177,7 +172,7 @@ scenes:
           - kind: noop
             label: 何でもない
       - object_type: book
-        position: [0.8, 0.3]
+        position: [0.84, 0.62]
         label: 委託先の安全管理措置報告書
         actions:
           - kind: collect
@@ -186,7 +181,7 @@ scenes:
             line: 委託先が提出した安全管理措置の報告書を確認した。アクセス権限の設定手順は定められているが、変更後の設定内容を第三者が確認するダブルチェック体制までは整備されていなかった。
             speaker: 橘
       - object_type: door
-        position: [0.5, 0.9]
+        position: [0.6, 0.5]
         label: 執務室への扉
         actions:
           - kind: goto

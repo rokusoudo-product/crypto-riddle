@@ -37,7 +37,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await page.goto('/')
   })
 
-  test('マップ選択からSLを選び、背景シーン経由の探索(ドア移動・危険操作)→解決(3問の会話モード・誤答フォロー)→結果まで通しプレイできる', async ({
+  test('マップ選択からSLを選び、背景シーン経由の探索(シーンタブ・ドア移動・危険操作)→解決(3問の会話モード・誤答フォロー)→結果まで通しプレイできる', async ({
     page,
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
@@ -55,14 +55,12 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
     await expect(page.getByText('委託契約書(監督条項)の確認')).toBeVisible()
 
-    // 自社執務室(背景未生成のためプレースホルダ表示。scene-explorer.tsx の BACKGROUND_SRC
-    // フォールバック=コード変更なしで動作することの確認を兼ねる)。
+    // 自社執務室(#76 仕上げで採用背景が確定し、scene-explorer.tsx の BACKGROUND_SRC に
+    // 登録済み=実画像の<img>で表示される)。
     const officeTab = page.getByRole('tab', { name: '自社執務室' })
     const vendorTab = page.getByRole('tab', { name: '委託先ブース(会議室)' })
     await expect(officeTab).toHaveAttribute('aria-selected', 'true')
-    await expect(
-      page.getByRole('img', { name: '自社執務室の背景（画像は準備中のためプレースホルダ表示）' }),
-    ).toBeVisible()
+    await expect(page.getByRole('img', { name: '自社執務室の背景', exact: true })).toBeVisible()
 
     // --- 執務室: book(委託契約書棚。collectを2件持つ) ---
     const bookHotspot = page.getByRole('button', { name: '委託契約書棚（書籍）' })
@@ -105,12 +103,13 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await page.getByRole('button', { name: '閉じる' }).click()
     await expect(pcHotspot).toHaveAccessibleName('委託先の一次報告を受けた端末（PC）・調査済み')
 
-    // --- ドア(door)で委託先ブースへ移動する(タブと併用可能・#78/T046-ui-dataと同じ結線) ---
-    await page.getByRole('button', { name: '委託先ブースへの扉（扉）' }).click()
+    // --- シーンタブで委託先ブースへ移動する(#76 仕上げで採用した執務室の背景にはドアが
+    // 描かれていないため、執務室側の委託先ブースへの door ホットスポットは削除した。
+    // 執務室→委託先の移動はシーンタブのみになる。委託先→執務室は door ホットスポットが
+    // 残っているため、後段でその両立=タブ・ドア併用を確認する) ---
+    await vendorTab.click()
     await expect(vendorTab).toHaveAttribute('aria-selected', 'true')
-    await expect(
-      page.getByRole('img', { name: '委託先ブース(会議室)の背景（画像は準備中のためプレースホルダ表示）' }),
-    ).toBeVisible()
+    await expect(page.getByRole('img', { name: '委託先ブース(会議室)の背景', exact: true })).toBeVisible()
 
     // --- 委託先ブース: device(委託先のクラウドストレージ管理端末。単一action=即実行) ---
     const deviceHotspot = page.getByRole('button', { name: '委託先のクラウドストレージ管理端末（機器）' })
@@ -143,6 +142,16 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await skipTypewriter(page, safetyLine)
     await page.getByRole('button', { name: '閉じる' }).click()
     await expect(safetyBookHotspot).toHaveAccessibleName('委託先の安全管理措置報告書（書籍）・調査済み')
+
+    // --- ドア(door)で執務室へ戻る(委託先ブース側の door は削除しておらず、タブと併用可能な
+    // ことを引き続き確認する・#78/T046-ui-dataと同じ結線) ---
+    await page.getByRole('button', { name: '執務室への扉（扉）' }).click()
+    await expect(officeTab).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('img', { name: '自社執務室の背景', exact: true })).toBeVisible()
+
+    // 一覧側の調査状況は保持されたまま、再度委託先ブースへ戻る(以降は一覧経由で解決へ進む)。
+    await vendorTab.click()
+    await expect(vendorTab).toHaveAttribute('aria-selected', 'true')
 
     // 一覧側(常に併設)でも6/6件が調査済みとして共有されている。
     await expect(page.getByText('6/6 件調査済み')).toBeVisible()
