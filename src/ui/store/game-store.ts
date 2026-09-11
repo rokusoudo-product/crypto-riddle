@@ -26,6 +26,9 @@
 // Issue #74(#6量産1本目)で S2「VPN装置の脆弱性放置とランサムウェア感染」が実データとして
 // 揃ったため、`scenarios` に追加した(マップ選択で両方選べる)。DEFAULT_SCENARIO(初回起動時の
 // 既定プレイ対象)は引き続き S1 のまま変更しない(#74 の実装範囲はマップ追加のみ)。
+//
+// Issue #75(#6量産2本目)で S3「ECサイトのカード情報漏洩」が実データとして揃ったため、
+// 同様に `scenarios` に追加した(マップ選択で3件とも選べる)。DEFAULT_SCENARIO は変更しない。
 import { create } from 'zustand'
 
 import type { SaveData, Scenario } from '@/core/model'
@@ -38,6 +41,7 @@ import {
 } from '@/core/scenario'
 import { s1TargetedEmailIntrusionFixture } from '@/core/scenario/fixtures/s1-targeted-email-intrusion.fixture'
 import { s2VpnRansomwareFixture } from '@/core/scenario/fixtures/s2-vpn-ransomware.fixture'
+import { s3EcCardLeakFixture } from '@/core/scenario/fixtures/s3-ec-card-leak.fixture'
 
 import {
   applyClearToSaveData,
@@ -97,7 +101,7 @@ async function persistProgress(
 }
 
 export const useGameStore = create<GameStoreState>()((set, get) => ({
-  scenarios: [DEFAULT_SCENARIO, s2VpnRansomwareFixture],
+  scenarios: [DEFAULT_SCENARIO, s2VpnRansomwareFixture, s3EcCardLeakFixture],
   scenario: DEFAULT_SCENARIO,
   progress: createInitialScenarioState(DEFAULT_SCENARIO),
   saveData: null,
