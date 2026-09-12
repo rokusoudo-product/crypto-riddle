@@ -50,6 +50,14 @@ export function TitleScreen() {
           情報処理技術者試験の過去問題を題材の参考として使用しています（設問の転載はありません）。
         </p>
       </StateFrame>
+      {/* Issue #81: 作成時点の注意書き。法制度・技術情報が制作時点のものである旨を画面左下に
+          小さく表示する（DESIGN.md ①タイトル）。ScreenContainer（min-h-dvh flex flex-col）の
+          直接の子として置き、mt-auto で残り高さを吸収して真の左下に固定する（4状態いずれでも
+          表示されるよう StateFrame の外に配置）。text-muted-foreground はライト/ダーク両文脈の
+          トークン定義済み（index.css）で、色・サイズの直書きはしない。 */}
+      <p className="text-muted-foreground mt-auto max-w-[60ch] text-xs">
+        本作の内容（法制度・技術情報を含む）は2026年9月時点の情報に基づく学習用の創作です。
+      </p>
     </ScreenContainer>
   )
 }

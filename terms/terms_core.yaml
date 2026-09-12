@@ -512,7 +512,9 @@ terms:
       domain: ストラテジ系
       field: 企業と法務
       exam_relevance: [SC]
-    source: { type: standard, reference: "個人情報の保護に関する法律 第22条の2" }
+    # 2026-09-12(#81)是正: 令和2年改正直後の条番号「第22条の2」を、令和3年改正(統合)後の
+    # 現行条番号「第26条」に修正(legal/laws_sample.yaml の LAW-APPI-BREACH-REPORT と同一根拠)。
+    source: { type: standard, reference: "個人情報の保護に関する法律 第26条" }
 
   - id: term-unauthorized-computer-access-law
     term: 不正アクセス禁止法

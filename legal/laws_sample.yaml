@@ -6,14 +6,19 @@
 #   このファイルの id を legal_refs で参照する形に統一する(docs/characters.md §9)。
 # - src/core/model/legal.ts (zod, T005) に準拠する。`npm run build:data` で検証できる。
 # - 本ファイルは #3(スキーマ定義)のサンプルであり、内容の法的正確性は制作時(#14 出典表記規則確定後)に
-#   代表監修のうえ再確認すること。last_verified はサンプル作成時点のプレースホルダ。
+#   代表監修のうえ再確認すること。LAW-APPI-BREACH-REPORT・LAW-APPI-CONSIGNMENT-SUPERVISION は
+#   2026-09-12(#81)に条文番号を代表確認済み(last_verified もその日付)。LAW-UCA-UNAUTHORIZED-ACCESS
+#   の last_verified はサンプル作成時点のプレースホルダのまま(未確認)。
 
 schema_version: "0.1.0"
 
 laws:
+  # 2026-09-12(#81)是正: article は #76 制作時点で「第22条の2」(令和2年改正直後の条番号)と
+  # していたが、令和3年改正(個人情報保護法・行政機関個人情報保護法等の統合)により条文が
+  # 繰り上がり、制作時点(2026-09-12)の現行条番号は「第26条」。代表確認済み。
   - id: LAW-APPI-BREACH-REPORT
     law_name: 個人情報の保護に関する法律
-    article: 第22条の2
+    article: 第26条
     title: 漏えい等の報告等
     report_deadline: >-
       速報: 個人情報保護委員会が定める事態を知った後、速やかに(概ね3〜5日以内が目安)。
@@ -21,20 +26,16 @@ laws:
     summary: >-
       個人データの漏えい等が発生し、個人の権利利益を害するおそれが大きい場合に、
       個人情報保護委員会への報告と本人への通知が義務付けられる規定。報告は速報・確報の二段階。
-    last_verified: "2026-08-07"
-    source_url: "https://www.ppc.go.jp/"
+    last_verified: "2026-09-12"
+    source_url: "https://elaws.e-gov.go.jp/document?lawid=415AC0000000057"
 
-  # 2026-09-11(#76)追加: sl-consignment-breach.yaml が参照する「委託先の監督」規定。
-  # 条文番号(第22条)は、既存 LAW-APPI-BREACH-REPORT(第22条の2)と隣接する条番号として
-  # #76 制作時点で暫定的に記載したドラフト値。docs/citation-policy.md §6 の法令出典例
-  # (「個人情報の保護に関する法律 第26条(令和4年4月1日施行時点)」)とは条番号の体系が食い違って
-  # おり、既存 LAW-APPI-BREACH-REPORT の第22条の2を含め、どちらの体系が制作時点の現行法に
-  # 対応するかは本 PR の範囲では確認していない。**本エントリ・既存エントリともに条文番号の
-  # 最終確認は Issue #81 のスコープで代表確認前提とする**(PR本文にも明記)。
-  # last_verified の日付はこのドラフトを作成した日であり、法的な確認を行った日ではない。
+  # 2026-09-11(#76)追加時点では article を「第22条」(令和2年改正直後の条番号)としていたが、
+  # 2026-09-12(#81)是正: 令和3年改正(個人情報保護法・行政機関個人情報保護法等の統合)により
+  # 条文が繰り上がり、制作時点(2026-09-12)の現行条番号は「第25条」。上記
+  # LAW-APPI-BREACH-REPORT(第26条)と合わせて代表確認済み。
   - id: LAW-APPI-CONSIGNMENT-SUPERVISION
     law_name: 個人情報の保護に関する法律
-    article: 第22条
+    article: 第25条
     title: 委託先の監督
     report_deadline: >-
       本条自体に報告期限の定めはない(監督義務は漏えい等の発生時に限らず、委託先選定時・契約時・
@@ -45,8 +46,8 @@ laws:
       監督を行わなければならないとする規定。委託先の安全管理措置の実施状況の確認・必要な指示等が
       含まれ、委託先の監督が不十分であったことに起因する漏えい等は、委託元の義務違反として
       問題になり得る。「業務を委託しているから委託元は無関係」とはならない点が要点。
-    last_verified: "2026-09-11"
-    source_url: "https://www.ppc.go.jp/"
+    last_verified: "2026-09-12"
+    source_url: "https://elaws.e-gov.go.jp/document?lawid=415AC0000000057"
 
   - id: LAW-UCA-UNAUTHORIZED-ACCESS
     law_name: 不正アクセス行為の禁止等に関する法律

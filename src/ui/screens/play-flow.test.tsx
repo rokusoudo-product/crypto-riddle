@@ -61,6 +61,9 @@ describe('1マップ通しプレイの結線(T013/T033) — s0-sample(暗号ス�
     const user = userEvent.setup()
     renderApp()
 
+    // ①タイトル: 作成時点の注意書き(#81)が表示される。
+    expect(screen.getByText(/2026年9月時点の情報に基づく学習用の創作です。/)).toBeInTheDocument()
+
     // ①タイトル → ②マップ選択
     await user.click(screen.getByRole('link', { name: 'つづきから' }))
     expect(await screen.findByRole('heading', { name: 'マップ選択' })).toBeInTheDocument()
