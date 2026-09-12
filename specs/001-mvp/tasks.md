@@ -442,7 +442,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 > 代表確定の台本 v2.2（2026-09-12。ナレーション全廃・完全会話劇化／発見時の多ターン化＋NPC直接発話／誤答ヒント2段／小鳥遊は①導入・⑦結果のみ）を反映する一連の Issue。**docs 先行 Issue #100**（本 Issue・コード変更なし）で spec/DESIGN/scenario_schema の仕様を確定し、承認ゲートを経たうえで **core Issue #101**（zod スキーマ 0.7.0 実装）→ **UI Issue #102**（会話フレーム3枠・NPC名札・explanations話者表示・表情フォールバック）→ **data Issue #103**（S1 シナリオを v2.2 台本へ本移植＋全 YAML/fixture の `schema_version` 更新＋e2e）の順で進める。詳細仕様は spec §5/§7.1/§8.2、`DESIGN.md`「会話フレーム」「探索シーン」節、`docs/scenario_schema.md` §2.6。委譲条件「**スキーマ差分は commit 前に報告して停止**」を維持。
 
-- [x] **T049-docs** spec/DESIGN/scenario_schema へのスキーマ0.7.0仕様反映（#100・本 Issue・docs のみ）
+- [ ] **T049-docs** spec/DESIGN/scenario_schema へのスキーマ0.7.0仕様反映（#100・本 Issue・docs のみ）
   - `docs/scenario_schema.md` §2.6: スキーマ0.7.0の7点（`characterSchema` 拡張／`expressionSchema` 新設／`intro.background` 省略可／`collect.dialogue` 追加／NPC直接発話・`explanations` union化／`schema_version` 0.7.0）＋小鳥遊ガードを明記。
   - `DESIGN.md`「会話フレーム」節: 支援役「2名固定」前提の記述を一括改訂（導入=3枠・探索/解決=2枠のまま、グレーアウトを「発話者以外は全員」に一般化、表情フォールバック・`bg-sl-office` 流用を追記）。「探索シーン」節に NPC 直接発話の描画（両立ち絵グレーアウト＋`npc` 名札＋トリガーホットスポット□強調）を追記。
   - `specs/001-mvp/spec.md` §5（小鳥遊の登場範囲）・§7.1（多ターン化・NPC直接発話）・§8.2（誤答ヒント2段・用語クッションの担い手）を反映。
