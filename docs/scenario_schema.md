@@ -290,7 +290,8 @@ scenes:
 ⑦結果（`resolution.clear_explanation`）のみ**。以下には**使用不可**とし、zod の union 構成そのもので
 表現できない（＝`characterSchema` の3値には小鳥遊を含むため、型だけでは防げない）箇所は `superRefine` で拒否する:
 
-- 探索の `collect.dialogue[]`（`character`／`npc` いずれの行としても不可。`character: 小鳥遊` を reject）
+- 探索の `collect.dialogue[]`（`character`／`npc` いずれの行としても不可。`character: 小鳥遊` を reject。`npc: '小鳥遊'` と名乗らせるすり抜けも reject）
+- 探索の `collect.speaker`（後方互換の単発台詞フィールド。`dialogue[]` だけを塞ぐと旧形式経由で小鳥遊が探索に入れてしまうため、同様に reject）
 - `resolution.questions[].speaker`（`characterSchema` を直接使うため、値として `小鳥遊` を reject）
 - `resolution.questions[].explanations`（話者付きオブジェクト要素の `character` に `小鳥遊` を reject）
 

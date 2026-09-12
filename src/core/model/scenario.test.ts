@@ -271,9 +271,7 @@ describe('resolution.questions(会話モード, #42/T030)', () => {
     const result = scenarioSchema.safeParse(scenario)
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(
-        result.error.issues.some((issue) => issue.message.includes('ちょうど1つ')),
-      ).toBe(true)
+      expect(result.error.issues.some((issue) => issue.message.includes('ちょうど1つ'))).toBe(true)
     }
   })
 
@@ -370,7 +368,11 @@ function validScenes(): Scene[] {
           position: [0.3, 0.42],
           label: '経理担当のPC',
           actions: [
-            { kind: 'collect', investigation_point_id: 'ip-proxy-log', label: 'プロキシログを見る' },
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-proxy-log',
+              label: 'プロキシログを見る',
+            },
             { kind: 'collect', investigation_point_id: 'ip-itdept', label: '対策メモを見る' },
             {
               kind: 'danger',
@@ -384,7 +386,9 @@ function validScenes(): Scene[] {
           object_type: 'person',
           position: [0.7, 0.38],
           label: '田中さん',
-          actions: [{ kind: 'collect', investigation_point_id: 'ip-witness-tanaka', label: '話を聞く' }],
+          actions: [
+            { kind: 'collect', investigation_point_id: 'ip-witness-tanaka', label: '話を聞く' },
+          ],
         },
       ],
     },
@@ -487,7 +491,9 @@ describe('scenes(探索の背景シーン, #52/T037)', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(
-        result.error.issues.some((issue) => issue.message.includes('investigation_points に存在しません')),
+        result.error.issues.some((issue) =>
+          issue.message.includes('investigation_points に存在しません'),
+        ),
       ).toBe(true)
     }
   })
@@ -769,7 +775,10 @@ describe('scenes[].hotspots[].actions の goto / object_type door / prompt(#52 P
 describe('characterSchema 拡張(小鳥遊)と expression(表情差分)(0.7.0)', () => {
   it('正常系: character_intros に小鳥遊を含めても受理する(導入は3枠)', () => {
     const scenario = validScenario()
-    scenario.intro.character_intros.push({ character: '小鳥遊', line: '庶務の小鳥遊です。よろしく。' })
+    scenario.intro.character_intros.push({
+      character: '小鳥遊',
+      line: '庶務の小鳥遊です。よろしく。',
+    })
     expect(scenarioSchema.safeParse(scenario).success).toBe(true)
   })
 
@@ -836,7 +845,11 @@ describe('collect.dialogue(多ターン・NPC直接発話, 0.7.0)', () => {
       investigation_point_id: 'ip-witness-tanaka',
       label: '田中さんに話を聞く',
       dialogue: [
-        { character: '霧島', expression: 'serious', line: 'あのメールを開いた時の状況を教えてください。' },
+        {
+          character: '霧島',
+          expression: 'serious',
+          line: 'あのメールを開いた時の状況を教えてください。',
+        },
         { npc: '田中', line: '取引先からの見積依頼だと思って、普通に開いてしまって……' },
         { character: '橘', line: '添付ファイルの拡張子は確認しましたか？' },
         { npc: '田中', line: 'いえ、そこまでは……' },
@@ -913,6 +926,24 @@ describe('collect.dialogue(多ターン・NPC直接発話, 0.7.0)', () => {
     }
   })
 
+  it('reject: 後方互換の collect.speaker に小鳥遊を使うと拒否する(dialogue 以外の抜け道を塞ぐ)', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-witness-tanaka',
+      label: '田中さんに話を聞く',
+      line: '旧形式の単発台詞。',
+      speaker: '小鳥遊',
+    }
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('小鳥遊'))).toBe(true)
+    }
+  })
+
   it('reject: npc が空文字の場合を拒否する', () => {
     const scenario = validScenario()
     const scenes = validScenes()
@@ -959,7 +990,11 @@ describe('resolution.questions.explanations の union 化と小鳥遊ガード(0
     const scenario = validScenario()
     scenario.resolution.questions[0].explanations = [
       '一次情報とその裏取りを整理しよう。',
-      { character: '橘', line: '保全の観点から見ても、まず一次情報を疑うのが筋よ。', expression: 'thinking' },
+      {
+        character: '橘',
+        line: '保全の観点から見ても、まず一次情報を疑うのが筋よ。',
+        expression: 'thinking',
+      },
     ]
     expect(scenarioSchema.safeParse(scenario).success).toBe(true)
   })

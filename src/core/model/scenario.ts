@@ -460,13 +460,29 @@ export const scenarioSchema = scenarioObjectSchema.superRefine((data, ctx) => {
               ctx.addIssue({
                 code: 'custom',
                 message: `scene '${scene.id}' の goto action が参照する scene_id '${action.scene_id}' が scenes に存在しません。`,
-                path: ['scenes', sceneIndex, 'hotspots', hotspotIndex, 'actions', actionIndex, 'scene_id'],
+                path: [
+                  'scenes',
+                  sceneIndex,
+                  'hotspots',
+                  hotspotIndex,
+                  'actions',
+                  actionIndex,
+                  'scene_id',
+                ],
               })
             } else if (action.scene_id === scene.id) {
               ctx.addIssue({
                 code: 'custom',
                 message: `scene '${scene.id}' の goto action が自シーン('${action.scene_id}')を参照しています。`,
-                path: ['scenes', sceneIndex, 'hotspots', hotspotIndex, 'actions', actionIndex, 'scene_id'],
+                path: [
+                  'scenes',
+                  sceneIndex,
+                  'hotspots',
+                  hotspotIndex,
+                  'actions',
+                  actionIndex,
+                  'scene_id',
+                ],
               })
             }
             return
@@ -477,7 +493,33 @@ export const scenarioSchema = scenarioObjectSchema.superRefine((data, ctx) => {
             ctx.addIssue({
               code: 'custom',
               message: `scene '${scene.id}' の collect action で dialogue と line/speaker を併用することはできません(どちらか一方のみ)。`,
-              path: ['scenes', sceneIndex, 'hotspots', hotspotIndex, 'actions', actionIndex, 'dialogue'],
+              path: [
+                'scenes',
+                sceneIndex,
+                'hotspots',
+                hotspotIndex,
+                'actions',
+                actionIndex,
+                'dialogue',
+              ],
+            })
+          }
+          // 小鳥遊ガード(docs/scenario_schema.md §2.6): 後方互換の collect.speaker(単発台詞)にも
+          // 小鳥遊は使えない。dialogue[] だけを塞いでも、旧形式の speaker 経由で探索に小鳥遊が
+          // 入れてしまうため(探索の会話フレームは2枠のままで描画先が無い)。
+          if (action.speaker === '小鳥遊') {
+            ctx.addIssue({
+              code: 'custom',
+              message: `scene '${scene.id}' の collect.speaker に小鳥遊は使用できません(探索の会話フレームは2枠のまま)。`,
+              path: [
+                'scenes',
+                sceneIndex,
+                'hotspots',
+                hotspotIndex,
+                'actions',
+                actionIndex,
+                'speaker',
+              ],
             })
           }
           // 小鳥遊ガード(docs/scenario_schema.md §2.6): 探索の collect.dialogue[] に小鳥遊は使えない
@@ -556,7 +598,14 @@ export const scenarioSchema = scenarioObjectSchema.superRefine((data, ctx) => {
         ctx.addIssue({
           code: 'custom',
           message: `question '${question.id}' の explanations に小鳥遊は使用できません(小鳥遊は intro.character_intros と resolution.clear_explanation でのみ話者になれます)。`,
-          path: ['resolution', 'questions', questionIndex, 'explanations', explanationIndex, 'character'],
+          path: [
+            'resolution',
+            'questions',
+            questionIndex,
+            'explanations',
+            explanationIndex,
+            'character',
+          ],
         })
       }
     })
