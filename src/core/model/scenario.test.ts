@@ -4,7 +4,7 @@ import { scenarioSchema, type Scene, type Scenario } from './scenario.ts'
 
 function validScenario(): Scenario {
   return {
-    schema_version: '0.6.0',
+    schema_version: '0.7.0',
     id: 's0-sample',
     title: 'アルファテック社 顧客データ流出事件(テスト用)',
     status: 'sample',
@@ -271,9 +271,7 @@ describe('resolution.questions(会話モード, #42/T030)', () => {
     const result = scenarioSchema.safeParse(scenario)
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(
-        result.error.issues.some((issue) => issue.message.includes('ちょうど1つ')),
-      ).toBe(true)
+      expect(result.error.issues.some((issue) => issue.message.includes('ちょうど1つ'))).toBe(true)
     }
   })
 
@@ -370,7 +368,11 @@ function validScenes(): Scene[] {
           position: [0.3, 0.42],
           label: '経理担当のPC',
           actions: [
-            { kind: 'collect', investigation_point_id: 'ip-proxy-log', label: 'プロキシログを見る' },
+            {
+              kind: 'collect',
+              investigation_point_id: 'ip-proxy-log',
+              label: 'プロキシログを見る',
+            },
             { kind: 'collect', investigation_point_id: 'ip-itdept', label: '対策メモを見る' },
             {
               kind: 'danger',
@@ -384,7 +386,9 @@ function validScenes(): Scene[] {
           object_type: 'person',
           position: [0.7, 0.38],
           label: '田中さん',
-          actions: [{ kind: 'collect', investigation_point_id: 'ip-witness-tanaka', label: '話を聞く' }],
+          actions: [
+            { kind: 'collect', investigation_point_id: 'ip-witness-tanaka', label: '話を聞く' },
+          ],
         },
       ],
     },
@@ -487,7 +491,9 @@ describe('scenes(探索の背景シーン, #52/T037)', () => {
     expect(result.success).toBe(false)
     if (!result.success) {
       expect(
-        result.error.issues.some((issue) => issue.message.includes('investigation_points に存在しません')),
+        result.error.issues.some((issue) =>
+          issue.message.includes('investigation_points に存在しません'),
+        ),
       ).toBe(true)
     }
   })
@@ -620,17 +626,17 @@ describe('scenes[].hotspots[].actions collect の line/speaker(#52 Phase4.7/T043
   })
 })
 
-describe('schema_version 0.6.0(#52 Phase4.7 追補/T046)', () => {
-  it('reject: schema_version が旧版(0.5.0)を拒否する', () => {
+describe('schema_version 0.7.0(#100/#101)', () => {
+  it('reject: schema_version が旧版(0.6.0)を拒否する', () => {
     const scenario = validScenario()
     // @ts-expect-error 意図的に旧バージョンを渡す
-    scenario.schema_version = '0.5.0'
+    scenario.schema_version = '0.6.0'
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 
-  it('正常系: schema_version が 0.6.0 を受理する', () => {
+  it('正常系: schema_version が 0.7.0 を受理する', () => {
     const scenario = validScenario()
-    expect(scenario.schema_version).toBe('0.6.0')
+    expect(scenario.schema_version).toBe('0.7.0')
     expect(scenarioSchema.safeParse(scenario).success).toBe(true)
   })
 })
@@ -760,5 +766,260 @@ describe('scenes[].hotspots[].actions の goto / object_type door / prompt(#52 P
     scenes[0].hotspots[1].prompt = ''
     scenario.scenes = scenes
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+})
+
+// schema_version 0.7.0(#100/#101、docs/scenario_schema.md §2.6): 小鳥遊(3値目のキャラ)・
+// expression(表情)・collect の多ターン dialogue・NPC直接発話・explanations 話者化・
+// intro.background 任意化。
+describe('characterSchema 拡張(小鳥遊)と expression(表情差分)(0.7.0)', () => {
+  it('正常系: character_intros に小鳥遊を含めても受理する(導入は3枠)', () => {
+    const scenario = validScenario()
+    scenario.intro.character_intros.push({
+      character: '小鳥遊',
+      line: '庶務の小鳥遊です。よろしく。',
+    })
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: resolution.clear_explanation に小鳥遊を含めても受理する', () => {
+    const scenario = validScenario()
+    scenario.resolution.clear_explanation.push({ character: '小鳥遊', line: 'お疲れさまでした。' })
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: 台詞に expression を付けても受理する', () => {
+    const scenario = validScenario()
+    scenario.intro.character_intros[0] = {
+      ...scenario.intro.character_intros[0],
+      expression: 'serious',
+    }
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: expression を省略しても受理する(後方互換)', () => {
+    const scenario = validScenario()
+    expect(scenario.intro.character_intros[0]).not.toHaveProperty('expression')
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: 不正な expression 値を拒否する', () => {
+    const scenario = validScenario()
+    scenario.intro.character_intros[0] = {
+      ...scenario.intro.character_intros[0],
+      // @ts-expect-error 意図的に未対応の expression を渡す
+      expression: 'angry',
+    }
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+})
+
+describe('intro.background の省略可(0.7.0・ナレーション廃止)', () => {
+  it('正常系: background を省略した intro を受理する', () => {
+    const scenario = validScenario()
+    delete scenario.intro.background
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('後方互換: background を指定した intro も引き続き受理する', () => {
+    const scenario = validScenario()
+    expect(scenario.intro.background).toBeTruthy()
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: background を省略しても victim_company は引き続き必須', () => {
+    const scenario = validScenario()
+    delete scenario.intro.background
+    // @ts-expect-error 意図的に必須フィールドを欠落させる
+    delete scenario.intro.victim_company
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+})
+
+describe('collect.dialogue(多ターン・NPC直接発話, 0.7.0)', () => {
+  it('正常系: 支援役の行とNPCの行(npc)が混在する dialogue を受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-witness-tanaka',
+      label: '田中さんに話を聞く',
+      dialogue: [
+        {
+          character: '霧島',
+          expression: 'serious',
+          line: 'あのメールを開いた時の状況を教えてください。',
+        },
+        { npc: '田中', line: '取引先からの見積依頼だと思って、普通に開いてしまって……' },
+        { character: '橘', line: '添付ファイルの拡張子は確認しましたか？' },
+        { npc: '田中', line: 'いえ、そこまでは……' },
+      ],
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('後方互換: 既存形式(line/speaker、dialogue 無し)は引き続き受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-proxy-log',
+      label: 'プロキシログを見る',
+      speaker: '霧島',
+      line: '霧島「深夜に大量ログイン試行の記録がある。」',
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: dialogue と line/speaker を併用すると拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-witness-tanaka',
+      label: '田中さんに話を聞く',
+      speaker: '橘',
+      line: '橘「これは併用できないはず。」',
+      dialogue: [{ npc: '田中', line: '併用テスト。' }],
+    }
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('併用'))).toBe(true)
+    }
+  })
+
+  it('reject: collect.dialogue に小鳥遊(character)を含むと拒否する(探索は2枠のまま)', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-witness-tanaka',
+      label: '田中さんに話を聞く',
+      dialogue: [{ character: '小鳥遊', line: '私も交ざっていいですか？' }],
+    }
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('小鳥遊'))).toBe(true)
+    }
+  })
+
+  it('reject: collect.dialogue の npc に「小鳥遊」と名乗らせるすり抜けも拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-witness-tanaka',
+      label: '田中さんに話を聞く',
+      dialogue: [{ npc: '小鳥遊', line: 'NPC名を借りたすり抜けテスト。' }],
+    }
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('小鳥遊'))).toBe(true)
+    }
+  })
+
+  it('reject: 後方互換の collect.speaker に小鳥遊を使うと拒否する(dialogue 以外の抜け道を塞ぐ)', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-witness-tanaka',
+      label: '田中さんに話を聞く',
+      line: '旧形式の単発台詞。',
+      speaker: '小鳥遊',
+    }
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('小鳥遊'))).toBe(true)
+    }
+  })
+
+  it('reject: npc が空文字の場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-witness-tanaka',
+      label: '田中さんに話を聞く',
+      dialogue: [{ npc: '', line: '空の名前。' }],
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: dialogue が空配列の場合を拒否する(.min(1))', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-witness-tanaka',
+      label: '田中さんに話を聞く',
+      dialogue: [],
+    }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+})
+
+describe('resolution.questions.explanations の union 化と小鳥遊ガード(0.7.0)', () => {
+  it('後方互換: explanations が文字列配列のみの場合を引き続き受理する', () => {
+    const scenario = validScenario()
+    scenario.resolution.questions[0].explanations = ['一次情報とその裏取りを整理しよう。']
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: explanations が話者付きオブジェクト配列のみの場合を受理する', () => {
+    const scenario = validScenario()
+    scenario.resolution.questions[0].explanations = [
+      { character: '橘', line: '保全の観点から見ても、まず一次情報を疑うのが筋よ。' },
+    ]
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: explanations が文字列とオブジェクトの混在の場合を受理する', () => {
+    const scenario = validScenario()
+    scenario.resolution.questions[0].explanations = [
+      '一次情報とその裏取りを整理しよう。',
+      {
+        character: '橘',
+        line: '保全の観点から見ても、まず一次情報を疑うのが筋よ。',
+        expression: 'thinking',
+      },
+    ]
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: explanations のオブジェクト要素に小鳥遊を使うと拒否する', () => {
+    const scenario = validScenario()
+    scenario.resolution.questions[0].explanations = [
+      { character: '小鳥遊', line: '私からも一言。' },
+    ]
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('小鳥遊'))).toBe(true)
+    }
+  })
+
+  it('reject: questions[].speaker に小鳥遊を使うと拒否する(2問い枠のまま)', () => {
+    const scenario = validScenario()
+    // 小鳥遊は characterSchema の値としては型上許容されるが、questions[].speaker では
+    // superRefine が拒否する(型だけでは表現できない箇所別の制約のため)。
+    scenario.resolution.questions[0].speaker = '小鳥遊'
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('小鳥遊'))).toBe(true)
+    }
   })
 })

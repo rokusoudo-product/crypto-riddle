@@ -17,7 +17,7 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const s3EcCardLeakFixture: Scenario = {
-  schema_version: '0.6.0',
+  schema_version: '0.7.0',
   id: 's3-ec-card-leak',
   title: 'ECサイトのカード情報漏洩',
   status: 'draft',

@@ -27,7 +27,7 @@
 //
 // core/ は React および src/ui/ を import してはならない（plan.md §2、advisor 承認条件）。
 import { judgeCipherStage, judgeQuestionChoice } from '../judge/index.ts'
-import type { Scenario } from '../model/index.ts'
+import type { DialogueLine, Scenario } from '../model/index.ts'
 
 export type ScenarioPart = 'intro' | 'exploration' | 'resolution' | 'clear'
 
@@ -116,14 +116,21 @@ function addUnique(list: readonly string[], value: string): readonly string[] {
  * 誤答時の段階解説を選ぶ(spec §8.2「外すたびに解説が段階的に深くなる」)。
  * `priorWrongAttempts` は今回の誤答より前の誤答回数(初回誤答なら0)。
  * explanations が無い/空なら null(reply のみで表示する、docs/scenario_schema.md §2.4)。
+ *
+ * schema_version 0.7.0（#100/#101）: explanations の要素は文字列(従来どおり questions[].speaker が
+ * 話す)または話者付きオブジェクト(DialogueLine)の union になった(docs/scenario_schema.md §2.6)。
+ * 話者名を添えた表示（会話フレームでの話者アイコン等）は UI 実装(#102)の範囲のため、本関数は
+ * これまでどおり `explanation: string | null` を返す後方互換な最小対応とし、オブジェクト要素からは
+ * `line`(台詞本文)のみを取り出す。
  */
 function pickExplanation(
-  explanations: readonly string[] | undefined,
+  explanations: readonly (string | DialogueLine)[] | undefined,
   priorWrongAttempts: number,
 ): string | null {
   if (!explanations || explanations.length === 0) return null
   const index = Math.min(priorWrongAttempts, explanations.length - 1)
-  return explanations[index]
+  const explanation = explanations[index]
+  return typeof explanation === 'string' ? explanation : explanation.line
 }
 
 /**

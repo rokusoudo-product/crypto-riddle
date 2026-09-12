@@ -18,7 +18,7 @@
 # `src/core/scenario/fixtures/s1-targeted-email-intrusion.fixture.ts`(手書きの写し)と食い違う。
 # 1行で書けば折り畳みが発生せず、フィクスチャとの文字列完全一致を保てる。
 
-schema_version: "0.6.0"
+schema_version: "0.7.0"
 id: s1-targeted-email-intrusion
 title: 標的型メールからの侵入
 status: reviewed
