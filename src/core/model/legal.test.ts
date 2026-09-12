@@ -6,7 +6,7 @@ function validLawEntry(): LawEntry {
   return {
     id: 'LAW-APPI-BREACH-REPORT',
     law_name: '個人情報の保護に関する法律',
-    article: '第22条の2',
+    article: '第26条',
     title: '漏えい等の報告等',
     report_deadline: '速報: 概ね3〜5日以内。確報: 30日以内。',
     summary: '個人データ漏えい時の報告義務。',

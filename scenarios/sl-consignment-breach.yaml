@@ -21,8 +21,9 @@
 # - 法制度(個人情報保護法)は legal/laws_sample.yaml の LAW-APPI-CONSIGNMENT-SUPERVISION(新設・
 #   委託先の監督)と LAW-APPI-BREACH-REPORT(既存・漏えい等の報告等)を resolution.legal_refs で
 #   参照し、条文番号・報告期限はセリフ・カード本文に直書きしない(docs/scenario_schema.md §4)。
-#   **LAW-APPI-CONSIGNMENT-SUPERVISION の条文番号(第22条)は制作時点(2026-09-11)のドラフト値で
-#   あり、Issue #81 と同じスコープで代表確認前提とする(#76 代表承認コメント)。**
+#   LAW-APPI-CONSIGNMENT-SUPERVISION の条文番号は制作時点(2026-09-11)は「第22条」のドラフト値
+#   だったが、2026-09-12(#81)に代表確認のうえ現行条番号「第25条」へ是正した(legal/laws_sample.yaml
+#   側で修正・last_verified 更新済み。本ファイルは legal_refs で id 参照のみのため変更なし)。
 # - **これは代表監修前のドラフト**(Issue #76)。教育内容・法制度(委託先監督義務・報告義務)の
 #   正確性は断定を避け resolution.questions の選択肢＋explanations で扱い、最終確定は代表レビュー
 #   (#81)を経る前提で作成した。status: draft。
