@@ -362,6 +362,30 @@ describe('解決パート: 問い(questions)の出題順・誤答再挑戦・ク
     })
   })
 
+  // schema_version 0.7.0(#100/#101): explanations は string | DialogueLine の union 配列になった。
+  // pickExplanation はオブジェクト要素から line(台詞本文)のみを取り出す(話者表示は UI #102 の範囲)。
+  it('explanations に話者付きオブジェクトが含まれる場合、line のみを explanation として返す', () => {
+    const scenario = buildScenario()
+    scenario.resolution.questions[0].explanations = [
+      '一段目の解説。',
+      { character: '橘', line: '保全の観点から見ても、まず一次情報を疑うのが筋よ。' },
+    ]
+    const q1 = stateAtFirstQuestion(scenario)
+    const firstMiss = scenarioReducer(scenario, q1, {
+      type: 'SUBMIT_QUESTION_ANSWER',
+      choiceIndex: 1,
+    })
+    expect(firstMiss.lastAnswerFeedback?.explanation).toBe('一段目の解説。')
+
+    const secondMiss = scenarioReducer(scenario, firstMiss, {
+      type: 'SUBMIT_QUESTION_ANSWER',
+      choiceIndex: 2,
+    })
+    expect(secondMiss.lastAnswerFeedback?.explanation).toBe(
+      '保全の観点から見ても、まず一次情報を疑うのが筋よ。',
+    )
+  })
+
   it('resolution(question) 以外で SUBMIT_QUESTION_ANSWER を送っても状態は変化しない', () => {
     const scenario = buildScenario()
     const resolving = stateAtResolution(scenario) // まだ cipher ステージ

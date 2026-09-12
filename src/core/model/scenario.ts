@@ -482,8 +482,11 @@ export const scenarioSchema = scenarioObjectSchema.superRefine((data, ctx) => {
           }
           // 小鳥遊ガード(docs/scenario_schema.md §2.6): 探索の collect.dialogue[] に小鳥遊は使えない
           // (character/npc いずれの行としても不可。探索の会話フレームは2枠のままで描画先が無いため)。
+          // npc は自由記述だが、npc: '小鳥遊' のように名乗らせるすり抜けも同様に拒否する。
           action.dialogue?.forEach((line, lineIndex) => {
-            if ('character' in line && line.character === '小鳥遊') {
+            const isForbiddenCharacterLine = 'character' in line && line.character === '小鳥遊'
+            const isForbiddenNpcLine = 'npc' in line && line.npc === '小鳥遊'
+            if (isForbiddenCharacterLine || isForbiddenNpcLine) {
               ctx.addIssue({
                 code: 'custom',
                 message: `scene '${scene.id}' の collect.dialogue に小鳥遊は使用できません(探索の会話フレームは2枠のまま)。`,
@@ -496,7 +499,7 @@ export const scenarioSchema = scenarioObjectSchema.superRefine((data, ctx) => {
                   actionIndex,
                   'dialogue',
                   lineIndex,
-                  'character',
+                  isForbiddenCharacterLine ? 'character' : 'npc',
                 ],
               })
             }

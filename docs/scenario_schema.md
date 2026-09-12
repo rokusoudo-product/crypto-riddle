@@ -13,7 +13,9 @@ related:
   - scripts/build-data.ts（YAML→JSON ビルドパイプライン。T010）
 status: reviewed
 created: 2026-08-07
-updated: 2026-09-12（#100 S1会話フロー刷新のスキーマ0.7.0仕様を §2.6 に追加。zod実装は後続 #101）
+updated: 2026-09-13（#101/PR #105 で zod 実装完了。schema_version 0.7.0 化・全 YAML/fixture の
+  schema_version 更新（内容無変更）を含む。#103 のスコープが S1 データ本体の移植のみに変更されたことを
+  §2.6 に反映）
 ---
 
 # crypto-riddle — シナリオ記述フォーマット
@@ -32,8 +34,15 @@ YAML スキーマの説明。Issue #3 に対応する。
 > **2026-09-12（#100）: S1 会話フロー刷新（台本 v2.2）のスキーマ 0.7.0 仕様を策定**。現行コードの
 > `schema_version` は `0.6.0`（探索の動線統合、#52 T046）。**本 Issue は docs 先行（コード変更なし）**で、
 > 0.7.0 の仕様確定のみを行う。zod 改訂は後続の **core Issue #101**、UI 実装は **UI Issue #102**、
-> S1 データの本移植（全 YAML/fixture の `schema_version` 更新を含む）は **data Issue #103** で行う。
-> 仕様の詳細は §2.6。
+> S1 データの本移植は **data Issue #103** で行う。仕様の詳細は §2.6。
+>
+> **2026-09-13（#101/PR #105）: zod 実装完了・`schema_version` を `0.7.0` に更新**。当初の計画（本欄の
+> 直前の記述）では「全 YAML/fixture の `schema_version` 更新は #103」としていたが、
+> `scenarioSchemaVersionSchema` を `z.literal('0.7.0')` に変更すると既存 `scenarios/*.yaml`（`0.6.0`）が
+> `npm run build:data`/テストで即座に落ち、**PR単独で CI がグリーンにならない**ため、
+> `scenarios/*.yaml` 全件・`fixtures/*.fixture.ts`（core/ui 双方）の `schema_version` の値のみ
+> （内容・構造・台詞は無変更）を #101（PR #105）に前倒しした。**#103 のスコープは S1 データ本体
+> （台本 v2.2 への移植）のみ**に変更されている。UI 実装は引き続き **UI Issue #102** の範囲。
 
 ## 0. 位置づけ（正本は何か）
 
@@ -74,7 +83,7 @@ scripts/
 
 | フィールド | spec 対応 | 説明 |
 |---|---|---|
-| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.6.0"`（探索の動線統合、#52・T046）。**S1 会話フロー刷新（#100 で仕様確定・#101 で zod 実装・#103 で全 YAML/fixture 反映）で `"0.7.0"` に更新予定（§2.6）** |
+| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.7.0"`（S1 会話フロー刷新、#100 で仕様確定・#101/PR #105 で zod 実装・全 YAML/fixture の値反映。詳細は §2.6） |
 | `id` | - | マップID。**ファイル名(拡張子除く)と一致必須**(`validate-collection.ts` の `checkScenarioFilenames` がチェック) |
 | `title` | §4 | マップタイトル(事件名) |
 | `status` | - | `draft`/`reviewed`/`published`/`sample`。省略時 `draft` |
@@ -235,21 +244,26 @@ scenes:
 - **背景アセット**は image_agent 自作（16:9・アニメ調で立ち絵と統一。DESIGN.md「探索シーン」「アセット」節）。`background` はアセットIDで参照し、YAML にパスを直書きしない。
 - `scenes`/`hotspots`/`object_type`/座標系は **T037（0.4.0）で確定済**。`collect` の `line`/`speaker` は **T043（0.5.0）で確定**。`goto`/`door`/`prompt` は **T046（0.6.0）で確定**。
 
-### 2.6 スキーマ 0.7.0（S1 会話フロー刷新・#100 で仕様確定／#101 で zod 実装予定）
+### 2.6 スキーマ 0.7.0（S1 会話フロー刷新・#100 で仕様確定／#101・PR #105 で zod 実装完了）
 
-> **策定状況**: 本節は **spec/plan/docs 先行 Issue #100**（docs のみ・コード変更なし）でスキーマ仕様を確定したもの。
-> zod 改訂（`src/core/model/common.ts` / `src/core/model/scenario.ts`）は後続の **core Issue #101** のスコープであり、
-> **本節がマージされた時点でも `scenarioSchemaVersionSchema` は引き続き `z.literal('0.6.0')` のまま**（#101 で `0.7.0` に変更）。
-> S1 データ本体・全シナリオ YAML/fixture の `schema_version` 移行は **data Issue #103**、会話フレーム3枠・NPC名札・
-> `explanations` 話者表示・表情フォールバックの UI 実装は **UI Issue #102** で行う。
+> **実装状況（2026-09-13 更新）**: 本節は **spec/plan/docs 先行 Issue #100**（docs のみ・コード変更なし）で
+> スキーマ仕様を確定したもの。zod 改訂（`src/core/model/common.ts` / `src/core/model/scenario.ts`）は
+> **core Issue #101（PR #105）で実装完了済み**。`scenarioSchemaVersionSchema` は `z.literal('0.7.0')`。
+> **当初の計画（策定時点の本欄）からのスコープ変更**: 「全シナリオ YAML/fixture の `schema_version` 移行は
+> data Issue #103」としていたが、`z.literal('0.7.0')` 化により既存 `scenarios/*.yaml`（`0.6.0`）のままでは
+> `npm run build:data`/テストが即座に落ち PR単独で CI がグリーンにならないため、`scenarios/*.yaml` 全件・
+> `fixtures/*.fixture.ts`（core/ui 双方）の `schema_version` の値のみ（内容・構造・台詞は無変更）を
+> **#101（PR #105）で先に更新済み**。**#103 のスコープは S1 データ本体（台本 v2.2 への移植）のみ**に変更。
+> 会話フレーム3枠・NPC名札・`explanations` 話者表示・表情フォールバックの UI 実装は引き続き
+> **UI Issue #102** で行う。
 
 台本 v2.2（2026-09-12 代表確定・S1 会話フロー刷新）に対応するため、以下7点をすべて「省略可の追加」または
-「必須→省略可の緩和」として改訂する。**S2/S3/SL は内容無変更のまま有効**（各ファイルの `schema_version` の値のみ
-#103 で書き換える。フィールドの追加・書き直しは不要）。
+「必須→省略可の緩和」として改訂する。**S2/S3/SL は内容無変更のまま有効**（各ファイルの `schema_version` の値は
+**#101（PR #105）で書き換え済み**。フィールドの追加・書き直しは不要）。
 
 1. **`characterSchema` を3値に拡張**（`src/core/model/common.ts`）: `z.enum(['霧島', '橘'])` →
    `z.enum(['霧島', '橘', '小鳥遊'])`。小鳥遊の登場自体は #97 で `docs/characters.md` に先行反映済みだが、
-   zod 側の enum 拡張は本節で仕様確定し #101 で実装する。
+   zod 側の enum 拡張は本節で仕様確定し #101（PR #105）で実装済み。
 2. **`expressionSchema` の新設**: `z.enum(['neutral', 'serious', 'confident', 'smile', 'thinking'])`
    （`DESIGN.md`「表情差分の定義表」#97 の5種と一致させる）。`dialogueLineSchema`（`src/core/model/common.ts`）に
    **`expression`（省略可）** を追加する。既存データは `expression` 省略のまま有効。表情差分の絵が未生成でも
@@ -269,8 +283,8 @@ scenes:
 6. **`explanations` を union 配列にする**（`questionSchema.explanations`）: `array(string | dialogueLineSchema)`。
    文字列要素＝従来どおり出題者（`questions[].speaker`）が話す動作、`dialogueLineSchema` オブジェクト要素＝話者を
    明示。**S2/S3/SL の既存の文字列配列は移行不要**（そのまま有効）で、S1 だけ話者付きで書ける。
-7. **`schema_version` を `0.7.0` に更新**（`scenarioSchemaVersionSchema`、#101 でリテラル変更・#103 で各
-   YAML/fixture に反映）。
+7. **`schema_version` を `0.7.0` に更新**（`scenarioSchemaVersionSchema`。リテラル変更・全 YAML/fixture への
+   反映(値のみ)とも #101/PR #105 で実施済み）。
 
 **小鳥遊ガード（探索・解決の描画枠制約）**: 小鳥遊が登場できるのは**①導入（`intro.character_intros`）と
 ⑦結果（`resolution.clear_explanation`）のみ**。以下には**使用不可**とし、zod の union 構成そのもので
@@ -284,7 +298,7 @@ scenes:
 （`DESIGN.md`「会話フレーム」節）。導入のみ3枠（対策室レイアウト。霧島＝左／橘＝右／小鳥遊＝中央後方やや小さめ）
 に拡張する。
 
-**フィールド構成イメージ（zod 実装は #101 のスコープ。以下は仕様確認用の非規範的サンプル）**:
+**フィールド構成イメージ（zod 実装は #101/PR #105 で実施済み。以下は仕様確認用の非規範的サンプル）**:
 
 ```yaml
 # 探索: collect の多ターン化（既存 line/speaker と dialogue は併用不可）
@@ -317,7 +331,7 @@ resolution:
 - `intro.background` を省略した場合、`victim_company`／`character_intros` は引き続き必須（会話劇化しても
   被害企業情報とキャラ導入台詞は要る）。
 - `dialogue`／`explanations`／`npc` 発話とも、**S2/S3/SL の既存 YAML は無改訂で有効**（`schema_version` の
-  値のみ #103 で更新）。
+  値は #101/PR #105 で更新済み）。
 
 ## 3. 出典表記（`references`）
 

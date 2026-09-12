@@ -896,6 +896,23 @@ describe('collect.dialogue(多ターン・NPC直接発話, 0.7.0)', () => {
     }
   })
 
+  it('reject: collect.dialogue の npc に「小鳥遊」と名乗らせるすり抜けも拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[1].actions[0] = {
+      kind: 'collect',
+      investigation_point_id: 'ip-witness-tanaka',
+      label: '田中さんに話を聞く',
+      dialogue: [{ npc: '小鳥遊', line: 'NPC名を借りたすり抜けテスト。' }],
+    }
+    scenario.scenes = scenes
+    const result = scenarioSchema.safeParse(scenario)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((issue) => issue.message.includes('小鳥遊'))).toBe(true)
+    }
+  })
+
   it('reject: npc が空文字の場合を拒否する', () => {
     const scenario = validScenario()
     const scenes = validScenes()
