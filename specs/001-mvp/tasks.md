@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-11 (#52 Phase 4.7: T042-T045 実装完了・③''''=「MVPとしてOK」＝量産ゲート開放可／T046〔ドア動線 goto・管理者統合・schema 0.6.0〕を量産と並行で追加)
+updated: 2026-09-12 (Phase 4.8 追加: S1会話フロー刷新〔台本v2.2・#100/#101/#102/#103〕。T049-docsは#100で完了・T050-core以降は後続Issue)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -438,6 +438,35 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 ---
 
+## Phase 4.8: S1 会話フロー刷新（台本 v2.2・#100/#101/#102/#103）= 探索・解決演出の再刷新
+
+> 代表確定の台本 v2.2（2026-09-12。ナレーション全廃・完全会話劇化／発見時の多ターン化＋NPC直接発話／誤答ヒント2段／小鳥遊は①導入・⑦結果のみ）を反映する一連の Issue。**docs 先行 Issue #100**（本 Issue・コード変更なし）で spec/DESIGN/scenario_schema の仕様を確定し、承認ゲートを経たうえで **core Issue #101**（zod スキーマ 0.7.0 実装）→ **UI Issue #102**（会話フレーム3枠・NPC名札・explanations話者表示・表情フォールバック）→ **data Issue #103**（S1 シナリオを v2.2 台本へ本移植＋全 YAML/fixture の `schema_version` 更新＋e2e）の順で進める。詳細仕様は spec §5/§7.1/§8.2、`DESIGN.md`「会話フレーム」「探索シーン」節、`docs/scenario_schema.md` §2.6。委譲条件「**スキーマ差分は commit 前に報告して停止**」を維持。
+
+- [ ] **T049-docs** spec/DESIGN/scenario_schema へのスキーマ0.7.0仕様反映（#100・本 Issue・docs のみ）
+  - `docs/scenario_schema.md` §2.6: スキーマ0.7.0の7点（`characterSchema` 拡張／`expressionSchema` 新設／`intro.background` 省略可／`collect.dialogue` 追加／NPC直接発話・`explanations` union化／`schema_version` 0.7.0）＋小鳥遊ガードを明記。
+  - `DESIGN.md`「会話フレーム」節: 支援役「2名固定」前提の記述を一括改訂（導入=3枠・探索/解決=2枠のまま、グレーアウトを「発話者以外は全員」に一般化、表情フォールバック・`bg-sl-office` 流用を追記）。「探索シーン」節に NPC 直接発話の描画（両立ち絵グレーアウト＋`npc` 名札＋トリガーホットスポット□強調）を追記。
+  - `specs/001-mvp/spec.md` §5（小鳥遊の登場範囲）・§7.1（多ターン化・NPC直接発話）・§8.2（誤答ヒント2段・用語クッションの担い手）を反映。
+  - `plan.md` §5 に本 Phase の仕様概要を追記。
+  - 完了条件: `npm run format:check`（変更した各 md）が通過し、PR 作成（**マージは代表**。spec/plan の承認ゲートに該当するため #101 着手前に代表承認を得る）。
+- [ ] **T050-core** シナリオスキーマ 0.7.0 の zod 実装（#101・依存: T049-docs のマージ・代表承認）
+  - `src/core/model/common.ts` / `src/core/model/scenario.ts` を `docs/scenario_schema.md` §2.6 のとおり改訂。`collect.dialogue` と `line`/`speaker` の併用拒否・小鳥遊ガード（探索の `dialogue`・`questions[].speaker`・`questions[].explanations` での使用不可）を `superRefine` で実装。**schema_version 0.6.0 → 0.7.0**（版数追随は T037/T043/T046-core と同手順）。
+  - 完了条件: zod 単体テスト（`expression` 有無・`dialogue`/`line` 併用 reject・NPC union・`explanations` union・小鳥遊ガード reject・0.7.0 検証）が通り `npm run build:data` 成功。**スキーマ差分は commit 前に報告して停止**。
+- [ ] **T051-ui** 会話フレーム3枠・NPC名札・explanations話者表示・表情フォールバック（#102・依存: T050-core）
+  - 導入（`intro-screen.tsx`）を3枠（霧島/橘/小鳥遊）の対策室レイアウトに刷新し、`bg-sl-office` を UI 定数で背景流用（ナレーション全廃に伴う会話劇化）。
+  - 探索（`scene-explorer.tsx`/`conversation-frame.tsx`）に多ターン送り（`dialogue[]`）・NPC 名札＋両立ち絵グレーアウト＋トリガーホットスポット□強調を実装。
+  - 解決（`resolve-screen.tsx`）の `explanations` を話者付き表示（文字列/オブジェクト混在）に対応。
+  - 立ち絵は `PORTRAIT_SRC[character][expression]` を解決し、該当 PNG が無ければ `neutral` にフォールバック。
+  - 完了条件: Vitest・Playwright e2e・axe が通る。既存3マップ（S2/S3/SL）を壊さない。
+- [ ] **T052-data** S1 シナリオを台本v2.2へ本移植＋全 YAML/fixture の schema_version 更新＋E2E（#103・依存: T051-ui）
+  - `scenarios/s1-targeted-email-intrusion.yaml` を台本v2.2（導入9往復・多ターン発見・NPC直接発話・誤答ヒント2段）へ書き直し。
+  - `scenarios/*.yaml`・`legal/*.yaml` 等の fixture の `schema_version` を 0.7.0 へ一括更新（内容は無改訂。S2/S3/SL は版数のみ）。
+  - E2E: S1 通しプレイ（導入3枠→探索多ターン/NPC→解決2段ヒント→結果の小鳥遊ねぎらい）。
+  - 完了条件: Vitest・Playwright e2e・`npm run build:data` が通る。
+
+**チェックポイント（Phase 4.8 完了後）**: 代表が S1 通しプレイで最終確認。量産済みの S2/S3/SL はこの Phase では無改訂のため影響なし。
+
+---
+
 ## Phase 5: マップ量産（plan §11-5）= プロダクション
 
 > **⚠️ 量産ゲート（#42・#52）**: **③''''（2026-09-11）の「MVP としては OK」で量産ゲートは開放可**。Phase 4.5（会話モード）・4.6（背景シーン化）・4.7（会話フレーム化）は main マージ済。**T046（ドア動線・管理者統合）は量産と並行**でよいが、**`goto` スキーマ（T046-core・0.6.0）は量産 YAML の執筆開始前に main へ入れる**（量産マップは複数シーンでドア移動を最初から使うため）。旧フォーマット（`required_card_ids`／背景なし／台詞なし）は全て書き直しになるため、量産は schema 0.6.0 確定後の様式で開始する。各量産マップには**背景2〜3枚（IMAGE_WORKFLOW）**を各制作 Issue に含める。着手可否（ゲートを開けるか）は代表判断。
@@ -508,9 +537,13 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#57](https://github.com/rokusoudo-product/crypto-riddle/issues/57) S1/s0 scenes データ＋探索E2E | closed（完了・PR #61） | **T040＋T041** | S1 に2シーン投入・s0 は省略でフォールバック検証。T039 背景は #60 |
 | [#62](https://github.com/rokusoudo-product/crypto-riddle/issues/62) 人物証言が対策カードを表示する不具合 | bug（Phase 4.7 T044 で吸収予定） | **T044 に吸収** | #56 由来。`pickTestimonyCard` 経路が Phase 4.7 で消えるため吸収。クローズは T044 マージ時 |
 | [#41](https://github.com/rokusoudo-product/crypto-riddle/issues/41) タイトル CTA が実セーブ状態と未接続 | bug（`ready`・優先度 Phase 7） | 別途（Phase 7 の a11y/仕上げ候補） | T018 由来。回答済み（つづきから=中断再開／出し分け実装／Phase7）。会話モードとは独立 |
-| [#50](https://github.com/rokusoudo-product/crypto-riddle/issues/50) 会話フレームを③導入・④探索にも適用 | フォロー（探索④分は #52 に統合。残=③導入） | 別途 | 会話モード刷新の残作業 |
+| [#50](https://github.com/rokusoudo-product/crypto-riddle/issues/50) 会話フレームを③導入・④探索にも適用 | フォロー（探索④分は #52 に統合。残=③導入分は #102 が吸収） | **T051-ui**（#102） | 会話モード刷新の残作業。残っていた③導入分は Phase 4.8・UI Issue #102 のスコープに含めて吸収する |
 | [#51](https://github.com/rokusoudo-product/crypto-riddle/issues/51) 暗号ステージ誤答のXP減算の要否 | フォロー（spec §8.4 で決定→反映） | T022 と連動 | 現行 S1 は暗号なしで実害なし |
 | [#53](https://github.com/rokusoudo-product/crypto-riddle/issues/53) 選択肢を南京錠でロック | future（MVP外） | 別途 | ヒント未収集で選択肢ロック。#52 と関連 |
+| [#100](https://github.com/rokusoudo-product/crypto-riddle/issues/100) docs: S1会話フロー刷新のspec/DESIGN/scenario_schema反映 | open（本 PR で対応・docs のみ） | **T049-docs・Phase 4.8** | 台本v2.2（2026-09-12代表確定）のスキーマ0.7.0仕様・会話フレーム3枠・表情フォールバックをdocsに先行反映。マージは代表（spec/plan承認ゲート該当）。実装は #101/#102/#103 |
+| [#101](https://github.com/rokusoudo-product/crypto-riddle/issues/101) feat(core): シナリオスキーマ0.7.0 | open（#100 のマージ・代表承認待ち） | **T050-core・Phase 4.8** | `docs/scenario_schema.md` §2.6 を zod（`src/core/model/`）に実装。小鳥遊/表情/多ターンdialogue/NPC発話/explanations話者/背景任意化 |
+| [#102](https://github.com/rokusoudo-product/crypto-riddle/issues/102) feat(ui): 導入の会話フレーム化（#50吸収）＋探索の多ターン送り・NPC名札・explanations話者・表情フォールバック | open（依存: #101） | **T051-ui・Phase 4.8** | #50（③導入の会話フレーム化）を吸収 |
+| [#103](https://github.com/rokusoudo-product/crypto-riddle/issues/103) feat(data): S1シナリオをv2.2台本へ移植＋e2e | open（依存: #102） | **T052-data・Phase 4.8** | 全シナリオYAML/fixtureの `schema_version` 0.7.0 更新を含む（内容はS2/S3/SL無改訂） |
 
 ## 依存関係の要約
 

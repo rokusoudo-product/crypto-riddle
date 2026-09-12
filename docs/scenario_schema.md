@@ -13,7 +13,7 @@ related:
   - scripts/build-data.ts（YAML→JSON ビルドパイプライン。T010）
 status: reviewed
 created: 2026-08-07
-updated: 2026-09-10（#52 探索の背景シーン `scenes[]` 目標形を §2.5 に追加）
+updated: 2026-09-12（#100 S1会話フロー刷新のスキーマ0.7.0仕様を §2.6 に追加。zod実装は後続 #101）
 ---
 
 # crypto-riddle — シナリオ記述フォーマット
@@ -28,6 +28,12 @@ YAML スキーマの説明。Issue #3 に対応する。
 > 結線・E2E更新（T035/T036、#46）も完了**。S1 の誤答肢は探索カードの内容を具体的に裏付けとして
 > 引用する reply へ本執筆し、`explanations` を多段化した。会話モードの仕様の正本は spec §8、
 > 画面は DESIGN.md「会話フレーム」節。
+>
+> **2026-09-12（#100）: S1 会話フロー刷新（台本 v2.2）のスキーマ 0.7.0 仕様を策定**。現行コードの
+> `schema_version` は `0.6.0`（探索の動線統合、#52 T046）。**本 Issue は docs 先行（コード変更なし）**で、
+> 0.7.0 の仕様確定のみを行う。zod 改訂は後続の **core Issue #101**、UI 実装は **UI Issue #102**、
+> S1 データの本移植（全 YAML/fixture の `schema_version` 更新を含む）は **data Issue #103** で行う。
+> 仕様の詳細は §2.6。
 
 ## 0. 位置づけ（正本は何か）
 
@@ -68,7 +74,7 @@ scripts/
 
 | フィールド | spec 対応 | 説明 |
 |---|---|---|
-| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.3.0"`（会話モード、#42・T030）。**探索の背景シーン（#52・T037）で `"0.4.0"` に更新予定** |
+| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.6.0"`（探索の動線統合、#52・T046）。**S1 会話フロー刷新（#100 で仕様確定・#101 で zod 実装・#103 で全 YAML/fixture 反映）で `"0.7.0"` に更新予定（§2.6）** |
 | `id` | - | マップID。**ファイル名(拡張子除く)と一致必須**(`validate-collection.ts` の `checkScenarioFilenames` がチェック) |
 | `title` | §4 | マップタイトル(事件名) |
 | `status` | - | `draft`/`reviewed`/`published`/`sample`。省略時 `draft` |
@@ -228,6 +234,90 @@ scenes:
 - **整合性チェック（`scenes` があるとき）**: ①各 `investigation_point` が**ちょうど1つの `collect` action** から参照されること。②各 **`goto.scene_id` が `scenes[]` に実在**し、かつ**自シーン以外**を指すこと（`superRefine`）。`scenes` 省略時はチェックしない。
 - **背景アセット**は image_agent 自作（16:9・アニメ調で立ち絵と統一。DESIGN.md「探索シーン」「アセット」節）。`background` はアセットIDで参照し、YAML にパスを直書きしない。
 - `scenes`/`hotspots`/`object_type`/座標系は **T037（0.4.0）で確定済**。`collect` の `line`/`speaker` は **T043（0.5.0）で確定**。`goto`/`door`/`prompt` は **T046（0.6.0）で確定**。
+
+### 2.6 スキーマ 0.7.0（S1 会話フロー刷新・#100 で仕様確定／#101 で zod 実装予定）
+
+> **策定状況**: 本節は **spec/plan/docs 先行 Issue #100**（docs のみ・コード変更なし）でスキーマ仕様を確定したもの。
+> zod 改訂（`src/core/model/common.ts` / `src/core/model/scenario.ts`）は後続の **core Issue #101** のスコープであり、
+> **本節がマージされた時点でも `scenarioSchemaVersionSchema` は引き続き `z.literal('0.6.0')` のまま**（#101 で `0.7.0` に変更）。
+> S1 データ本体・全シナリオ YAML/fixture の `schema_version` 移行は **data Issue #103**、会話フレーム3枠・NPC名札・
+> `explanations` 話者表示・表情フォールバックの UI 実装は **UI Issue #102** で行う。
+
+台本 v2.2（2026-09-12 代表確定・S1 会話フロー刷新）に対応するため、以下7点をすべて「省略可の追加」または
+「必須→省略可の緩和」として改訂する。**S2/S3/SL は内容無変更のまま有効**（各ファイルの `schema_version` の値のみ
+#103 で書き換える。フィールドの追加・書き直しは不要）。
+
+1. **`characterSchema` を3値に拡張**（`src/core/model/common.ts`）: `z.enum(['霧島', '橘'])` →
+   `z.enum(['霧島', '橘', '小鳥遊'])`。小鳥遊の登場自体は #97 で `docs/characters.md` に先行反映済みだが、
+   zod 側の enum 拡張は本節で仕様確定し #101 で実装する。
+2. **`expressionSchema` の新設**: `z.enum(['neutral', 'serious', 'confident', 'smile', 'thinking'])`
+   （`DESIGN.md`「表情差分の定義表」#97 の5種と一致させる）。`dialogueLineSchema`（`src/core/model/common.ts`）に
+   **`expression`（省略可）** を追加する。既存データは `expression` 省略のまま有効。表情差分の絵が未生成でも
+   データには先に書ける（表示側のフォールバックは `DESIGN.md`「会話フレーム」節§表情フォールバック参照）。
+3. **`introSchema.background` を省略可にする**（`src/core/model/scenario.ts`）: ナレーション全廃・完全会話劇化
+   （台本v2.2）に伴い、導入の背景説明文（地の文）を省略できるようにする。**フィールド名は変えない**
+   （`background` のまま。`scenes[].background`＝背景アセットIDとは別フィールドであり、そちらは対象外＝引き続き必須）。
+4. **`collect` アクションに `dialogue`（省略可・1件以上の配列）を追加**: 探索の発見時に多ターンのやり取り
+   （短い「問いかけ」＋間）を表現するため。**既存の `line`／`speaker` は後方互換で残す**が、
+   **`dialogue` との併用は拒否する**（`scenarioSchema` の `superRefine` で相互排他を検証。単一の `collectHotspotActionSchema`
+   内では `.strict()` の対象外の相関チェックのため、フィールド単体の型ではなく `superRefine` 側の責務とする）。
+5. **NPC 直接発話（`npc` + `line`）の新設**: `npc`（自由記述の名前文字列。例: `中野`／`経理部長`／`サーバ管理者`）と
+   `line` を持つ行型 `npcDialogueLineSchema` を新設し、**`collect.dialogue[]` 限定**で
+   `dialogueLineSchema | npcDialogueLineSchema` の union として使う。**`intro.character_intros` /
+   `resolution.clear_explanation` / `resolution.questions[].explanations` の型は緩めない**（引き続き
+   `dialogueLineSchema`（`character` は3値 enum）のみ・NPC が出ない型のまま）。
+6. **`explanations` を union 配列にする**（`questionSchema.explanations`）: `array(string | dialogueLineSchema)`。
+   文字列要素＝従来どおり出題者（`questions[].speaker`）が話す動作、`dialogueLineSchema` オブジェクト要素＝話者を
+   明示。**S2/S3/SL の既存の文字列配列は移行不要**（そのまま有効）で、S1 だけ話者付きで書ける。
+7. **`schema_version` を `0.7.0` に更新**（`scenarioSchemaVersionSchema`、#101 でリテラル変更・#103 で各
+   YAML/fixture に反映）。
+
+**小鳥遊ガード（探索・解決の描画枠制約）**: 小鳥遊が登場できるのは**①導入（`intro.character_intros`）と
+⑦結果（`resolution.clear_explanation`）のみ**。以下には**使用不可**とし、zod の union 構成そのもので
+表現できない（＝`characterSchema` の3値には小鳥遊を含むため、型だけでは防げない）箇所は `superRefine` で拒否する:
+
+- 探索の `collect.dialogue[]`（`character`／`npc` いずれの行としても不可。`character: 小鳥遊` を reject）
+- `resolution.questions[].speaker`（`characterSchema` を直接使うため、値として `小鳥遊` を reject）
+- `resolution.questions[].explanations`（話者付きオブジェクト要素の `character` に `小鳥遊` を reject）
+
+理由: 探索・解決の会話フレームは現行どおり**2枠（霧島＝左／橘＝右）のまま**であり、小鳥遊を描画する枠が無い
+（`DESIGN.md`「会話フレーム」節）。導入のみ3枠（対策室レイアウト。霧島＝左／橘＝右／小鳥遊＝中央後方やや小さめ）
+に拡張する。
+
+**フィールド構成イメージ（zod 実装は #101 のスコープ。以下は仕様確認用の非規範的サンプル）**:
+
+```yaml
+# 探索: collect の多ターン化（既存 line/speaker と dialogue は併用不可）
+- kind: collect
+  investigation_point_id: ip-witness-nakano
+  label: 中野さんに話を聞く
+  dialogue:
+    - character: 霧島
+      expression: serious
+      line: "霧島「中野さん、あのメールを開いた時の状況を教えてください。」"
+    - npc: 中野
+      line: "中野「取引先からの見積依頼だと思って、普通に開いてしまって……」"
+    - character: 橘
+      line: "橘「添付ファイルの拡張子は確認しましたか？」"
+    - npc: 中野
+      line: "中野「いえ、そこまでは……」"
+
+# 解決: explanations の話者付きオブジェクト（S1 のみ想定。S2/S3/SL は既存の文字列のままでよい）
+resolution:
+  questions:
+    - id: q-entry-point
+      speaker: 霧島
+      # ...(prompt/choices/consult_hint は §2.4 のまま)
+      explanations:
+        - "一次情報（ログ）と証言のどちらを裏取りに使えるかを考えてみよう。"   # 文字列＝speaker(霧島)が話す
+        - character: 橘
+          line: "橘「保全の観点から見ても、まず一次情報を疑うのが筋よ。」"    # オブジェクト＝明示話者
+```
+
+- `intro.background` を省略した場合、`victim_company`／`character_intros` は引き続き必須（会話劇化しても
+  被害企業情報とキャラ導入台詞は要る）。
+- `dialogue`／`explanations`／`npc` 発話とも、**S2/S3/SL の既存 YAML は無改訂で有効**（`schema_version` の
+  値のみ #103 で更新）。
 
 ## 3. 出典表記（`references`）
 
