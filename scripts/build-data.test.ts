@@ -27,7 +27,7 @@ laws:
 
 function validScenarioYaml(id: string): string {
   return `
-schema_version: "0.6.0"
+schema_version: "0.7.0"
 id: ${id}
 title: テストシナリオ
 subject_tags: [ネットワーク基盤]

@@ -15,7 +15,13 @@
 // core/ は React および src/ui/ を import してはならない（plan.md §2、advisor 承認条件）。
 import { z } from 'zod'
 
-import { characterSchema, dialogueLineSchema, legalRefIdSchema, termIdSchema } from './common.ts'
+import {
+  characterSchema,
+  dialogueLineSchema,
+  legalRefIdSchema,
+  npcDialogueLineSchema,
+  termIdSchema,
+} from './common.ts'
 import { subjectTagSchema } from './tags.ts'
 import { uniqueArraySchema } from './util.ts'
 
@@ -38,7 +44,17 @@ import { uniqueArraySchema } from './util.ts'
 // 省略可能な prompt(アクションシート見出し用の挨拶台詞)を追加した後方互換な拡張。goto.scene_id が
 // scenes[] に実在し自シーンでないことを superRefine で検証する。データ本体(実際の goto/door/prompt
 // の追加)は T046-ui-data の範囲であり、本バージョンは型の追加のみ。詳細は docs/scenario_schema.md §2.5。
-export const scenarioSchemaVersionSchema = z.literal('0.6.0')
+// 0.7.0（#100/#101, 2026-09-12）: S1 会話フロー刷新（台本v2.2）に対応する7点の後方互換な拡張。
+// (1) characterSchema を3値(霧島/橘/小鳥遊)に拡張(common.ts)。(2) 台詞に expression(表情、省略可)を
+// 追加(common.ts)。(3) introSchema.background を省略可にする(ナレーション廃止)。(4) collect action に
+// 多ターン dialogue(省略可)を追加。既存の line/speaker は後方互換で残すが、dialogue との併用は
+// superRefine で拒否する。(5) NPC 直接発話(npc+line、common.ts の npcDialogueLineSchema)を新設し、
+// collect.dialogue[] 限定で dialogueLineSchema との union(sceneDialogueLineSchema)として使う。
+// (6) questions[].explanations を array(string | dialogueLineSchema) にする。(7) 小鳥遊は
+// intro.character_intros / resolution.clear_explanation でのみ話者にでき、それ以外
+// (collect.dialogue[]・questions[].speaker・questions[].explanations)への出現は superRefine で拒否する
+// (探索・解決の会話フレームは2枠のままで描画先が無いため)。詳細は docs/scenario_schema.md §2.6。
+export const scenarioSchemaVersionSchema = z.literal('0.7.0')
 
 /** マップID。ファイル名(拡張子除く)と一致させる（実在チェックは validate-collection.ts）。 */
 export const scenarioIdSchema = z.string().regex(/^[a-z][a-z0-9_-]*$/)
@@ -103,7 +119,10 @@ export const victimCompanySchema = z
 
 export const introSchema = z
   .object({
-    background: z.string().min(1),
+    // 0.7.0（#100/#101）でナレーション全廃・完全会話劇化(台本v2.2)に伴い省略可へ緩和。フィールド名は
+    // 変えない(scenes[].background=背景アセットIDとは別フィールドであり、そちらは対象外＝引き続き必須)。
+    // 省略時も victim_company/character_intros は引き続き必須(docs/scenario_schema.md §2.6)。
+    background: z.string().min(1).optional(),
     victim_company: victimCompanySchema,
     character_intros: z.array(dialogueLineSchema).min(1),
   })
@@ -149,11 +168,22 @@ export type HotspotObjectType = z.infer<typeof hotspotObjectTypeSchema>
 export const hotspotPositionSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])
 export type HotspotPosition = z.infer<typeof hotspotPositionSchema>
 
+// 探索の collect アクション限定で使う会話行の union(0.7.0・#100/#101、docs/scenario_schema.md §2.6)。
+// dialogueLineSchema(character=霧島/橘/小鳥遊のいずれか)と npcDialogueLineSchema(npc=自由記述)の
+// どちらかを許容する。intro.character_intros / resolution.clear_explanation / questions[].explanations
+// は従来どおり dialogueLineSchema のみ(NPC が出ない型を維持)であり、この union はここでしか使わない。
+// 小鳥遊ガード(collect.dialogue[] への小鳥遊出現の禁止)は scenarioSchema の superRefine で検証する
+// (union の型だけでは character 別の場所ごとの許可/禁止を表現できないため)。
+export const sceneDialogueLineSchema = z.union([dialogueLineSchema, npcDialogueLineSchema])
+export type SceneDialogueLine = z.infer<typeof sceneDialogueLineSchema>
+
 // ホットスポットのアクションは kind を判別子とする discriminated union にする(docs/scenario_schema.md §2.5)。
 // - collect: investigation_point_id を参照してカードを獲得する(1オブジェクトが複数ポイントを
 //   束ねられる。hotspot→point は 1:N。例: 1台のPCにメールログとEDRの2点)。省略可能な
 //   line(台詞)・speaker(話者)を持てる(#52 Phase4.7/T043, 0.5.0。danger の feedback と対称)。
 //   省略時は既定の導入文＋カード本文へのフォールバック(UI側T044の範囲)。
+//   0.7.0（#100/#101）: 多ターンのやり取りを表現する dialogue(省略可・1件以上)を追加。
+//   line/speaker は後方互換で残すが、dialogue との併用は superRefine で拒否する(相互排他)。
 // - danger: 電源を落とす等の危険な選択肢。feedback は教育的な台詞のみを返し、ペナルティなし・
 //   操作継続可(詰み防止, spec §8.4)。
 // - noop: 何も起きない選択肢。
@@ -167,10 +197,14 @@ const collectHotspotActionSchema = z
     investigation_point_id: investigationPointIdSchema,
     label: z.string().min(1),
     // 調査結果を会話フレームで台詞提示するための任意フィールド(#52 Phase4.7/T043)。
-    // line: キャラの台詞。speaker: 既存の会話フレームの話者型(characterSchema=霧島/橘)。
+    // line: キャラの台詞。speaker: 既存の会話フレームの話者型(characterSchema=霧島/橘/小鳥遊)。
     // 両者は独立して省略可能(line のみ・speaker のみ・両方・両省略のいずれも許容)。
     line: z.string().min(1).optional(),
     speaker: characterSchema.optional(),
+    // 多ターンのやり取り(短い「問いかけ」＋間)を表現する任意フィールド(0.7.0・#100/#101)。
+    // line/speaker との併用は scenarioSchema の superRefine で拒否する(単体の action の型では
+    // フィールド単体の可否しか表現できないため、相関チェックは superRefine 側の責務とする)。
+    dialogue: z.array(sceneDialogueLineSchema).min(1).optional(),
   })
   .strict()
 const dangerHotspotActionSchema = z
@@ -291,7 +325,11 @@ export const questionSchema = z
     prompt: z.string().min(1),
     choices: questionChoicesSchema,
     // 外すたびに深まる段階解説(教育的失敗の会話内統合)。任意・多段。
-    explanations: z.array(z.string().min(1)).optional(),
+    // 0.7.0（#100/#101）: 文字列(従来どおり questions[].speaker が話す)と、話者付きオブジェクト
+    // (dialogueLineSchema。character は霧島/橘/小鳥遊のいずれかだが、小鳥遊は superRefine で拒否
+    // ＝この問い枠で使えるのは霧島/橘のみ)の union 配列にする。S2/S3/SL の既存の文字列配列は
+    // 移行不要でそのまま有効。
+    explanations: z.array(z.union([z.string().min(1), dialogueLineSchema])).optional(),
     // 相談(コストあり、マップ単位3回まで。spec §8.4)で提示する詳細ヒント。
     consult_hint: z.string().min(1),
   })
@@ -434,6 +472,35 @@ export const scenarioSchema = scenarioObjectSchema.superRefine((data, ctx) => {
             return
           }
           if (action.kind !== 'collect') return
+          // 0.7.0（#100/#101）: dialogue と line/speaker の併用を拒否する(相互排他)。
+          if (action.dialogue && (action.line !== undefined || action.speaker !== undefined)) {
+            ctx.addIssue({
+              code: 'custom',
+              message: `scene '${scene.id}' の collect action で dialogue と line/speaker を併用することはできません(どちらか一方のみ)。`,
+              path: ['scenes', sceneIndex, 'hotspots', hotspotIndex, 'actions', actionIndex, 'dialogue'],
+            })
+          }
+          // 小鳥遊ガード(docs/scenario_schema.md §2.6): 探索の collect.dialogue[] に小鳥遊は使えない
+          // (character/npc いずれの行としても不可。探索の会話フレームは2枠のままで描画先が無いため)。
+          action.dialogue?.forEach((line, lineIndex) => {
+            if ('character' in line && line.character === '小鳥遊') {
+              ctx.addIssue({
+                code: 'custom',
+                message: `scene '${scene.id}' の collect.dialogue に小鳥遊は使用できません(探索の会話フレームは2枠のまま)。`,
+                path: [
+                  'scenes',
+                  sceneIndex,
+                  'hotspots',
+                  hotspotIndex,
+                  'actions',
+                  actionIndex,
+                  'dialogue',
+                  lineIndex,
+                  'character',
+                ],
+              })
+            }
+          })
           if (!pointIds.has(action.investigation_point_id)) {
             ctx.addIssue({
               code: 'custom',
@@ -469,6 +536,28 @@ export const scenarioSchema = scenarioObjectSchema.superRefine((data, ctx) => {
       }
     })
   }
+
+  // 小鳥遊ガード(docs/scenario_schema.md §2.6): resolution.questions[].speaker /
+  // resolution.questions[].explanations には小鳥遊を使えない(intro.character_intros /
+  // resolution.clear_explanation の2箇所限定)。
+  data.resolution.questions.forEach((question, questionIndex) => {
+    if (question.speaker === '小鳥遊') {
+      ctx.addIssue({
+        code: 'custom',
+        message: `question '${question.id}' の speaker に小鳥遊は使用できません(小鳥遊は intro.character_intros と resolution.clear_explanation でのみ話者になれます)。`,
+        path: ['resolution', 'questions', questionIndex, 'speaker'],
+      })
+    }
+    question.explanations?.forEach((explanation, explanationIndex) => {
+      if (typeof explanation !== 'string' && explanation.character === '小鳥遊') {
+        ctx.addIssue({
+          code: 'custom',
+          message: `question '${question.id}' の explanations に小鳥遊は使用できません(小鳥遊は intro.character_intros と resolution.clear_explanation でのみ話者になれます)。`,
+          path: ['resolution', 'questions', questionIndex, 'explanations', explanationIndex, 'character'],
+        })
+      }
+    })
+  })
 })
 
 export type Scenario = z.infer<typeof scenarioSchema>

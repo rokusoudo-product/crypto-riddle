@@ -23,7 +23,7 @@ import { scenarioSchema } from '@/core/model'
 import type { Scenario } from '@/core/model'
 
 const rawScenario: Scenario = {
-  schema_version: '0.6.0',
+  schema_version: '0.7.0',
   id: 's-test-scene-explore',
   title: '探索シーンUIテスト用マップ',
   status: 'draft',

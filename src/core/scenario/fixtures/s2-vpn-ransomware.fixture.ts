@@ -17,7 +17,7 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const s2VpnRansomwareFixture: Scenario = {
-  schema_version: '0.6.0',
+  schema_version: '0.7.0',
   id: 's2-vpn-ransomware',
   title: 'VPN装置の脆弱性放置とランサムウェア感染',
   status: 'draft',

@@ -96,9 +96,14 @@ function usePrefersReducedMotion(): boolean {
 // 霧島=左・橘=右で固定(docs/characters.md「霧島＝左・橘＝右」)。
 const PORTRAIT_ORDER: readonly Character[] = ['霧島', '橘']
 
+// 小鳥遊(#100/#101, schema_version 0.7.0) の立ち絵アセット・3枠レイアウトは UI Issue #102 の
+// スコープ。本PR(#101)はスキーマ改訂のみで、小鳥遊は現行データ(S2/S3/SL/s0)には登場しないが、
+// characterSchema が3値になった影響で Record<Character, string> の網羅性を保つ必要があるため、
+// #102 で正式なアセットに差し替えるまでの暫定プレースホルダとして橘の立ち絵を仮当てしておく。
 const PORTRAIT_SRC: Record<Character, string> = {
   霧島: kirishimaPortrait,
   橘: tachibanaPortrait,
+  小鳥遊: tachibanaPortrait,
 }
 
 interface PortraitProps {

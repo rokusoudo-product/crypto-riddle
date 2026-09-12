@@ -32,7 +32,7 @@
 # 注記: S1/S2 と同じ理由(scripts/build-data.test.ts の S3 フィクスチャ一致テストが折り返しの
 # 空白挿入を検出する)で、本文フィールド(body/description/line 等)は1行で記述している。
 
-schema_version: "0.6.0"
+schema_version: "0.7.0"
 id: s3-ec-card-leak
 title: ECサイトのカード情報漏洩
 status: draft

@@ -39,7 +39,7 @@
 # 注記: S1/S2/S3 と同じ理由(scripts/build-data.test.ts のフィクスチャ一致テストが折り返しの
 # 空白挿入を検出する)で、本文フィールド(body/description/line 等)は1行で記述している。
 
-schema_version: "0.6.0"
+schema_version: "0.7.0"
 id: sl-consignment-breach
 title: 委託先クラウドストレージからの個人データ漏えい
 status: draft
