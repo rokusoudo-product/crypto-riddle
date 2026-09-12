@@ -7,6 +7,7 @@ import { ConversationFrame } from '@/ui/components/conversation-frame'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
+import { resolveExplanation } from '@/ui/lib/explanation'
 import { routeForProgress } from '@/ui/screens/navigation'
 import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
@@ -80,6 +81,17 @@ export function ResolveScreen() {
   const consultRemaining = MAX_CONSULTS - progress.consultsUsed
   const consultDisabled = consultRemaining <= 0
 
+  // 誤答時の段階解説を話者付きで解決する(#100/#102、docs/scenario_schema.md §2.6)。
+  // dispatch後は wrongAttemptsByQuestionId が既に+1されているため、coreのpickExplanationが
+  // 使った「今回の誤答より前の回数」に戻すには1引く(resolveExplanationのJSDoc参照)。
+  const priorWrongAttempts = question
+    ? (progress.wrongAttemptsByQuestionId[question.id] ?? 1) - 1
+    : 0
+  const resolvedExplanation =
+    question && progress.lastAnswerFeedback?.correct === false
+      ? resolveExplanation(question, priorWrongAttempts)
+      : null
+
   return (
     <ScreenContainer title="解決">
       <StateFrame state={state}>
@@ -146,8 +158,14 @@ export function ResolveScreen() {
                 className="border-border bg-background rounded-lg border p-3 text-sm"
               >
                 {progress.lastAnswerFeedback.reply && <p>{progress.lastAnswerFeedback.reply}</p>}
-                {progress.lastAnswerFeedback.explanation && (
-                  <p className="text-muted-foreground">{progress.lastAnswerFeedback.explanation}</p>
+                {/* 段階解説の話者表示(#100/#102): explanationsのunion要素(string |
+                    DialogueLine)を{character, line}へ正規化してから、結果画面(result-screen.tsx)の
+                    clear_explanationと同じ表示形式(話者名+「台詞」)を流用する。 */}
+                {resolvedExplanation && (
+                  <p className="text-muted-foreground">
+                    <span className="font-semibold">{resolvedExplanation.character}</span>「
+                    {resolvedExplanation.line}」
+                  </p>
                 )}
               </div>
             )}

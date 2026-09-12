@@ -11,7 +11,11 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { ConversationFrame, TYPEWRITER_CHAR_INTERVAL_MS } from './conversation-frame'
+import {
+  ConversationFrame,
+  resolvePortraitSrc,
+  TYPEWRITER_CHAR_INTERVAL_MS,
+} from './conversation-frame'
 
 const LINE = 'こんにちは'
 
@@ -344,6 +348,72 @@ describe('ConversationFrame(#64/T042 タイプライター表示)', () => {
       const skipButton = screen.getByRole('button', { name: LINE })
       expect(skipButton.tagName).toBe('BUTTON')
       expect(skipButton.closest('[role="button"]')).toBeNull()
+    })
+
+    it('onEscapeを指定すると、onDismissを「次の行へ」等に流用していてもEscapeは常にonEscapeを呼ぶ(#100/#102)', () => {
+      const onDismiss = vi.fn()
+      const onEscape = vi.fn()
+      render(
+        <ConversationFrame
+          speaker="橘"
+          line={LINE}
+          layout="overlay"
+          onDismiss={onDismiss}
+          onEscape={onEscape}
+        />,
+      )
+      const conversationWindow = screen.getByRole('button', { name: LINE })
+      fireEvent.keyDown(conversationWindow, { key: 'Escape' })
+      expect(onEscape).toHaveBeenCalledTimes(1)
+      expect(onDismiss).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('layout="intro"(導入の対策室レイアウト・#100/#102)', () => {
+    it('霧島=左・橘=右に加えて小鳥遊を中央後方に1体追加した3枠を描画する', () => {
+      render(<ConversationFrame speaker="霧島" line={LINE} layout="intro" />)
+      expect(screen.getByAltText('霧島（発話中）')).toBeInTheDocument()
+      expect(screen.getByAltText('橘（待機中）')).toBeInTheDocument()
+      expect(screen.getByAltText('小鳥遊（待機中）')).toBeInTheDocument()
+    })
+
+    it('小鳥遊が話者のときは小鳥遊がフルカラー、他2名がグレーアウトする(発話者以外は全員グレーアウト)', () => {
+      render(<ConversationFrame speaker="小鳥遊" line={LINE} layout="intro" />)
+      expect(screen.getByAltText('小鳥遊（発話中）')).toBeInTheDocument()
+      expect(screen.getByAltText('霧島（待機中）')).toBeInTheDocument()
+      expect(screen.getByAltText('橘（待機中）')).toBeInTheDocument()
+    })
+  })
+
+  describe('NPC直接発話(speakerがConversationSpeakerオブジェクト・#100/#102)', () => {
+    it('speakerに{npc}を渡すと、名札にnpcの値がそのまま表示され、既知の立ち絵は全員グレーアウトする', () => {
+      render(<ConversationFrame speaker={{ npc: '中野' }} line={LINE} layout="overlay" />)
+      // 名札(会話ウィンドウ左上のピル)にはnpcの値がそのまま表示される(色だけに頼らない、WCAG 1.4.1)。
+      expect(screen.getAllByText('中野').length).toBeGreaterThan(0)
+      // 霧島・橘のどちらも発話者に一致しない(=全員グレーアウト)。
+      expect(screen.getByAltText('霧島（待機中）')).toBeInTheDocument()
+      expect(screen.getByAltText('橘（待機中）')).toBeInTheDocument()
+      expect(screen.queryByAltText(/（発話中）/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('表情フォールバック(resolvePortraitSrc・#100/#102)', () => {
+    it('該当表情のPNGが無ければneutralにフォールバックする(現在生成済みは3名ともneutralのみ)', () => {
+      const neutral = resolvePortraitSrc('霧島', 'neutral')
+      // 'serious'は定義表(DESIGN.md)にあるが未生成のため、neutralと同じ結果になる。
+      expect(resolvePortraitSrc('霧島', 'serious')).toBe(neutral)
+      expect(resolvePortraitSrc('霧島', 'confident')).toBe(neutral)
+      expect(resolvePortraitSrc('霧島', 'smile')).toBe(neutral)
+      expect(resolvePortraitSrc('霧島', 'thinking')).toBe(neutral)
+    })
+
+    it('expression省略時はneutralを使う', () => {
+      expect(resolvePortraitSrc('橘')).toBe(resolvePortraitSrc('橘', 'neutral'))
+    })
+
+    it('キャラクターごとに異なるアセットを返す(取り違えていない)', () => {
+      expect(resolvePortraitSrc('霧島')).not.toBe(resolvePortraitSrc('橘'))
+      expect(resolvePortraitSrc('橘')).not.toBe(resolvePortraitSrc('小鳥遊'))
     })
   })
 })

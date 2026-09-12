@@ -33,7 +33,7 @@ import { useScreenState } from '@/ui/state/use-screen-state'
 //
 // 2026-09-11(#52 Phase4.7/#71・T045、T047で会話オーバーレイに統合): 探索完了→解決への誘導。
 // 「解決へ」の活性条件(canEnterResolution、下記 canProceed)を満たした時点で、会話フレームで
-// 「そろそろ問題をまとめようか」と橘(司令塔・既定話者)が1回促す(spec §7.1・DESIGN.md
+// 「材料は揃いました。そろそろ問題を整理しましょうか、あなた。」と橘(司令塔・既定話者)が1回促す(spec §7.1・DESIGN.md
 // 「探索シーン」節)。新しい活性条件は作らず、既存の canProceed をそのまま流用する。
 // isExplorerConversationOpen は SceneExplorer 側の会話オーバーレイ(調査結果=collect・dangerの
 // 教育的フィードバック)が開いているかどうかの通知(onConversationOpenChange)を受けるための
@@ -80,7 +80,7 @@ export function ExploreScreen() {
   const progress = useGameStore((s) => s.progress)
   const dispatch = useGameStore((s) => s.dispatch)
   const [isExplorerConversationOpen, setIsExplorerConversationOpen] = useState(false)
-  // 誘導会話「そろそろ問題をまとめようか」を外側クリック/Escapeで閉じたかどうか(PR#92追補・
+  // 誘導会話「材料は揃いました。そろそろ問題を整理しましょうか、あなた。」を外側クリック/Escapeで閉じたかどうか(PR#92追補・
   // 代表FB。上記コンポーネント冒頭コメント参照)。一度trueにしたら自動的にはfalseへ戻さない
   // (ナグ防止=再表示しない)。
   const [isWrapUpPromptDismissed, setIsWrapUpPromptDismissed] = useState(false)
@@ -194,7 +194,7 @@ export function ExploreScreen() {
       <ConversationFrame
         layout={hasScenes ? 'overlay' : 'stacked'}
         speaker="橘"
-        line="そろそろ問題をまとめようか。"
+        line="材料は揃いました。そろそろ問題を整理しましょうか、あなた。"
         onOutsideDismiss={handleDismissWrapUpPrompt}
       >
         <div className="flex items-center justify-between gap-2">

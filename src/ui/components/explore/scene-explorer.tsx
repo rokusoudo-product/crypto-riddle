@@ -28,7 +28,7 @@
 //   「調査ポイント一覧」は旧「常時併設リスト」「モバイルでは初期展開」の置き換え(#66)。
 //   開くと呼び出し側(explore-screen.tsx)から渡された`investigationList`をパネル表示する。
 //   一覧からは背景に頼らずキーボードのみで全ポイント調査→解決へ進められる。
-// - 探索完了→解決への誘導(橘の「そろそろ問題をまとめようか」)も同じ会話オーバーレイに載せる
+// - 探索完了→解決への誘導(橘の「材料は揃いました。そろそろ問題を整理しましょうか、あなた。」)も同じ会話オーバーレイに載せる
 //   ため、呼び出し側は`conversationSlot`にoverlay layoutの`ConversationFrame`要素を渡す
 //   (scenesが無いフォールバックでは`conversationSlot`を使わずstacked layoutのまま呼び出し側で
 //   直接描画する。explore-screen.tsx参照。conversationSlot側は独自の「わかった」ボタンを
@@ -110,14 +110,16 @@ import { X } from 'lucide-react'
 
 import type {
   Character,
+  Expression,
   HotspotAction,
+  HotspotPosition,
   InvestigationPoint,
   Scenario,
   Scene,
   SceneHotspot,
 } from '@/core/model'
 import { CardDrawer } from '@/ui/components/card-drawer'
-import { ConversationFrame } from '@/ui/components/conversation-frame'
+import { ConversationFrame, type ConversationSpeaker } from '@/ui/components/conversation-frame'
 import { Button } from '@/ui/components/ui/button'
 import { cn } from '@/ui/lib/utils'
 
@@ -188,19 +190,39 @@ function defaultSpeakerForCategory(category: InvestigationPoint['category']): Ch
   return category === 'ログを見る' ? '霧島' : '橘'
 }
 
+/** 会話オーバーレイの1ターン分(#100/#102。多ターンのdialogue・NPC発話に対応するため、
+ * 単発のline/speakerも含めすべてこの形へ正規化してから描画する)。 */
+interface ConversationTurn {
+  speaker: ConversationSpeaker
+  line: string
+  expression?: Expression
+}
+
 /**
- * collect action の話者・台詞を解決する(#52 Phase4.7/T044)。line/speakerが明示されていれば
- * それを使い、無ければ既定の導入文＋カード本文(先頭カード)にフォールバックする。
+ * collect action の台詞ターン列を解決する(#52 Phase4.7/T044、多ターン化は#100/#102)。
+ * `dialogue`(多ターン・省略可)が明示されていればそれを使い(NPC行は`{npc: ...}`へ正規化する)、
+ * 無ければ従来どおり`line`/`speaker`(単発・省略可)を使い、それも無ければ既定の導入文＋
+ * カード本文(先頭カード)にフォールバックする(いずれも1ターンの配列にする)。
+ * `dialogue`と`line`/`speaker`の併用は scenarioSchema の superRefine で拒否済みのため、
+ * ここでは`dialogue`の有無だけで分岐すればよい(docs/scenario_schema.md §2.6)。
  * is_dummyでの選別は行わない(#62 吸収: 非ダミー優先で選ぶ経路自体を廃止したため)。
  */
-function resolveCollectPresentation(
+function resolveCollectTurns(
   scenario: Scenario,
   hotspot: SceneHotspot,
   action: CollectAction,
-): { speaker: Character; line: string } {
+): ConversationTurn[] {
+  if (action.dialogue) {
+    return action.dialogue.map((line) =>
+      'npc' in line
+        ? { speaker: { npc: line.npc }, line: line.line }
+        : { speaker: line.character, line: line.line, expression: line.expression },
+    )
+  }
+
   const point = scenario.investigation_points.find((p) => p.id === action.investigation_point_id)
   const speaker = action.speaker ?? defaultSpeakerForCategory(point?.category ?? '人に聞く')
-  if (action.line) return { speaker, line: action.line }
+  if (action.line) return [{ speaker, line: action.line }]
 
   const firstCardBody = scenario.cards.find(
     (c) => c.investigation_point_id === action.investigation_point_id,
@@ -209,26 +231,32 @@ function resolveCollectPresentation(
     hotspot.object_type === 'person'
       ? `${hotspot.label}に話を聞いた。`
       : `${hotspot.label}を調べた。`
-  return { speaker, line: firstCardBody ? `${intro}${firstCardBody}` : intro }
+  return [{ speaker, line: firstCardBody ? `${intro}${firstCardBody}` : intro }]
 }
 
 // danger の feedback は scenarios/*.yaml・テストフィクスチャのいずれも「橘「〜」」という
 // 引用付きの形式で統一して書かれている(会話フレーム導入=#42より前からの記法)。会話オーバーレイの
 // 名札に既に「橘」を表示するため、この形式に一致する場合だけ引用符を剥がして本文のみを話者の
 // 台詞として使う(二重に名乗らせないため)。schema/YAMLの変更はしない防御的な後方互換パースで、
-// 一致しない(将来 橘 以外が話す等の)feedbackはそのまま使う。
+// 一致しない(将来 橘 以外が話す等の)feedbackはそのまま使う。danger は dialogue を持たないため
+// 常に1ターン(docs/scenario_schema.md §2.5・§2.6、dangerHotspotActionSchema参照)。
 const QUOTED_TACHIBANA_FEEDBACK = /^橘「(.+)」$/
-function resolveDangerPresentation(action: DangerAction): { speaker: Character; line: string } {
+function resolveDangerTurns(action: DangerAction): ConversationTurn[] {
   const match = QUOTED_TACHIBANA_FEEDBACK.exec(action.feedback)
-  return { speaker: '橘', line: match ? match[1] : action.feedback }
+  return [{ speaker: '橘', line: match ? match[1] : action.feedback }]
 }
 
-/** 会話オーバーレイに載せる内容(調査結果=collect、danger の教育的フィードバックの2種類、T047)。 */
+/** 会話オーバーレイに載せる内容(調査結果=collect、danger の教育的フィードバックの2種類、T047)。
+ * 多ターン化(#100/#102)により単発のspeaker/lineではなくturns配列を持つ。現在のターン位置は
+ * 呼び出し側(SceneExplorer)が別state(conversationTurnIndex)で持つ(advisor指摘:
+ * turnIndexをこのオブジェクトに含めると、ターン送りのたびにconversation自体の参照が変わり
+ * onConversationOpenChangeが不要に再発火するため)。 */
 interface ConversationContent {
   kind: 'collect' | 'danger'
   hotspotLabel: string
-  speaker: Character
-  line: string
+  /** NPC発話ターンでトリガー元のホットスポットを□で強調するための位置(#100/#102、下記JSX参照)。 */
+  hotspotPosition: HotspotPosition
+  turns: readonly ConversationTurn[]
 }
 
 export interface SceneExplorerProps {
@@ -290,6 +318,10 @@ export function SceneExplorer({
   // dangerFeedbackの2つのstateだったが、どちらも「会話状態」として排他的に1つしか
   // 表示されないため1つのstateにまとめた)。
   const [conversation, setConversation] = useState<ConversationContent | null>(null)
+  // 現在表示中のターン位置(#100/#102の多ターン送り)。conversationとは別stateにする理由は
+  // ConversationContentのJSDoc参照(ターン送りのたびにconversation自体の参照が変わらないように
+  // するため)。conversationを開くたび(runAction)に0へ戻す。
+  const [conversationTurnIndex, setConversationTurnIndex] = useState(0)
   // 「調査ポイント一覧」トグルパネルの開閉(#66→T047でトグル化)。シーン切替では閉じない
   // (一覧はシーンをまたいだ全ポイントの一覧のため、シーン非依存で開閉を保持する)。
   const [isListOpen, setIsListOpen] = useState(false)
@@ -386,6 +418,16 @@ export function SceneExplorer({
     // (advisor指摘)。
     returnFocusHotspotIndexRef.current = null
     setConversation(null)
+    setConversationTurnIndex(0)
+  }
+
+  /** 自身の会話オーバーレイ(調査結果=collect/danger)を閉じる(最終ターンでのonDismiss/onEscape、
+   * #100/#102)。closeOverlaysと違いreturnFocusHotspotIndexRefは維持する(下のuseEffectが
+   * conversationのnull遷移を見てホットスポットへフォーカスを戻すため、ここで先にnullへ
+   * 落としてはいけない=シーン切替専用のcloseOverlaysとの違い)。 */
+  function closeConversation() {
+    setConversation(null)
+    setConversationTurnIndex(0)
   }
 
   /** アクションシートのX閉じる・noop選択時の、ホットスポットへのフォーカス復帰(同期)。
@@ -438,17 +480,31 @@ export function SceneExplorer({
     if (action.kind === 'collect') {
       onCollect(action.investigation_point_id)
       // 種別を問わず同じ経路で調査結果を会話オーバーレイに台詞提示する(#62吸収、ファイル冒頭コメント参照)。
-      const { speaker, line } = resolveCollectPresentation(scenario, hotspot, action)
+      // 多ターン化(#100/#102): dialogueがあれば複数ターン、無ければ従来どおり1ターンになる。
+      const turns = resolveCollectTurns(scenario, hotspot, action)
       setOpenHotspotIndex(null)
-      setConversation({ kind: 'collect', hotspotLabel: hotspot.label, speaker, line })
+      setConversationTurnIndex(0)
+      setConversation({
+        kind: 'collect',
+        hotspotLabel: hotspot.label,
+        hotspotPosition: hotspot.position,
+        turns,
+      })
       return
     }
     if (action.kind === 'danger') {
       // 教育的フィードバックを会話オーバーレイで提示する(T047。dispatchしない=ペナルティ無し・
       // 操作継続可。詰み防止=閉じて同じホットスポットを再度開けば他のactionを選べる)。
-      const { speaker, line } = resolveDangerPresentation(action)
+      // dangerは常に1ターン(dialogueを持たない、resolveDangerTurns参照)。
+      const turns = resolveDangerTurns(action)
       setOpenHotspotIndex(null)
-      setConversation({ kind: 'danger', hotspotLabel: hotspot.label, speaker, line })
+      setConversationTurnIndex(0)
+      setConversation({
+        kind: 'danger',
+        hotspotLabel: hotspot.label,
+        hotspotPosition: hotspot.position,
+        turns,
+      })
       return
     }
     if (action.kind === 'goto') {
@@ -464,6 +520,7 @@ export function SceneExplorer({
   function handleHotspotActivate(hotspot: SceneHotspot, hotspotIndex: number) {
     returnFocusHotspotIndexRef.current = hotspotIndex
     setConversation(null)
+    setConversationTurnIndex(0)
     // 単一actionのショートカット即実行は「collectまたはgoto」の場合に限る(例: personの
     // 「話を聞く」、doorの「〜へ移動する」)。いずれも選ぶ余地が無い1択のため、アクションシートを
     // 経由させず即座に実行する(#78・T046-ui-data。goto単独=door標準形をここに含めた)。
@@ -483,6 +540,16 @@ export function SceneExplorer({
   // 会話状態かどうか(DESIGN.md「探索シーン」節「2つの状態」)。自身のconversation(collect/danger)
   // に加え、呼び出し側から渡されたconversationSlot(探索完了→解決への誘導)も会話状態に含める。
   const isConversationActive = conversation !== null || Boolean(conversationSlot)
+
+  // 多ターン送り(#100/#102): 現在のターン・最終ターンか・NPC発話ターンか。
+  const currentTurn = conversation?.turns[conversationTurnIndex]
+  const isLastTurn = conversation ? conversationTurnIndex >= conversation.turns.length - 1 : true
+  const isNpcTurn = currentTurn ? typeof currentTurn.speaker !== 'string' : false
+
+  /** 次の会話ターンへ進める(最終ターンでない間、onDismissから呼ぶ)。 */
+  function advanceConversationTurn() {
+    setConversationTurnIndex((index) => index + 1)
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -612,28 +679,54 @@ export function SceneExplorer({
 
           {/* 会話状態(T047): 調査結果/dangerの教育的フィードバック(自身のconversation)、
               または呼び出し側の会話(conversationSlot、探索完了→解決への誘導)を排他的に
-              重ねる。背景シーンは暗転させずそのまま保持する(DESIGN.md「探索シーン」節)。 */}
-          {conversation ? (
-            // 「閉じる」ボタンは置かず、会話ウィンドウ全体をクリック/タップで閉じる
-            // (#52 Phase4.7 追補・T048、DESIGN.md「探索シーン」節「会話ウィンドウ」)。
-            // onDismissを指定すると、タイプライターの全文表示前のクリック/タップ/Enter/Spaceは
-            // スキップ、全文表示後の同操作でsetConversation(null)を呼ぶ(2段階、
-            // ConversationFrame側の実装参照)。Escapeは常に閉じる。カード閲覧(旧・会話ウィンドウ内の
-            // ?ボタン)は右上の「ヒント確認」に統合したため、children はもう調査結果の
-            // 文脈行のみで、操作要素を持たない(閉じる操作とホットスポット操作が競合しないよう、
-            // 会話状態ではホットスポット自体をそもそもDOMに置かない=上記の分岐と併せて安全)。
-            <ConversationFrame
-              layout="overlay"
-              speaker={conversation.speaker}
-              line={conversation.line}
-              onDismiss={() => setConversation(null)}
-            >
-              <p className="text-muted-foreground text-xs">
-                {conversation.kind === 'collect'
-                  ? `${conversation.hotspotLabel}を調べた結果`
-                  : `${conversation.hotspotLabel}を操作した結果`}
-              </p>
-            </ConversationFrame>
+              重ねる。背景シーンは暗転させずそのまま保持する(DESIGN.md「探索シーン」節)。
+              多ターン化(#100/#102): conversation.turns[conversationTurnIndex]が現在のターン。
+              最終ターンでない間はonDismiss/onEscapeで「次の行へ」進め(advanceConversationTurn)、
+              最終ターンでのみ会話を閉じる(closeConversation)。onEscapeは常にcloseConversationに
+              固定する(onDismissを「次の行へ」に流用してもEscapeだけは常に閉じられるように、
+              conversation-frame.tsxのonEscape JSDoc参照)。 */}
+          {conversation && currentTurn ? (
+            <>
+              {/* NPC直接発話(collect.dialogue限定・#100/#102)のターンでは、トリガー元の
+                  ホットスポットを□で強調する(DESIGN.md「探索シーン」節「NPC直接発話の描画」)。
+                  会話状態ではホットスポット自体(実<button>)をDOMに置かない方針
+                  (#52 Phase4.7・T047)を維持したまま、位置だけ再現した装飾用の□マーカーを
+                  重ねる(非対話・aria-hidden・pointer-events-none。実ホットスポットの
+                  □マーカーと同じ見た目にするため同じクラスを使う)。 */}
+              {isNpcTurn && (
+                <div
+                  aria-hidden="true"
+                  data-testid="npc-hotspot-marker"
+                  style={{
+                    left: `${conversation.hotspotPosition[0] * 100}%`,
+                    top: `${conversation.hotspotPosition[1] * 100}%`,
+                  }}
+                  className="border-hotspot-highlight ring-hotspot-highlight/50 pointer-events-none absolute z-10 min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 ring-3"
+                />
+              )}
+              {/* 「閉じる」ボタンは置かず、会話ウィンドウ全体をクリック/タップで閉じる(または
+                  次の行へ進める)(#52 Phase4.7 追補・T048、DESIGN.md「探索シーン」節
+                  「会話ウィンドウ」)。onDismissを指定すると、タイプライターの全文表示前の
+                  クリック/タップ/Enter/Spaceはスキップ、全文表示後の同操作でonDismissを呼ぶ
+                  (2段階、ConversationFrame側の実装参照)。カード閲覧(旧・会話ウィンドウ内の
+                  ?ボタン)は右上の「ヒント確認」に統合したため、children はもう調査結果の
+                  文脈行のみで、操作要素を持たない(閉じる操作とホットスポット操作が競合しないよう、
+                  会話状態ではホットスポット自体をそもそもDOMに置かない=上記の分岐と併せて安全)。 */}
+              <ConversationFrame
+                layout="overlay"
+                speaker={currentTurn.speaker}
+                line={currentTurn.line}
+                expression={currentTurn.expression}
+                onDismiss={isLastTurn ? closeConversation : advanceConversationTurn}
+                onEscape={closeConversation}
+              >
+                <p className="text-muted-foreground text-xs">
+                  {conversation.kind === 'collect'
+                    ? `${conversation.hotspotLabel}を調べた結果`
+                    : `${conversation.hotspotLabel}を操作した結果`}
+                </p>
+              </ConversationFrame>
+            </>
           ) : conversationSlot ? (
             // idはisWrapUpVisibleのuseEffectが最初の操作可能要素を探すためのフック
             // (上記コメント参照)。

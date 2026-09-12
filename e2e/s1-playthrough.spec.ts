@@ -74,7 +74,7 @@ async function playThroughExplorationToResolution(page: import('@playwright/test
   await expect(page.getByRole('heading', { name: '導入' })).toBeVisible()
   await expect(page.getByText('株式会社浜通商事')).toBeVisible()
 
-  await page.getByRole('button', { name: 'タップで進行' }).click()
+  await page.getByRole('button', { name: 'SKIP' }).click()
   await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
   // S1は背景シーン(#57/T040)を持つため、「調査ポイント一覧」はトグルを開くまで表示されない
@@ -222,7 +222,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
     await selectS1Map(page)
-    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await page.getByRole('button', { name: 'SKIP' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
     // 執務室／サーバ室の2シーンタブが表示され、背景画像(T039生成物)が読み込まれる。
@@ -340,7 +340,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
     // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
     // 引き継ぐ)。
-    const wrapUpLine = 'そろそろ問題をまとめようか。'
+    const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
     await expect(page.getByText(wrapUpLine)).toBeVisible()
 
     // PR#92追補・代表FB「閉じて再探索も可・ロックしない」: 会話ウィンドウの外側(背景シーンの
@@ -382,7 +382,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
     await selectS1Map(page)
-    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await page.getByRole('button', { name: 'SKIP' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
     const officeTab = page.getByRole('tab', { name: '執務室' })
@@ -409,7 +409,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
     await selectS1Map(page)
-    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await page.getByRole('button', { name: 'SKIP' }).click()
 
     // 「ヒント確認」は右上のボタン群の一員として探索状態・会話状態のどちらでも常時表示される
     // (T048。aria-labelは移設前と同じ固定文言「手持ちカードを見る（無料）」を維持)。
@@ -440,7 +440,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
     await selectS1Map(page)
-    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await page.getByRole('button', { name: 'SKIP' }).click()
     await page.getByRole('tab', { name: 'サーバ室' }).click()
 
     // #78・T046-ui-dataで「サーバ管理者」に統合されたホットスポット経由(複数action=シート)。
@@ -473,7 +473,7 @@ test.describe('S1「標的型メールからの侵入」タッチ端末での「
     await page.goto('/')
     await page.getByRole('link', { name: 'つづきから' }).click()
     await selectS1Map(page)
-    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await page.getByRole('button', { name: 'SKIP' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
     const toggle = page.getByRole('button', { name: '調査ポイント一覧' })
@@ -491,7 +491,7 @@ test.describe('S1「標的型メールからの侵入」タッチ端末での「
 })
 
 // #52 Phase4.7/#71・T045: 探索完了(「解決へ」の活性条件を満たす)と同時に、橘が会話フレームで
-// 「そろそろ問題をまとめようか」と1回促す(spec §7.1・DESIGN.md「探索シーン」節)。
+// 「材料は揃いました。そろそろ問題を整理しましょうか、あなた。」と1回促す(spec §7.1・DESIGN.md「探索シーン」節)。
 // 一覧側から全件調査して活性条件を満たす経路(高速)でE2E確認する(背景シーン経由の等価な結線は
 // 上の describe で既に確認済みのため、ここでは誘導の有無・1回性・導線の明示のみに絞る)。
 test.describe('S1「標的型メールからの侵入」探索完了→解決への誘導(#71・T045)', () => {
@@ -501,10 +501,10 @@ test.describe('S1「標的型メールからの侵入」探索完了→解決へ
     await page.goto('/')
     await page.getByRole('link', { name: 'つづきから' }).click()
     await selectS1Map(page)
-    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await page.getByRole('button', { name: 'SKIP' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
-    const wrapUpLine = 'そろそろ問題をまとめようか。'
+    const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
     await expect(page.getByText(wrapUpLine)).toHaveCount(0)
 
     // 「調査ポイント一覧」トグルを開き(#66→T047でトグル化)、一覧側から全9件を調査して

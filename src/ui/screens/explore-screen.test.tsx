@@ -30,6 +30,7 @@ import { s0SampleFixture } from '@/core/scenario/fixtures/s0-sample.fixture'
 
 import { exploreSceneDoorFixture } from './explore-scene-door.fixture'
 import { exploreSceneNoNoopFixture } from './explore-scene-no-noop.fixture'
+import { exploreSceneNpcDialogueFixture } from './explore-scene-npc-dialogue.fixture'
 import { exploreSceneFixture } from './explore-scene.fixture'
 import { ExploreScreen } from './explore-screen'
 import { resetGameStoreForTests, useGameStore } from '@/ui/store/game-store'
@@ -191,7 +192,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       // 可能要素(タイプライターのスキップボタン)へ自動的にフォーカスが移る(advisor指摘の
       // 修正: 直前にホットスポットへ戻ったフォーカスが、この入れ替わりでホットスポットが
       // 再アンマウントされて迷子にならないようにするため)。
-      const wrapUpLine = 'そろそろ問題をまとめようか。'
+      const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
       await screen.findByText(wrapUpLine)
       expect(document.activeElement).toBe(screen.getByRole('button', { name: wrapUpLine }))
       await user.keyboard('{Enter}')
@@ -354,7 +355,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
   })
 
   describe('探索完了→解決への誘導(#52 Phase4.7/#71・T045、T047で会話オーバーレイに統合)', () => {
-    const wrapUpLine = 'そろそろ問題をまとめようか。'
+    const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
 
     /** 「調査ポイント一覧」トグルを開き、一覧側から全ポイントを調査して「解決へ」の活性条件を満たす。 */
     async function investigateAllViaList(user: ReturnType<typeof userEvent.setup>) {
@@ -366,7 +367,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       }
     }
 
-    it('「解決へ」の活性条件を満たした時点で、会話オーバーレイで橘が「そろそろ問題をまとめようか」と促す', async () => {
+    it('「解決へ」の活性条件を満たした時点で、会話オーバーレイで橘が「材料は揃いました。そろそろ問題を整理しましょうか、あなた。」と促す', async () => {
       const user = userEvent.setup()
       renderExplore(exploreSceneFixture)
 
@@ -633,7 +634,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       // このフィクスチャの解決条件(ip-log・ip-witnessの両方)は今の2つ目のcollectで満たされる
       // ため、探索完了への誘導(#71・T045)の会話オーバーレイが入れ替わりで自動的に開く
       // (conversationSlotが会話状態を引き継ぐ)。
-      const wrapUpLine = 'そろそろ問題をまとめようか。'
+      const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
       await screen.findByText(wrapUpLine)
       await user.click(screen.getByRole('button', { name: wrapUpLine }))
 
@@ -749,5 +750,69 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
         within(sheet).queryByRole('button', { name: '閉じる（何もしない）' }),
       ).not.toBeInTheDocument()
     })
+  })
+
+  describe('collect.dialogue[]の多ターン送り・NPC直接発話(#100/#102)', () => {
+    it(
+      '3ターン(霧島→NPC「中野」→橘)を1行ずつタップ送りし、NPCターンでは霧島・橘の立ち絵が' +
+        'グレーアウトして名札にNPC名が出て、トリガー元のホットスポットが□で強調される。' +
+        '最終ターンの後は会話が閉じて探索状態に戻る',
+      async () => {
+        const user = userEvent.setup()
+        renderExplore(exploreSceneNpcDialogueFixture)
+
+        // person・単一action(collect)のため即座に会話オーバーレイが開く(アクションシートを
+        // 経由しない、#78・T046-ui-data)。
+        const personHotspot = screen.getByRole('button', { name: /経理部長（人物）/ })
+        await user.click(personHotspot)
+
+        // 1ターン目: 霧島。NPCターンではないため□マーカーは無い。
+        const line1 = '経理部長、中野さんが開いた添付ファイルについて教えてください。'
+        expect(await screen.findByText(line1)).toBeInTheDocument()
+        expect(screen.getAllByText('霧島').length).toBeGreaterThan(0)
+        expect(screen.queryByTestId('npc-hotspot-marker')).not.toBeInTheDocument()
+
+        // ウィンドウをクリック: 1回目はタイプライターのスキップ(全文表示)。
+        const window1 = screen.getByRole('button', { name: line1 })
+        await user.click(window1)
+        // 2回目: 最終ターンではないため次の行へ進む(会話は閉じない)。
+        await user.click(window1)
+        expect(screen.queryByText(line1)).not.toBeInTheDocument()
+
+        // 2ターン目: NPC「中野」の直接発話。霧島・橘の両立ち絵がグレーアウトし、
+        // 名札には「中野」がそのまま表示される(名札=霧島/橘ではない)。
+        const line2 = '取引先からの見積依頼だと思って、普通に開いてしまって……'
+        expect(await screen.findByText(line2)).toBeInTheDocument()
+        expect(screen.getByAltText('霧島（待機中）')).toBeInTheDocument()
+        expect(screen.getByAltText('橘（待機中）')).toBeInTheDocument()
+        expect(screen.queryByAltText(/（発話中）/)).not.toBeInTheDocument()
+        expect(screen.getAllByText('中野').length).toBeGreaterThan(0)
+        // トリガー元のホットスポットが□で強調される(装飾用マーカー、非対話)。
+        expect(screen.getByTestId('npc-hotspot-marker')).toBeInTheDocument()
+
+        const window2 = screen.getByRole('button', { name: line2 })
+        await user.click(window2)
+        await user.click(window2)
+        expect(screen.queryByText(line2)).not.toBeInTheDocument()
+
+        // 3ターン目(最終): 橘。NPCターンではないため□マーカーは消える。
+        const line3 = '添付ファイルの拡張子は確認しましたか？'
+        expect(await screen.findByText(line3)).toBeInTheDocument()
+        expect(screen.queryByTestId('npc-hotspot-marker')).not.toBeInTheDocument()
+
+        const window3 = screen.getByRole('button', { name: line3 })
+        await user.click(window3)
+        // 最終ターンでのクリックは会話を閉じる(次の行へは進まない)。
+        await user.click(window3)
+        expect(screen.queryByText(line3)).not.toBeInTheDocument()
+
+        // 獲得は1回だけ(ターンごとに重複してonCollectが呼ばれない)。このフィクスチャは
+        // investigation_pointが1件のみのため、会話を閉じた瞬間に「解決へ」の活性条件も
+        // 満たし、探索完了への誘導(誘導会話)へそのまま入れ替わる(既存の挙動、
+        // explore-screen.tsx参照)。ホットスポットの再表示確認は2件以上のexploreSceneFixtureで
+        // 既に回帰確認済みのため、ここでは獲得が1回だけであることだけを確認する。
+        expect(useGameStore.getState().progress.investigatedPointIds).toEqual(['ip-interview'])
+      },
+    )
   })
 })
