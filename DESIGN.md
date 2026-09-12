@@ -154,9 +154,19 @@
 立ち絵の運用メモ（2026-09-09 確定）:
 
 - 切り抜いて使う前提のため、生成時の背景色は問わない（単色の無地で生成。透過 PNG は未作成で、UI 実装時に切り抜く）
-- 表情差分は未作成。候補C（取り乱さない設計）のため「通常」1種で開始し、必要になった時点で本表に行を追加する
+- 表情差分は「表情差分の定義表」（Issue #97）参照。候補C（取り乱さない設計）のため「通常（neutral）」1種で開始し、必要になった時点で本表（アセット表）に行を追加する
 - プロンプトの色指定はダーク文脈トークンを日本語に翻訳したもの（background/surface → 暖色寄りの暗い焦げ茶、text-primary → 生成り色、primary → 金色）
 - 生成元の Drive URL・不採用案とその理由は Obsidian タスク `Tasks/po_agent/crypto-riddle/20260909_character_portraits.md` に記録
+
+**表情差分の定義表（Issue #97・定義のみ）**
+
+サポート役3名（霧島・橘・小鳥遊）の表情差分を `neutral / serious / confident / smile / thinking` の5種で定義する。**本表は定義のみであり、neutral 以外は未生成**。実生成は S1 台本v2承認後に実使用分だけ行う（承認ゲートを経ずに生成しない。`IMAGE_WORKFLOW.md`）。生成済みアセットの正本は上のアセット表（`char-kirishima-neutral` / `char-tachibana-neutral`）。
+
+| キャラクター | neutral | serious | confident | smile | thinking |
+|---|---|---|---|---|---|
+| 霧島 悠 | 生成済み（`char-kirishima-neutral`） | 未生成 | 未生成 | 未生成 | 未生成 |
+| 橘 澪 | 生成済み（`char-tachibana-neutral`） | 未生成 | 未生成 | 未生成 | 未生成 |
+| 小鳥遊 綾香 | 未生成（立ち絵採用選定中・アセット行は確定後に追記） | 未生成 | 未生成 | 未生成 | 未生成 |
 
 **P-1（霧島 悠・採用＝第2案）**
 
