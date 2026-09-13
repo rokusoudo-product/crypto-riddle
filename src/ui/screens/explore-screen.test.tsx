@@ -192,7 +192,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       // 可能要素(タイプライターのスキップボタン)へ自動的にフォーカスが移る(advisor指摘の
       // 修正: 直前にホットスポットへ戻ったフォーカスが、この入れ替わりでホットスポットが
       // 再アンマウントされて迷子にならないようにするため)。
-      const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
+      const wrapUpLine = '材料は揃ったわ。そろそろ問題を整理しましょう。'
       await screen.findByText(wrapUpLine)
       expect(document.activeElement).toBe(screen.getByRole('button', { name: wrapUpLine }))
       await user.keyboard('{Enter}')
@@ -355,7 +355,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
   })
 
   describe('探索完了→解決への誘導(#52 Phase4.7/#71・T045、T047で会話オーバーレイに統合)', () => {
-    const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
+    const wrapUpLine = '材料は揃ったわ。そろそろ問題を整理しましょう。'
 
     /** 「調査ポイント一覧」トグルを開き、一覧側から全ポイントを調査して「解決へ」の活性条件を満たす。 */
     async function investigateAllViaList(user: ReturnType<typeof userEvent.setup>) {
@@ -367,7 +367,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       }
     }
 
-    it('「解決へ」の活性条件を満たした時点で、会話オーバーレイで橘が「材料は揃いました。そろそろ問題を整理しましょうか、あなた。」と促す', async () => {
+    it('「解決へ」の活性条件を満たした時点で、会話オーバーレイで橘が「材料は揃ったわ。そろそろ問題を整理しましょう。」と促す', async () => {
       const user = userEvent.setup()
       renderExplore(exploreSceneFixture)
 
@@ -634,7 +634,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       // このフィクスチャの解決条件(ip-log・ip-witnessの両方)は今の2つ目のcollectで満たされる
       // ため、探索完了への誘導(#71・T045)の会話オーバーレイが入れ替わりで自動的に開く
       // (conversationSlotが会話状態を引き継ぐ)。
-      const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
+      const wrapUpLine = '材料は揃ったわ。そろそろ問題を整理しましょう。'
       await screen.findByText(wrapUpLine)
       await user.click(screen.getByRole('button', { name: wrapUpLine }))
 

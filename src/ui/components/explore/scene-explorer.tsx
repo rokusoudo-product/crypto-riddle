@@ -28,7 +28,7 @@
 //   「調査ポイント一覧」は旧「常時併設リスト」「モバイルでは初期展開」の置き換え(#66)。
 //   開くと呼び出し側(explore-screen.tsx)から渡された`investigationList`をパネル表示する。
 //   一覧からは背景に頼らずキーボードのみで全ポイント調査→解決へ進められる。
-// - 探索完了→解決への誘導(橘の「材料は揃いました。そろそろ問題を整理しましょうか、あなた。」)も同じ会話オーバーレイに載せる
+// - 探索完了→解決への誘導(橘の「材料は揃ったわ。そろそろ問題を整理しましょう。」)も同じ会話オーバーレイに載せる
 //   ため、呼び出し側は`conversationSlot`にoverlay layoutの`ConversationFrame`要素を渡す
 //   (scenesが無いフォールバックでは`conversationSlot`を使わずstacked layoutのまま呼び出し側で
 //   直接描画する。explore-screen.tsx参照。conversationSlot側は独自の「わかった」ボタンを
