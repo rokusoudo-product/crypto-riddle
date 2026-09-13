@@ -4,7 +4,7 @@ doc: tasks.md (タスク分解)
 feature: 001-mvp
 status: active
 created: 2026-08-06
-updated: 2026-09-12 (Phase 4.8 追加: S1会話フロー刷新〔台本v2.2・#100/#101/#102/#103〕。T049-docsは#100で完了・T050-core以降は後続Issue)
+updated: 2026-09-13 (Phase 4.9 追加: 会話フレーム左右2枠入れ替わり・立ち絵拡大・導入クリック送り〔#108/#110〕。T053-docsは#108で完了・T054-uiは後続Issue)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -452,6 +452,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   - `src/core/model/common.ts` / `src/core/model/scenario.ts` を `docs/scenario_schema.md` §2.6 のとおり改訂。`collect.dialogue` と `line`/`speaker` の併用拒否・小鳥遊ガード（探索の `dialogue`・`questions[].speaker`・`questions[].explanations` での使用不可）を `superRefine` で実装。**schema_version 0.6.0 → 0.7.0**（版数追随は T037/T043/T046-core と同手順）。
   - 完了条件: zod 単体テスト（`expression` 有無・`dialogue`/`line` 併用 reject・NPC union・`explanations` union・小鳥遊ガード reject・0.7.0 検証）が通り `npm run build:data` 成功。**スキーマ差分は commit 前に報告して停止**。
 - [ ] **T051-ui** 会話フレーム3枠・NPC名札・explanations話者表示・表情フォールバック（#102・依存: T050-core）
+  - ⚠️ **導入のレイアウト部分は #108/#110 で置き換え**: 以下「3枠（霧島/橘/小鳥遊）の対策室レイアウト」は #100 時点（Phase 4.8 策定時）の仕様。S1 実装台本レビュー第1回（2026-09-13 代表）を受けて #108 で「導入・探索・解決すべて左右2枠の入れ替わり方式」に改訂されたため、導入の枠レイアウト実装は本タスクではなく **T054-ui（#110）** で行う。本タスクの NPC名札・explanations話者表示・表情フォールバックの実装スコープは変更なし。
   - 導入（`intro-screen.tsx`）を3枠（霧島/橘/小鳥遊）の対策室レイアウトに刷新し、`bg-sl-office` を UI 定数で背景流用（ナレーション全廃に伴う会話劇化）。
   - 探索（`scene-explorer.tsx`/`conversation-frame.tsx`）に多ターン送り（`dialogue[]`）・NPC 名札＋両立ち絵グレーアウト＋トリガーホットスポット□強調を実装。
   - 解決（`resolve-screen.tsx`）の `explanations` を話者付き表示（文字列/オブジェクト混在）に対応。
@@ -460,10 +461,30 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 - [ ] **T052-data** S1 シナリオを台本v2.2へ本移植＋全 YAML/fixture の schema_version 更新＋E2E（#103・依存: T051-ui）
   - `scenarios/s1-targeted-email-intrusion.yaml` を台本v2.2（導入9往復・多ターン発見・NPC直接発話・誤答ヒント2段）へ書き直し。
   - `scenarios/*.yaml`・`legal/*.yaml` 等の fixture の `schema_version` を 0.7.0 へ一括更新（内容は無改訂。S2/S3/SL は版数のみ）。
-  - E2E: S1 通しプレイ（導入3枠→探索多ターン/NPC→解決2段ヒント→結果の小鳥遊ねぎらい）。
+  - E2E: S1 通しプレイ（導入（左右2枠の入れ替わり。#108/T054-ui）→探索多ターン/NPC→解決2段ヒント→結果の小鳥遊ねぎらい）。
   - 完了条件: Vitest・Playwright e2e・`npm run build:data` が通る。
 
 **チェックポイント（Phase 4.8 完了後）**: 代表が S1 通しプレイで最終確認。量産済みの S2/S3/SL はこの Phase では無改訂のため影響なし。
+
+---
+
+## Phase 4.9: 会話フレームの左右2枠入れ替わり・立ち絵拡大・導入クリック送り（#108/#110）= 会話フレーム演出の再改訂
+
+> S1 実装台本レビュー第1回（2026-09-13 代表）で、Phase 4.8（#100）にて定めた「探索④・解決⑤＝霧島＝左・橘＝右の固定2枠／導入③のみ小鳥遊を加えた3枠の対策室レイアウト」への追加フィードバック（導入のタップ送りボタン廃止・立ち絵拡大・左右2枠への統一）が返った。**docs 先行 Issue #108**（本 Issue・コード変更なし）で spec/DESIGN/scenario_schema の仕様を改訂し、承認ゲートを経たうえで **UI Issue #110**（左右2枠入れ替わりロジックの実装・立ち絵拡大・導入クリック送り化）で実装する。データモデル・zod スキーマへの変更はない（Phase 4.8／T050-core のスキーマ0.7.0実装はそのまま有効）。詳細仕様は spec §5/§8、`DESIGN.md`「会話フレーム」「探索シーン」節、`docs/scenario_schema.md` §2.6「小鳥遊ガード」。
+
+- [ ] **T053-docs** spec/DESIGN/scenario_schema への左右2枠入れ替わり方式の反映（#108・本 Issue・docs のみ）
+  - `DESIGN.md`「会話フレーム」節: 「探索④・解決⑤は2枠固定（霧島＝左・橘＝右）／導入③のみ3枠（対策室レイアウト）」の記述を、**導入・探索・解決すべて共通の左右2枠の入れ替わり方式**（最初の話者は左、画面にいる人が話せば自分の枠をカラー・他方をグレー、画面にいない人が話せば直前の話者ではない枠に入れ替え、NPC発話は枠を動かさず両方グレー、並びは導入/探索の会話ごと/解決の開始でリセットし解決は問いをまたいで保つ）に一括改訂。導入9行の見え方の表を追記。立ち絵の拡大寸法（デスクトップ／モバイル）を追記。画面一覧③導入の主要アクションを「画面クリックで進行・SKIP」に改訂。「探索シーン」節の立ち絵固定配置の記述も同じロジックへ改訂。
+  - `specs/001-mvp/spec.md` §5（小鳥遊の登場範囲の記述）・§8（会話フレーム共通演出の記述）を反映。
+  - `docs/scenario_schema.md` §2.6「小鳥遊ガード」: ガード自体（探索の `dialogue`・`collect.speaker`・`questions[].speaker`/`explanations` での小鳥遊拒否）は維持し、**理由の記述のみ**「2枠のままで描画先が無い」から「庶務のため現場（探索・解決）に同行しない設定を型で守る」に改訂。
+  - `plan.md` §5 に本 Phase の仕様概要を追記。
+  - 完了条件: 変更した各 md の `prettier --check` が通過し、PR 作成（**マージは代表**。spec/DESIGN の承認ゲートに該当するため #110 着手前に代表承認を得る）。
+- [ ] **T054-ui** 会話フレームの左右2枠入れ替わり実装・立ち絵拡大・導入クリック送り（#110・依存: T053-docs のマージ・代表承認）
+  - 枠の並びを決めるロジックを**純粋関数として切り出し単体テスト**する（`DESIGN.md`「会話フレーム」節の決まりと、導入9行の見え方の表をテストケースにする）。
+  - 導入（`intro-screen.tsx`）の3枠対策室レイアウトを廃止し、探索・解決と同じ左右2枠の入れ替わりコンポーネントに統一。「タップで進行」ボタンを廃止し画面クリック送り（Enter/Space 併用）に統一。
+  - 立ち絵（`conversation-frame.tsx`）を `DESIGN.md` で定めた寸法まで拡大し、モバイル幅でも会話ウィンドウ・選択肢と重ならないことを確認する。
+  - 完了条件: 枠並びロジックの単体テストが通り、Vitest・Playwright e2e・axe が通る。既存3マップ（S2/S3/SL）を壊さない。
+
+**チェックポイント（Phase 4.9 完了後）**: 代表が S1 通しプレイで最終確認。
 
 ---
 
@@ -544,6 +565,8 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#101](https://github.com/rokusoudo-product/crypto-riddle/issues/101) feat(core): シナリオスキーマ0.7.0 | open（#100 のマージ・代表承認待ち） | **T050-core・Phase 4.8** | `docs/scenario_schema.md` §2.6 を zod（`src/core/model/`）に実装。小鳥遊/表情/多ターンdialogue/NPC発話/explanations話者/背景任意化 |
 | [#102](https://github.com/rokusoudo-product/crypto-riddle/issues/102) feat(ui): 導入の会話フレーム化（#50吸収）＋探索の多ターン送り・NPC名札・explanations話者・表情フォールバック | open（依存: #101） | **T051-ui・Phase 4.8** | #50（③導入の会話フレーム化）を吸収 |
 | [#103](https://github.com/rokusoudo-product/crypto-riddle/issues/103) feat(data): S1シナリオをv2.2台本へ移植＋e2e | open（依存: #102） | **T052-data・Phase 4.8** | 全シナリオYAML/fixtureの `schema_version` 0.7.0 更新を含む（内容はS2/S3/SL無改訂） |
+| [#108](https://github.com/rokusoudo-product/crypto-riddle/issues/108) docs: 会話フレームを左右2枠の入れ替わり方式に変更（全パート・立ち絵拡大・画面クリック送り） | open（本 PR で対応・docs のみ） | **T053-docs・Phase 4.9** | S1実装台本レビュー第1回（2026-09-13代表）を受け、#100 の「探索・解決2枠固定／導入のみ3枠」を撤回し全パート共通の左右2枠入れ替わり方式へ改訂。立ち絵拡大寸法・導入クリック送りも定義。マージは代表（spec/DESIGN承認ゲート該当）。実装は #110 |
+| [#110](https://github.com/rokusoudo-product/crypto-riddle/issues/110) feat(ui): 会話フレームの2枠入れ替わり・立ち絵拡大・画面クリック送り | open（#108 のマージ・代表承認待ち） | **T054-ui・Phase 4.9** | 枠並びロジックの純粋関数化・単体テスト／導入の3枠レイアウト廃止・クリック送り化／立ち絵拡大 |
 
 ## 依存関係の要約
 
