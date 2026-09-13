@@ -73,8 +73,10 @@ describe('1マップ通しプレイの結線(T013/T033) — s0-sample(暗号ス�
     expect(await screen.findByRole('heading', { name: '導入' })).toBeInTheDocument()
     expect(screen.getByText('株式会社アルファテック')).toBeInTheDocument()
 
-    // ③導入 → ④探索(タップで進行。ステートマシンが intro→exploration へ遷移する)
-    await user.click(screen.getByRole('button', { name: 'タップで進行' }))
+    // ③導入 → ④探索(SKIPで即座に進む。ステートマシンが intro→exploration へ遷移する。
+    // #100/#102で導入が会話フレーム化され「タップで進行」は1行ずつの送りになったため、
+    // 導入の内容を確認しない本テストではSKIPで一気に抜ける)
+    await user.click(screen.getByRole('button', { name: 'SKIP' }))
     expect(await screen.findByRole('heading', { name: '探索' })).toBeInTheDocument()
     expect(screen.getByText('プロキシログ')).toBeInTheDocument()
 

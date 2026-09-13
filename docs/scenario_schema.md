@@ -201,7 +201,7 @@ scenes:
         actions:
           # collect は省略可能な line（台詞）と speaker を持てる（#52 Phase 4.7・0.5.0）。
           - { kind: collect, investigation_point_id: ip-maillog, label: メール受信ログを取る,
-              speaker: 霧島, line: "霧島「受信ログを追った。問題のメールは取引先を騙る別ドメインからだ。」" }
+              speaker: 霧島, line: 受信ログを追った。問題のメールは取引先を騙る別ドメインからだ。 }
           - { kind: collect, investigation_point_id: ip-edr,     label: EDRのアラートを確認 }   # line/speaker 省略→既定文＋カード本文
           - { kind: danger,  label: 感染端末の電源を落とす, feedback: "橘「ここで電源を落とすと揮発性メモリの証拠が消えます。」" }
           - { kind: noop,    label: 今は触らない }
@@ -309,13 +309,13 @@ scenes:
   dialogue:
     - character: 霧島
       expression: serious
-      line: "霧島「中野さん、あのメールを開いた時の状況を教えてください。」"
+      line: 中野さん、あのメールを開いた時の状況を教えてください。
     - npc: 中野
-      line: "中野「取引先からの見積依頼だと思って、普通に開いてしまって……」"
+      line: 取引先からの見積依頼だと思って、普通に開いてしまって……
     - character: 橘
-      line: "橘「添付ファイルの拡張子は確認しましたか？」"
+      line: 添付ファイルの拡張子は確認しましたか？
     - npc: 中野
-      line: "中野「いえ、そこまでは……」"
+      line: いえ、そこまでは……
 
 # 解決: explanations の話者付きオブジェクト（S1 のみ想定。S2/S3/SL は既存の文字列のままでよい）
 resolution:
@@ -326,8 +326,14 @@ resolution:
       explanations:
         - "一次情報（ログ）と証言のどちらを裏取りに使えるかを考えてみよう。"   # 文字列＝speaker(霧島)が話す
         - character: 橘
-          line: "橘「保全の観点から見ても、まず一次情報を疑うのが筋よ。」"    # オブジェクト＝明示話者
+          line: 保全の観点から見ても、まず一次情報を疑うのが筋よ。    # オブジェクト＝明示話者
 ```
+
+- **`line` には話者名も鉤括弧（「」）も含めない**（台詞の本文だけを書く）。話者は `character`／`npc`／`speaker`
+  に持たせ、**名札と鉤括弧は UI 側が描画する**（`DESIGN.md`「会話フレーム」節§名札、`result-screen.tsx` の
+  `{character}「{line}」`）。`line` に「霧島「…」」のように書くと**名札と二重に話者名が出る**。
+  例外は `danger.feedback` のみ（話者フィールドを持たない単一文字列のため、慣例として `橘「…」` の形で
+  話者名と鉤括弧を埋め込む。既存 S1〜SL データもこの形）。
 
 - `intro.background` を省略した場合、`victim_company`／`character_intros` は引き続き必須（会話劇化しても
   被害企業情報とキャラ導入台詞は要る）。

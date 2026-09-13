@@ -51,7 +51,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     // 表記が完全一致しないため、この曖昧一致は発生していなかった)。
     await expect(page.getByRole('heading', { name: '株式会社ひばり生活サービス' })).toBeVisible()
 
-    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await page.getByRole('button', { name: 'SKIP' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
     // 「調査ポイント一覧」はトグルを開くまで表示されない(#66→T047でトグル化)ため、
     // このテスト(背景シーン経由)ではここでは開かず、末尾で開いて件数を確認する。
@@ -83,7 +83,9 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     // --- 執務室: PC(委託先の一次報告を受けた端末。collect/danger/noopの3action=アクションシート) ---
     const pcHotspot = page.getByRole('button', { name: '委託先の一次報告を受けた端末（PC）' })
     await pcHotspot.click()
-    await expect(page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' })).toBeVisible()
+    await expect(
+      page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' }),
+    ).toBeVisible()
 
     // dangerを先に選ぶ: アクションシートは閉じ、会話オーバーレイ(橘の台詞)で教育的
     // フィードバックが提示される(T047。旧: シート内テキスト表示)。探索ではペナルティに
@@ -109,7 +111,9 @@ test.describe('SL「委託先クラウドストレージからの個人データ
       page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' }),
     ).toBeVisible()
     await page.getByRole('button', { name: '委託先からの一次報告を確認する' }).click()
-    await expect(page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' })).toBeHidden()
+    await expect(
+      page.getByRole('group', { name: '委託先の一次報告を受けた端末の操作' }),
+    ).toBeHidden()
     const reportLine =
       '委託先からの一次報告メールを確認した。クラウドストレージの共有設定を「限定公開」から誤って「リンクを知っていれば誰でも閲覧可能」に変更しており、外部からアクセスされた形跡があるとのことだった。'
     await expect(page.getByText(reportLine, { exact: false })).toBeVisible()
@@ -123,23 +127,31 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     // 残っているため、後段でその両立=タブ・ドア併用を確認する) ---
     await vendorTab.click()
     await expect(vendorTab).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('img', { name: '委託先ブース(会議室)の背景', exact: true })).toBeVisible()
+    await expect(
+      page.getByRole('img', { name: '委託先ブース(会議室)の背景', exact: true }),
+    ).toBeVisible()
 
     // --- 委託先ブース: device(委託先のクラウドストレージ管理端末。単一action=即実行) ---
-    const deviceHotspot = page.getByRole('button', { name: '委託先のクラウドストレージ管理端末（機器）' })
+    const deviceHotspot = page.getByRole('button', {
+      name: '委託先のクラウドストレージ管理端末（機器）',
+    })
     await deviceHotspot.click()
     const storageLogLine =
       '委託先のクラウドストレージのアクセスログを確認した。共有設定が変更された直後から、複数の見知らぬ外部IPアドレスから会員データの保管領域へ直接アクセスされた記録が残っている。'
     await skipTypewriter(page, storageLogLine) // スキップ(全文表示)
     await page.getByRole('button', { name: storageLogLine, exact: true }).click() // 閉じる(T048。専用の「閉じる」ボタンは無い)
-    await expect(deviceHotspot).toHaveAccessibleName('委託先のクラウドストレージ管理端末（機器）・調査済み')
+    await expect(deviceHotspot).toHaveAccessibleName(
+      '委託先のクラウドストレージ管理端末（機器）・調査済み',
+    )
 
     // --- 委託先ブース: person(委託先担当者。promptの挨拶が見出しに出る) ---
     const vendorHotspot = page.getByRole('button', { name: '委託先担当者（人物）' })
     await vendorHotspot.click()
     const vendorSheet = page.getByRole('group', { name: '委託先担当者の操作' })
     await expect(vendorSheet).toBeVisible()
-    await expect(page.getByRole('heading', { name: '委託先担当者「何かご質問はありますか？」' })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: '委託先担当者「何かご質問はありますか？」' }),
+    ).toBeVisible()
 
     await page.getByRole('button', { name: '委託先担当者に話を聞く' }).click()
     const testimonyLine =
@@ -161,7 +173,9 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await expect(vendorTab).toHaveAttribute('aria-selected', 'true')
 
     // --- 委託先ブース: book(委託先の安全管理措置報告書。単一action=即実行) ---
-    const safetyBookHotspot = page.getByRole('button', { name: '委託先の安全管理措置報告書（書籍）' })
+    const safetyBookHotspot = page.getByRole('button', {
+      name: '委託先の安全管理措置報告書（書籍）',
+    })
     await safetyBookHotspot.click()
     const safetyLine =
       '委託先が提出した安全管理措置の報告書を確認した。アクセス権限の設定手順は定められているが、変更後の設定内容を第三者が確認するダブルチェック体制までは整備されていなかった。'
@@ -171,7 +185,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     // これが6件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
     // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
     // 引き継ぐ)。
-    const wrapUpLine = 'そろそろ問題をまとめようか。'
+    const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
     await expect(page.getByText(wrapUpLine)).toBeVisible()
     await skipTypewriter(page, wrapUpLine)
 
@@ -200,7 +214,9 @@ test.describe('SL「委託先クラウドストレージからの個人データ
       name: '委託先の従業員が個人データを意図的に持ち出した',
     })
     await insiderChoice.click()
-    await expect(page.getByText('共有設定の誤変更という単純なミスだ', { exact: false })).toBeVisible()
+    await expect(
+      page.getByText('共有設定の誤変更という単純なミスだ', { exact: false }),
+    ).toBeVisible()
     await expect(page.getByText(causePrompt)).toBeVisible()
     await expect(insiderChoice).toBeVisible()
 
@@ -211,7 +227,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
       })
       .click()
 
-    const reportDutyPrompt = '個人データの漏えいのおそれが確認できました。報告義務は誰に生じると考えますか？'
+    const reportDutyPrompt =
+      '個人データの漏えいのおそれが確認できました。報告義務は誰に生じると考えますか？'
     await expect(page.getByText(reportDutyPrompt)).toBeVisible()
     await skipTypewriter(page, reportDutyPrompt)
     await page
@@ -257,7 +274,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
     await selectSlMap(page)
-    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await page.getByRole('button', { name: 'SKIP' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
     // 「調査ポイント一覧」トグルを開き(#66→T047でトグル化)、一覧側の「調査する」だけで
@@ -284,7 +301,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
       })
       .click()
 
-    const reportDutyPrompt = '個人データの漏えいのおそれが確認できました。報告義務は誰に生じると考えますか？'
+    const reportDutyPrompt =
+      '個人データの漏えいのおそれが確認できました。報告義務は誰に生じると考えますか？'
     await expect(page.getByText(reportDutyPrompt)).toBeVisible()
     await skipTypewriter(page, reportDutyPrompt)
     await page

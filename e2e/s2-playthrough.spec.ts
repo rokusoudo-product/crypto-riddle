@@ -44,7 +44,7 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
     await expect(page.getByRole('heading', { name: '導入' })).toBeVisible()
     await expect(page.getByText('株式会社みなと精工')).toBeVisible()
 
-    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await page.getByRole('button', { name: 'SKIP' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
     // 「調査ポイント一覧」はトグルを開くまで表示されない(#66→T047でトグル化)ため、
     // このテスト(背景シーン経由)ではここでは開かず、末尾で開いて件数を確認する。
@@ -162,7 +162,7 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
     // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
     // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
     // 引き継ぐ)。
-    const wrapUpLine = 'そろそろ問題をまとめようか。'
+    const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
     await expect(page.getByText(wrapUpLine)).toBeVisible()
     await skipTypewriter(page, wrapUpLine)
 
@@ -251,7 +251,7 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
     await selectS2Map(page)
-    await page.getByRole('button', { name: 'タップで進行' }).click()
+    await page.getByRole('button', { name: 'SKIP' }).click()
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
 
     // 「調査ポイント一覧」トグルを開き(#66→T047でトグル化)、一覧側の「調査する」だけで

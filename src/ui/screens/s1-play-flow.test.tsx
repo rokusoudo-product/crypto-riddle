@@ -94,7 +94,7 @@ async function playThroughExplorationToResolution(
   expect(await screen.findByRole('heading', { name: '導入' })).toBeInTheDocument()
   expect(screen.getByText('株式会社浜通商事')).toBeInTheDocument()
 
-  await user.click(screen.getByRole('button', { name: 'タップで進行' }))
+  await user.click(screen.getByRole('button', { name: 'SKIP' }))
   expect(await screen.findByRole('heading', { name: '探索' })).toBeInTheDocument()
 
   // S1は背景シーン(#57/T040)を持つため、「調査ポイント一覧」はトグルを開くまで表示されない
@@ -308,7 +308,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
 
       await user.click(screen.getByRole('link', { name: 'つづきから' }))
       await user.click(await screen.findByRole('button', { name: 'マップを選ぶ' }))
-      await user.click(await screen.findByRole('button', { name: 'タップで進行' }))
+      await user.click(await screen.findByRole('button', { name: 'SKIP' }))
       expect(await screen.findByRole('heading', { name: '探索' })).toBeInTheDocument()
 
       // 執務室／サーバ室の2シーンタブが表示される(既定は執務室)。
@@ -332,7 +332,9 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       // 不変(=XP等への影響が一切無い)ことも確認する。
       const progressBeforeDanger = useGameStore.getState().progress
       await user.click(screen.getByRole('button', { name: '感染端末の電源を落とす' }))
-      expect(screen.queryByRole('group', { name: '経理部 中野の端末の操作' })).not.toBeInTheDocument()
+      expect(
+        screen.queryByRole('group', { name: '経理部 中野の端末の操作' }),
+      ).not.toBeInTheDocument()
       const dangerLine =
         'ここで電源を落とすと、動作中のプロセスや通信先の情報が乗った揮発性メモリの証拠が消えてしまいます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全してください。'
       expect(await screen.findByText(dangerLine)).toBeInTheDocument()
@@ -454,7 +456,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
       // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
       // 引き継ぐ)。
-      const wrapUpLine = 'そろそろ問題をまとめようか。'
+      const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
       expect(await screen.findByText(wrapUpLine)).toBeInTheDocument()
       await skipTypewriterByClick(user, wrapUpLine)
 
@@ -482,7 +484,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
 
       await user.click(screen.getByRole('link', { name: 'つづきから' }))
       await user.click(await screen.findByRole('button', { name: 'マップを選ぶ' }))
-      await user.click(await screen.findByRole('button', { name: 'タップで進行' }))
+      await user.click(await screen.findByRole('button', { name: 'SKIP' }))
       await user.click(screen.getByRole('tab', { name: 'サーバ室' }))
 
       // #78・T046-ui-dataで「サーバ管理者」に統合されたホットスポット経由(複数action=シート)。
