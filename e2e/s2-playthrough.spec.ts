@@ -162,7 +162,7 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
     // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
     // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
     // 引き継ぐ)。
-    const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
+    const wrapUpLine = '材料は揃ったわ。そろそろ問題を整理しましょう。'
     await expect(page.getByText(wrapUpLine)).toBeVisible()
     await skipTypewriter(page, wrapUpLine)
 

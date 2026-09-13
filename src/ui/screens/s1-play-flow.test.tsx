@@ -210,7 +210,7 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       // 結果画面側で progress.lastAnswerFeedback を参照して表示する。
       expect(
         screen.getByText(
-          'それが正しい初動です、あなた。IoCを抽出して被害範囲の特定へ進みましょう。この保全が、後の報告と説明責任の裏付けになります。',
+          'それが正しい初動よ、あなた。IoCを抽出して被害範囲の特定へ進みましょう。この保全が、後の報告と説明責任の裏付けになるわ。',
         ),
       ).toBeInTheDocument()
 
@@ -253,7 +253,7 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
     await skipTypewriterByClick(user, '感染が疑われる端末への初動対応は？')
     await user.click(
       screen.getByRole('button', {
-        name: 'ネットワークから論理的に隔離し(LANケーブル抜線・Wi-Fi無効化)、電源は落とさず揮発性メモリとディスクの証拠を保全する',
+        name: 'ネットワークから論理的に隔離し(LANケーブル抜線・無線LAN無効化)、電源は落とさず揮発性メモリとディスクの証拠を保全する',
       }),
     )
 
@@ -345,7 +345,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
         screen.queryByRole('group', { name: '経理部 中野の端末の操作' }),
       ).not.toBeInTheDocument()
       const dangerLine =
-        '待って、あなた。ここで電源を落とすと、動作中のプロセスや通信先が乗った揮発性メモリの証拠が消えます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全を。'
+        '待って。ここで電源を落とすと、動作中のプロセスや通信先が乗った揮発性メモリの証拠が消えるわ。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全を。'
       expect(await screen.findByText(dangerLine)).toBeInTheDocument()
       expect(useGameStore.getState().progress).toBe(progressBeforeDanger)
 
@@ -368,9 +368,9 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       })
       expect(await screen.findAllByText('霧島')).not.toHaveLength(0)
       // EDRアラート確認は霧島の2ターン(問いかけ→答え合わせ、#100/#103台本v2.2)。
-      const edrLine1 = '新人、このプロセス名――どう見る？'
+      const edrLine1 = 'このプロセス名――どう見る？'
       const edrLine2 =
-        'Excelのマクロ実行に続いて、見慣れないPowerShellが起動した記録がある。正規の業務でこの並びは出ない。侵入の起点はここだ。'
+        '表計算ソフトのマクロ実行に続いて、見慣れないスクリプトが起動した記録がある。正規の業務でこの並びは出ない。侵入の起点はここだ。'
       await skipCollectResultAndClose(user, edrLine1)
       await skipCollectResultAndClose(user, edrLine2)
       expect(getPcHotspot()).toHaveAccessibleName('経理部 中野の端末（PC）・調査済み')
@@ -384,7 +384,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       expect(await screen.findAllByText('中野')).not.toHaveLength(0)
       expect(screen.queryByAltText(/（発話中）/)).not.toBeInTheDocument()
       const nakanoLine2 =
-        '……ご本人も認めています。件名の巧妙さと、月末の油断が重なった。よくある入口です。'
+        '……ご本人も認めているわ。件名の巧妙さと、月末の油断が重なった。よくある入口ね。'
       await skipCollectResultAndClose(user, nakanoLine1)
       expect(await screen.findAllByText('橘')).not.toHaveLength(0)
       await skipCollectResultAndClose(user, nakanoLine2)
@@ -394,7 +394,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       const buchoLine1 =
         '今月は取引先の請求サイクルが集中していてね。多少雑な件名でも、本物と思い込みやすい状況だった。……マクロ実行に関する社内規程も、正直、周知が徹底できていなかった。私の責任だ。'
       const buchoLine2 =
-        '規程はあっても、現場に届いていなければ機能しません。ここは後の再発防止と説明責任に効いてくる論点です。覚えておいて。'
+        '規程はあっても、現場に届いていなければ機能しないわ。ここは後の再発防止と説明責任に効いてくる論点ね。覚えておいて。'
       expect(await screen.findAllByText('経理部長 夏目')).not.toHaveLength(0)
       await skipCollectResultAndClose(user, buchoLine1)
       await skipCollectResultAndClose(user, buchoLine2)
@@ -409,7 +409,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
         expect(screen.queryByRole('group', { name: '資料棚の操作' })).not.toBeInTheDocument()
       })
       const advisoryLine =
-        '業界団体の注意喚起だ。取引先を装った請求書メールにマクロ付きファイルを添付し、開封後にC2サーバへ接続させる手口が、直近で全国的に報告されている。今回の型と一致する。'
+        '業界団体の注意喚起だ。取引先を装った請求書メールにマクロ付きファイルを添付し、開封後にC2サーバへ接続させる手口が、直近で全国的に報告されている。今回の型と一致するな。'
       await skipCollectResultAndClose(user, advisoryLine)
 
       await user.click(screen.getByRole('button', { name: '資料棚（書籍）' }))
@@ -421,7 +421,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
         expect(screen.queryByRole('group', { name: '資料棚の操作' })).not.toBeInTheDocument()
       })
       const guidelineLine =
-        'インシデント対応ガイドライン。感染が疑われる端末は、まずネットワークから論理的に隔離し、電源は落とさないこと。揮発性メモリの証拠を失わないためです。'
+        'インシデント対応ガイドライン。感染が疑われる端末は、まずネットワークから論理的に隔離し、電源は落とさないこと。揮発性メモリの証拠を失わないためね。'
       await skipCollectResultAndClose(user, guidelineLine)
       expect(screen.getByRole('button', { name: '資料棚（書籍）・調査済み' })).toBeInTheDocument()
 
@@ -443,7 +443,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
 
       await user.click(screen.getByRole('button', { name: 'メールサーバ（機器）' }))
       const mailLine =
-        '問題のメールを確認した。取引先名を騙った件名で、送信元は正規ドメインによく似た別ドメイン。手口は典型的だが、手が込んでいる。'
+        '問題のメールを確認した。取引先名を騙った件名で、送信元は正規ドメインによく似た別ドメイン。手口は典型的だが、手が込んでいるな。'
       await skipCollectResultAndClose(user, mailLine)
       expect(
         screen.getByRole('button', { name: 'メールサーバ（機器）・調査済み' }),
@@ -467,7 +467,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       })
       // 「PCを確認する」は霧島→橘(用語クッション・IoC)→霧島の3ターン(台本v2.2/#100/#103)。
       const sandboxLine1 =
-        '回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加プログラムを取得し、プロキシログと同じ宛先へビーコンを送っている。この宛先はIoC――侵害の痕跡として、他端末の調査にも使える。'
+        '回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加プログラムを取得し、プロキシログと同じ宛先へビーコンを送っている。この宛先はIoC――侵害の痕跡として、他端末の調査にも使えるぞ。'
       const sandboxLine2 = 'そのIoCというのは、具体的には何を指すの？'
       const sandboxLine3 =
         '「この通信先が出たら感染を疑え」という手掛かりの一覧だ。今回はビーコンの宛先がそれにあたる。一つ掴めば他端末への横展開調査が早くなる。'
@@ -485,7 +485,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       const itStaffLine1 =
         '発覚した直後、正直、反射的に経理部PCの電源ケーブルに手をかけたんです。でも……抜いていいのか判断がつかなくて。結局ためらって、対策室の到着を待ちました。'
       const itStaffLine2 =
-        'その判断、結果的に正解です。抜かずに待ったから、私たちはまだメモリの証拠を取れる。初動の“ためらい”が保全に効くこともあります。'
+        'その判断、結果的に正解ですね。抜かずに待ったから、私たちはまだメモリの証拠を取れる。初動の“ためらい”が保全に効くこともあるのよ。'
       expect(await screen.findAllByText('サーバ管理者')).not.toHaveLength(0)
       await skipCollectResultAndClose(user, itStaffLine1)
       await skipCollectResultAndClose(user, itStaffLine2)
@@ -493,7 +493,7 @@ describe('S1「標的型メールからの侵入」背景シーン経由の探�
       // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
       // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
       // 引き継ぐ)。
-      const wrapUpLine = '材料は揃いました。そろそろ問題を整理しましょうか、あなた。'
+      const wrapUpLine = '材料は揃ったわ。そろそろ問題を整理しましょう。'
       expect(await screen.findByText(wrapUpLine)).toBeInTheDocument()
       await skipTypewriterByClick(user, wrapUpLine)
 
