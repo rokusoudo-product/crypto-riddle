@@ -7,7 +7,7 @@
 #   resolution.cipher_stages は空配列(src/core/model/scenario.ts の T015 変更で0件を許容)。
 # - 実在の企業・人物・事案を特定できない類型に抽象化し、攻撃手法は学習目的に必要な粒度に留め、
 #   再現手順書にはしていない(#5 受け入れ基準)。
-# - src/core/model/scenario.ts (zod, schema_version 0.6.0) に準拠する。`npm run build:data` で検証できる。
+# - src/core/model/scenario.ts (zod, schema_version 0.7.0) に準拠する。`npm run build:data` で検証できる。
 # - 解決パート(resolution)は会話モード(#42/T030)の questions[] 形式(#44 で旧 attack_identification/
 #   countermeasure/wrong_answer_follow_ups から機械移植。#46/T035 で誤答肢のセリフを本執筆し、
 #   各誤答理由が具体的なカード(EDR検知の時系列・プロキシログの向き等)を裏付けに引用する形へ仕上げた)。
@@ -17,6 +17,19 @@
 # scripts/build-data.test.ts の S1 フィクスチャ一致テストが検出したとおり
 # `src/core/scenario/fixtures/s1-targeted-email-intrusion.fixture.ts`(手書きの写し)と食い違う。
 # 1行で書けば折り畳みが発生せず、フィクスチャとの文字列完全一致を保てる。
+#
+# 2026-09-13(#103): 台本v2.2(代表確定・#100でスキーマ0.7.0仕様策定/#101・PR#105でzod実装完了)
+# へ本文を移植した。intro.background(ナレーション)を廃止し character_intros を小鳥遊の
+# 入電から始まる9行の会話劇に置き換え、scenes[].hotspots[].actions[].collect は全件 dialogue[]
+# へ統一した(line/speakerは使わない)。中野・経理部長 夏目・サーバ管理者はNPC直接発話
+# (npc+line)にし、続けて霧島/橘が要約・補足する2段構成にした。用語クッション(IoC)は
+# 橘が質問役、霧島が回答役の3行構成。danger.feedbackは台本の橘台詞に更新。
+# resolution.questions[].reply/explanations(話者付き2段=霧島→橘)・clear_explanation
+# (霧島→橘→小鳥遊のねぎらいの3行)も台本の文言に更新した。choices[].text/consult_hintは
+# 既存のまま維持した(台本と全角/半角括弧・略記に軽微な差異があるが、変更サマリに変更点として
+# 挙がっておらず既存データを正とした。PR本文に記載)。cards[].body・investigation_points・
+# ホットスポットの座標・object_type・カードの構造は変更していない。台本原本(Markdown)は
+# 代表のDownloadsのみに保持し、本リポジトリにはコミットしない方針。
 
 schema_version: "0.7.0"
 id: s1-targeted-email-intrusion
@@ -51,16 +64,40 @@ related_terms:
   - term-appi-breach-report
 
 intro:
-  background: 月末、経理部の中野が取引先を装った「請求書送付のご連絡」というメールを受け取り、添付のマクロ付きExcelファイルを開いた。その場では何も起きたように見えなかったが、1週間後、社内の端末から外部の見慣れないIPアドレスへ、深夜帯に一定間隔で通信が続いている痕跡がプロキシログに記録されているのが見つかり、対策室に緊急招集がかかる。
+  # ナレーション(background)は台本v2.2で廃止(完全会話劇化)。小鳥遊の緊急入電から始まる
+  # 9行の会話に置き換えた(#103)。
   victim_company:
     name: 株式会社浜通商事
     industry: 産業資材卸売業
     description: 取引先への請求書・発注書のやり取りが多い中堅の産業資材商社。経理部では日常的にメール添付のPDF・Excelファイルを開く業務フローが定着しており、添付ファイルの多さがかえって警戒心を鈍らせていた。
   character_intros:
+    - character: 小鳥遊
+      expression: smile
+      line: あらあら〜、新人さん、ちょうど良いところに。今、浜通(はまどおり)商事さんから緊急のお電話が入りまして……。はい、お茶どうぞ〜。
+    - character: 小鳥遊
+      expression: serious
+      line: ……産業資材の卸売をされている会社さんなんですけど、経理部の端末が一台、どうも様子がおかしいと。一週間ほど前に届いた請求書のメールを開いてから、というお話でした。
     - character: 霧島
-      line: 一定間隔の通信か。ビーコンの可能性が高い。まず感染の実態を洗おう。証拠を消すなよ。
+      expression: serious
+      line: ……深夜帯に、その端末から外部の見慣れないIPへ、一定間隔で通信が続いている。ビーコンの可能性が高いな。
+    - character: 小鳥遊
+      expression: thinking
+      line: びーこん、ですか？
+    - character: 霧島
+      expression: neutral
+      line: 乗っ取った端末が、攻撃者のサーバへ「準備できました」と定期的に信号を送る通信だ。C2――指令サーバとの連絡線だと思っていい。開いた請求書メールが起点だろう。
     - character: 橘
-      line: 報告義務の判断はこれからです。まずは事実確認と、被害範囲の特定を急ぎましょう。
+      expression: serious
+      line: 一週間放置されていたのが気がかりです。取引先の請求データを扱う部署なら、影響範囲によっては個人情報保護法の報告義務が絡みます。……新人。ここからは事実確認と、被害範囲の特定が先決です。
+    - character: 橘
+      expression: confident
+      line: あなたが現場を見て、証拠を組み立ててください。私と霧島さんは、詰まったところをフォローします。答えは代わりに出しません。
+    - character: 霧島
+      expression: neutral
+      line: ……証拠を消すなよ、新人。現場へ行くぞ。
+    - character: 小鳥遊
+      expression: smile
+      line: わたしは対策室で待機して、資料や各所への連絡をまわしておきますね〜。いってらっしゃい、新人さん。
 
 investigation_points:
   - id: ip-proxy-log
@@ -112,6 +149,12 @@ investigation_points:
 # カード群(card-reference-guideline・card-witness-itstaff-shutdown)にある
 # 「電源を落とすと揮発性メモリの証拠が消える」という学びと整合させる(feedbackのみ・
 # ペナルティ無し・操作継続可=詰み防止, spec §8.4)。
+#
+# 2026-09-13(#103): 台本v2.2への移植で、各collect actionの本文は line/speaker(単発)から
+# dialogue[](多ターン・NPC直接発話対応、schema 0.7.0/§2.6)へ全件差し替えた。話者の既定導出
+# (ログを見る→霧島／人に聞く・文献を引く→橘、scene-explorer.tsxのdefaultSpeakerForCategory)は
+# dialogueが明示されている場合は使われない(dialogue優先)。以下のline/speaker前提の記述は
+# 差し替え前(0.6.0以前)の設計判断の記録として残す。
 #
 # 各collect actionのline/speaker(#52 Phase4.7/#65・T043で追加されたスキーマ、#66・T044で
 # 本文執筆)は、カード本文の事実に忠実にキャラの口調で書いた(カードそのものの引用ではなく、
@@ -172,11 +215,16 @@ scenes:
           - kind: collect
             investigation_point_id: ip-edr-alert
             label: EDRアラートを確認する
-            line: 中野の端末でExcelのマクロ実行に続いて、見慣れないPowerShellプロセスが起動した記録がある。侵入の起点はここだろう。
-            speaker: 霧島
+            dialogue:
+              - character: 霧島
+                expression: thinking
+                line: 新人、このプロセス名――どう見る？
+              - character: 霧島
+                expression: serious
+                line: Excelのマクロ実行に続いて、見慣れないPowerShellが起動した記録がある。正規の業務でこの並びは出ない。侵入の起点はここだ。
           - kind: danger
             label: 感染端末の電源を落とす
-            feedback: "橘「ここで電源を落とすと、動作中のプロセスや通信先の情報が乗った揮発性メモリの証拠が消えてしまいます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全してください。」"
+            feedback: "橘「待って、あなた。ここで電源を落とすと、動作中のプロセスや通信先が乗った揮発性メモリの証拠が消えます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全を。」"
           - kind: noop
             label: 今は触らない
       - object_type: person
@@ -186,8 +234,12 @@ scenes:
           - kind: collect
             investigation_point_id: ip-witness-nakano
             label: 中野に話を聞く
-            line: 中野さんに話を聞きました。月末で請求書処理が立て込み、深く確認せずに開いてしまったと。マクロ有効化の警告が出たことにも、深く気を留めなかったそうです。
-            speaker: 橘
+            dialogue:
+              - npc: 中野
+                line: すみません……月末で請求処理が立て込んでて。取引先からの「請求書送付のご連絡」ってメールで、疑いもせず添付を開いてしまって……。「マクロを有効にしますか」って出たのも、いつも通りだと思って押しちゃったんです。
+              - character: 橘
+                expression: neutral
+                line: ……ご本人も認めています。件名の巧妙さと、月末の油断が重なった。よくある入口です。
       - object_type: person
         position: [0.39, 0.27]
         label: 経理部長
@@ -195,8 +247,12 @@ scenes:
           - kind: collect
             investigation_point_id: ip-witness-manager
             label: 経理部長に話を聞く
-            line: 経理部長に伺いました。今月は取引先の請求サイクルが集中する時期で、多少雑な件名のメールでも本物だと思い込みやすい状況だったと。マクロ実行に関する社内規程の周知も、徹底されていなかったようです。
-            speaker: 橘
+            dialogue:
+              - npc: 経理部長 夏目
+                line: 今月は取引先の請求サイクルが集中していてね。多少雑な件名でも、本物と思い込みやすい状況だった。……マクロ実行に関する社内規程も、正直、周知が徹底できていなかった。私の責任だ。
+              - character: 橘
+                expression: serious
+                line: 規程はあっても、現場に届いていなければ機能しません。ここは後の再発防止と説明責任に効いてくる論点です。覚えておいて。
       - object_type: book
         position: [0.62, 0.2]
         label: 資料棚
@@ -204,13 +260,17 @@ scenes:
           - kind: collect
             investigation_point_id: ip-reference-advisory
             label: セキュリティ注意喚起情報を確認する
-            line: 業界団体の注意喚起を確認した。取引先を装った請求書メールにマクロ付きファイルを添付し、開封後にC2サーバへ接続させる手口が、直近全国で報告されている。今回の型と一致する。
-            speaker: 霧島
+            dialogue:
+              - character: 霧島
+                expression: neutral
+                line: 業界団体の注意喚起だ。取引先を装った請求書メールにマクロ付きファイルを添付し、開封後にC2サーバへ接続させる手口が、直近で全国的に報告されている。今回の型と一致する。
           - kind: collect
             investigation_point_id: ip-reference-guideline
             label: インシデント対応ガイドラインを確認する
-            line: インシデント対応ガイドラインを確認しました。感染が疑われる端末は、まずネットワークから論理的に隔離し、電源は落とさないこと。揮発性メモリに乗った証拠を失わないためです。
-            speaker: 橘
+            dialogue:
+              - character: 橘
+                expression: neutral
+                line: インシデント対応ガイドライン。感染が疑われる端末は、まずネットワークから論理的に隔離し、電源は落とさないこと。揮発性メモリの証拠を失わないためです。
       - object_type: door
         position: [0.84, 0.54]
         label: サーバ室への扉
@@ -229,8 +289,13 @@ scenes:
           - kind: collect
             investigation_point_id: ip-proxy-log
             label: プロキシログを確認する
-            line: 深夜帯、中野のPCから見覚えのない海外IPアドレスへ、約30分間隔で通信が続いている。典型的なビーコン通信のパターンだ。
-            speaker: 霧島
+            dialogue:
+              - character: 霧島
+                expression: thinking
+                line: 新人、この通信の“間隔”に注目しろ。何か気づかないか？
+              - character: 霧島
+                expression: serious
+                line: 深夜帯、中野のPCから見覚えのない海外IPへ、約30分間隔できっちり通信が続いている。人間の操作ではありえない規則正しさ――典型的なビーコンだ。
       - object_type: device
         position: [0.82, 0.45]
         label: メールサーバ
@@ -238,8 +303,10 @@ scenes:
           - kind: collect
             investigation_point_id: ip-mail-log
             label: メールサーバのログを確認する
-            line: 問題のメールを確認した。取引先名を騙った件名で、送信元は正規ドメインによく似た別ドメインだ。手口としては典型的だが、手が込んでいる。
-            speaker: 霧島
+            dialogue:
+              - character: 霧島
+                expression: neutral
+                line: 問題のメールを確認した。取引先名を騙った件名で、送信元は正規ドメインによく似た別ドメイン。手口は典型的だが、手が込んでいる。
       - object_type: person
         position: [0.51, 0.43]
         label: サーバ管理者
@@ -248,13 +315,25 @@ scenes:
           - kind: collect
             investigation_point_id: ip-witness-itstaff
             label: 話を聞く
-            line: 情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。
-            speaker: 橘
+            dialogue:
+              - npc: サーバ管理者
+                line: 発覚した直後、正直、反射的に経理部PCの電源ケーブルに手をかけたんです。でも……抜いていいのか判断がつかなくて。結局ためらって、対策室の到着を待ちました。
+              - character: 橘
+                expression: confident
+                line: その判断、結果的に正解です。抜かずに待ったから、私たちはまだメモリの証拠を取れる。初動の“ためらい”が保全に効くこともあります。
           - kind: collect
             investigation_point_id: ip-sandbox-analysis
             label: PCを確認する
-            line: 回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加のプログラムを取得し、プロキシログと同じ宛先へビーコン通信している。IoCとして他端末の調査にも使える。
-            speaker: 霧島
+            dialogue:
+              - character: 霧島
+                expression: serious
+                line: 回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加プログラムを取得し、プロキシログと同じ宛先へビーコンを送っている。この宛先はIoC――侵害の痕跡として、他端末の調査にも使える。
+              - character: 橘
+                expression: thinking
+                line: そのIoCというのは、具体的には何を指すの？
+              - character: 霧島
+                expression: neutral
+                line: 「この通信先が出たら感染を疑え」という手掛かりの一覧だ。今回はビーコンの宛先がそれにあたる。一つ掴めば他端末への横展開調査が早くなる。
           - kind: noop
             label: 何でもない
       - object_type: door
@@ -387,16 +466,20 @@ resolution:
       choices:
         - text: 取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)
           is_correct: true
-          reply: その通りだ。フィッシングメールの実在、マクロ実行の記録、C2通信の痕跡がすべて一直線に噛み合っている。
+          reply: その通りだ、新人。フィッシングメールの実在、マクロ実行の記録、C2通信の痕跡――すべてが一直線に噛み合っている。
         - text: 公開サーバーの脆弱性を突かれた侵入
           is_correct: false
-          reply: その場合は境界の通信記録に外から内への不審なアクセスが残るはずだ。だがプロキシログにあるのは、中野のPCから外部へ一定間隔で送られるビーコン通信だけで、外からの侵入を示す痕跡はない。
+          reply: その場合は境界の通信記録に、外から内への不審なアクセスが残るはずだ。だがログにあるのは中野のPCから外部への定期通信だけ。外からの侵入痕跡はない。
         - text: ウイルス対策ソフトの定義ファイル更新エラーに乗じた侵入
           is_correct: false
-          reply: そのエラーは半年前から続く既知の警告で、時期が合わない。EDRが実際に捉えた不審な流れは、Excelのマクロ実行に続いてPowerShellが起動したところから始まっている。侵入口はそこだ。
+          reply: そのエラーは半年前から続く既知の警告で、時期が合わない。EDRが捉えた不審な流れは、マクロ実行→PowerShell起動から始まっている。侵入口はそこだ。
       explanations:
-        - 「怪しく見える」ことと「今回の侵入を裏付ける証拠であること」は違う。侵入口・実行痕跡・通信の証拠・当事者の証言が噛み合っているかを確かめよう。
-        - 怪しい事象が「いつ」「何と同時に」起きたかを時系列で並べてみよう。半年前から続く警告と今回の侵入は別の話だ。マクロの実行→不審なプロセスの起動→外部への定期通信という一本の線で繋がる証拠がどれかを、カードから探せ。
+        - character: 霧島
+          expression: serious
+          line: 「怪しく見える」ことと「今回の侵入を裏付ける証拠」は違う。侵入口・実行痕跡・通信の証拠・当事者の証言が噛み合うかを確かめろ。
+        - character: 橘
+          expression: serious
+          line: 時系列で並べて。半年前の警告と今回は別件です。この整理は、後で「いつ・何が起きたか」を説明する報告の骨子そのものになります。曖昧なままだと報告書が書けません。
       consult_hint: フィッシングメールの実在・マクロ実行の記録・C2通信の痕跡・中野の証言を分野で整理して提示する。
 
     - id: q-initial-response
@@ -406,20 +489,29 @@ resolution:
       choices:
         - text: ネットワークから論理的に隔離し(LANケーブル抜線・Wi-Fi無効化)、電源は落とさず揮発性メモリとディスクの証拠を保全する
           is_correct: true
-          reply: それが正しい初動です。IoCを抽出して被害範囲の特定を進めましょう。
+          reply: それが正しい初動です、あなた。IoCを抽出して被害範囲の特定へ進みましょう。この保全が、後の報告と説明責任の裏付けになります。
         - text: 感染が疑われる端末の電源を直ちに落とし、被害の拡大を止める
           is_correct: false
-          reply: 電源を切れば、事件の証拠になり得る揮発性メモリの情報が失われます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で証拠を保全してからでなければ、後の説明責任が果たせません。
+          reply: 電源を切れば、証拠になり得る揮発性メモリの情報が失われます。先にネットワークから論理隔離し、メモリ→ディスクの順で保全を。でなければ「何が漏れたか」を説明できず、報告義務を果たせません。
       explanations:
-        - 揮発性メモリには、動作中のプロセスや通信先の情報など、電源を切ると失われる証拠が乗っています。何が消えるかをまず考えましょう。
-        - 証拠保全の原則は「揮発性の高い情報から」です。まずネットワークから論理的に隔離し、そのうえでメモリ→ディスクの順に保全する、という手順そのものが、後の報告・説明責任の裏付けになります。電源は落とさないでください。
+        - character: 霧島
+          expression: neutral
+          line: 揮発性メモリには、動作中のプロセスや通信先が乗っている。電源を切れば消える。まず「何が消えるか」を考えろ。
+        - character: 橘
+          expression: serious
+          line: 証拠保全の原則は「揮発性の高い情報から」。論理隔離→メモリ→ディスクという手順そのものが、後の報告・説明責任の裏付けになります。範囲を特定できて初めて、報告要否の判断ができるのです。
       consult_hint: インシデント対応ガイドラインの原則(揮発性の高い情報から保全する)と、電源を落とすリスクを整理して提示する。
 
   clear_explanation:
     - character: 霧島
-      line: 侵入口は取引先を装った請求書メールだ。マクロ付きファイルの実行でマルウェアが仕込まれ、C2への定期通信が確立した。感染端末はまず論理的に隔離し、電源を落とさずに揮発性メモリを保全する—これが鉄則だ。
+      expression: neutral
+      line: 侵入口は取引先を装った請求書メール。マクロ付きファイルの実行でマルウェアが仕込まれ、C2への定期通信が確立した。感染端末はまず論理隔離、電源を落とさず揮発性メモリを保全――これが鉄則だ。よくやった、新人。
     - character: 橘
-      line: 経理部長の証言にもあった通り、社内規程の周知不足も一因です。今回は個人情報の漏えいが確認されたわけではありませんが、取引先の請求データを扱う部署である以上、影響範囲の確認と、個人情報保護法に基づく報告要否の判断を怠らないでください。
+      expression: serious
+      line: 経理部長の証言どおり、社内規程の周知不足も一因です。今回は個人情報の漏えいが確認されたわけではありませんが、取引先の請求データを扱う部署である以上、影響範囲の確認と、個人情報保護法に基づく報告要否の判断を怠らないこと。証拠を保全したからこそ、その判断ができるのです。
+    - character: 小鳥遊
+      expression: smile
+      line: お疲れ様でした〜、新人さん。冷たいお茶、淹れておきましたよ。……次の現場も、きっと大丈夫。
 
   legal_refs:
     - LAW-APPI-BREACH-REPORT
