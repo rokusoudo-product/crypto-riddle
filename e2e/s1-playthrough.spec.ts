@@ -39,6 +39,17 @@
 // ボタンと同じ遷移で解決画面へ直接進むようになった(DESIGN.md「探索シーン」節「探索完了→
 // 解決への誘導」)。そのため一覧・ホットスポットの状態確認は「わかった」を押す前(会話状態でも
 // 右上ボタン群は常時表示されるため確認できる)に行うよう書き直した。
+//
+// 2026-09-13(#103): S1データを台本v2.2へ移植した(小鳥遊の入電から始まる導入9行の会話劇化、
+// 探索のcollect.dialogue[]化=多ターン・NPC直接発話、resolution.explanations/clear_explanation
+// の話者付きオブジェクト化)。それに伴い: (1) 導入③の character_intros を1行ずつタップ送りする
+// 専用テストを追加した(advanceIntroLine)、(2) 探索の多ターンcollectはskipCollectResultAndClose
+// をターン数ぶん順に呼ぶ形にした(会話ウィンドウはターンごとに同じ2クリック=スキップ→次へ/閉じる
+// のパターンを繰り返すだけで良い、conversation-frame.tsx/scene-explorer.tsxのonDismiss参照)、
+// (3) NPC直接発話ターンでは名札にNPC名がそのまま出ること・トリガー元ホットスポットが
+// npc-hotspot-markerで強調されることを確認する行を追加した、(4) explanationsの話者表示
+// (「{character}「{line}」」、resolve-screen.tsx)と結果画面の小鳥遊のねぎらい
+// (clear_explanationの3行目)を確認する行を追加した。
 import { expect, test } from '@playwright/test'
 
 /**
@@ -62,6 +73,16 @@ async function selectS1Map(page: import('@playwright/test').Page) {
     .filter({ hasText: '標的型メールからの侵入' })
     .getByRole('button', { name: 'マップを選ぶ' })
     .click()
+}
+
+/**
+ * 導入③の character_intros を1行ずつタップ送りする(台本v2.2・#100/#103で小鳥遊の入電から
+ * 始まる9行の会話劇になった)。各行についてタイプライターをスキップし、「タップで進行」を押す。
+ * 最終行は呼び出し側でSKIPするか、この関数で最後まで送り切る。
+ */
+async function advanceIntroLine(page: import('@playwright/test').Page, line: string) {
+  await skipTypewriter(page, line)
+  await page.getByRole('button', { name: 'タップで進行' }).click()
 }
 
 /** 探索を最後まで終え、解決パート(会話モード, q-entry-point)へ進める共通手順。 */
@@ -123,7 +144,7 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
     await expect(page.getByText('感染が疑われる端末への初動対応は？')).toBeVisible()
     await skipTypewriter(page, '感染が疑われる端末への初動対応は？')
     await expect(
-      page.getByText('その通りだ。フィッシングメールの実在', { exact: false }),
+      page.getByText('その通りだ、新人。フィッシングメールの実在', { exact: false }),
     ).toBeVisible()
     await page
       .getByRole('button', {
@@ -134,6 +155,14 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
     await expect(page.getByRole('heading', { name: '結果' })).toBeVisible()
     await expect(page.getByText('標的型メール攻撃', { exact: false }).first()).toBeVisible()
 
+    // 台本v2.2(#100/#103): clear_explanationの3行目=小鳥遊のねぎらい(結果画面のみ登場可)。
+    // 名札込みの表示(「{character}「{line}」」、result-screen.tsx)で話者=小鳥遊を確認する。
+    await expect(
+      page.getByText('小鳥遊「お疲れ様でした〜、新人さん。冷たいお茶、淹れておきましたよ。', {
+        exact: false,
+      }),
+    ).toBeVisible()
+
     // FR-6/FR-11: 誤答・相談なしでクリアしたので満額のXPが加算・表示される。
     await expect(page.getByText('誤答: 0回 / 相談: 0回')).toBeVisible()
     await expect(page.getByText('獲得XP: +100')).toBeVisible()
@@ -143,6 +172,39 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
     await expect(
       page.getByText('本シナリオは以下を参考に作成したオリジナルの創作です。'),
     ).toBeVisible()
+  })
+
+  test('導入③: character_intros を9行タップ送りでき、小鳥遊→霧島→橘の対策室レイアウトで会話劇が進行する(台本v2.2・#100/#103)', async ({
+    page,
+  }) => {
+    await page.getByRole('link', { name: 'つづきから' }).click()
+    await selectS1Map(page)
+    await expect(page.getByRole('heading', { name: '導入' })).toBeVisible()
+
+    // 1行目(小鳥遊)は発話中、霧島・橘は待機中(対策室レイアウト=3枠、#100/#102)。
+    await expect(page.getByAltText('小鳥遊（発話中）')).toBeVisible()
+    await expect(page.getByAltText('霧島（待機中）')).toBeVisible()
+    await expect(page.getByAltText('橘（待機中）')).toBeVisible()
+
+    const introLines = [
+      'あらあら〜、新人さん、ちょうど良いところに。今、浜通(はまどおり)商事さんから緊急のお電話が入りまして……。はい、お茶どうぞ〜。',
+      '……産業資材の卸売をされている会社さんなんですけど、経理部の端末が一台、どうも様子がおかしいと。一週間ほど前に届いた請求書のメールを開いてから、というお話でした。',
+      '……深夜帯に、その端末から外部の見慣れないIPへ、一定間隔で通信が続いている。ビーコンの可能性が高いな。',
+      'びーこん、ですか？',
+      '乗っ取った端末が、攻撃者のサーバへ「準備できました」と定期的に信号を送る通信だ。C2――指令サーバとの連絡線だと思っていい。開いた請求書メールが起点だろう。',
+      '一週間放置されていたのが気がかりです。取引先の請求データを扱う部署なら、影響範囲によっては個人情報保護法の報告義務が絡みます。……新人。ここからは事実確認と、被害範囲の特定が先決です。',
+      'あなたが現場を見て、証拠を組み立ててください。私と霧島さんは、詰まったところをフォローします。答えは代わりに出しません。',
+      '……証拠を消すなよ、新人。現場へ行くぞ。',
+      'わたしは対策室で待機して、資料や各所への連絡をまわしておきますね〜。いってらっしゃい、新人さん。',
+    ]
+
+    for (const line of introLines) {
+      await expect(page.getByText(line, { exact: false })).toBeVisible()
+      await advanceIntroLine(page, line)
+    }
+
+    // 最終行(9行目・小鳥遊)の「タップで進行」で探索へ遷移する。
+    await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
   })
 
   test('教育的失敗の分岐(#42/#46): 感染端末の電源を切ると橘が揮発性メモリの喪失を解説し、選択肢は残ったまま正しい初動でクリアできる', async ({
@@ -169,7 +231,16 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
     // 誤答フォロー: 揮発性メモリの証拠喪失が解説され、問い文・選択肢は残ったまま再挑戦できる
     // (⑥失敗解説の独立画面は廃止済み。会話モード内で完結する)。
     await expect(
-      page.getByText('電源を切れば、事件の証拠になり得る揮発性メモリの情報が失われます', {
+      page.getByText('電源を切れば、証拠になり得る揮発性メモリの情報が失われます', {
+        exact: false,
+      }),
+    ).toBeVisible()
+    // 段階解説(explanations)は話者付きオブジェクト(台本v2.2/#100/#103: 霧島→橘の2段)。
+    // このq-initial-responseの出題キャラは橘だが、1回目の誤答で表示されるのは
+    // explanations[0](霧島)であることを、名札込みの表示(「{character}「{line}」」、
+    // resolve-screen.tsxがexplanation.lib/explanation.tsのresolveExplanationを使う)で確認する。
+    await expect(
+      page.getByText('霧島「揮発性メモリには、動作中のプロセスや通信先が乗っている', {
         exact: false,
       }),
     ).toBeVisible()
@@ -247,7 +318,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await page.getByRole('button', { name: '感染端末の電源を落とす' }).click()
     await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeHidden()
     const dangerLine =
-      'ここで電源を落とすと、動作中のプロセスや通信先の情報が乗った揮発性メモリの証拠が消えてしまいます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全してください。'
+      '待って、あなた。ここで電源を落とすと、動作中のプロセスや通信先が乗った揮発性メモリの証拠が消えます。まずネットワークから論理的に隔離し、メモリ→ディスクの順で保全を。'
     await expect(page.getByText(dangerLine, { exact: false })).toBeVisible()
 
     // 会話オーバーレイを閉じると探索状態に戻り、同じホットスポットを再度開いて他のactionを
@@ -259,21 +330,35 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeVisible()
     await page.getByRole('button', { name: 'EDRアラートを確認する' }).click()
     await expect(page.getByRole('group', { name: '経理部 中野の端末の操作' })).toBeHidden()
-    const edrLine =
-      '中野の端末でExcelのマクロ実行に続いて、見慣れないPowerShellプロセスが起動した記録がある。侵入の起点はここだろう。'
-    await skipCollectResultAndClose(page, edrLine)
+    // EDRアラート確認は霧島の2ターン(問いかけ→答え合わせ、台本v2.2/#100/#103)。
+    const edrLine1 = '新人、このプロセス名――どう見る？'
+    const edrLine2 =
+      'Excelのマクロ実行に続いて、見慣れないPowerShellが起動した記録がある。正規の業務でこの並びは出ない。侵入の起点はここだ。'
+    await skipCollectResultAndClose(page, edrLine1)
+    await skipCollectResultAndClose(page, edrLine2)
     await expect(pcHotspot).toHaveAccessibleName('経理部 中野の端末（PC）・調査済み')
 
     // --- 執務室: person(中野・経理部長。単一action=即実行、調査結果は会話フレームで表示) ---
+    // NPC直接発話(中野)→橘の要約の2ターン(台本v2.2/#100/#103)。NPCターンでは霧島・橘の
+    // 両立ち絵がグレーアウトし、名札に「中野」がそのまま表示される。
     await page.getByRole('button', { name: '中野（人物）', exact: true }).click()
-    const nakanoLine =
-      '中野さんに話を聞きました。月末で請求書処理が立て込み、深く確認せずに開いてしまったと。マクロ有効化の警告が出たことにも、深く気を留めなかったそうです。'
-    await skipCollectResultAndClose(page, nakanoLine)
+    const nakanoLine1 =
+      'すみません……月末で請求処理が立て込んでて。取引先からの「請求書送付のご連絡」ってメールで、疑いもせず添付を開いてしまって……。「マクロを有効にしますか」って出たのも、いつも通りだと思って押しちゃったんです。'
+    const nakanoLine2 =
+      '……ご本人も認めています。件名の巧妙さと、月末の油断が重なった。よくある入口です。'
+    await expect(page.getByText(nakanoLine1, { exact: false })).toBeVisible()
+    await expect(page.getByText('中野', { exact: true }).first()).toBeVisible()
+    await skipCollectResultAndClose(page, nakanoLine1)
+    await skipCollectResultAndClose(page, nakanoLine2)
 
     await page.getByRole('button', { name: '経理部長（人物）', exact: true }).click()
-    const buchoLine =
-      '経理部長に伺いました。今月は取引先の請求サイクルが集中する時期で、多少雑な件名のメールでも本物だと思い込みやすい状況だったと。マクロ実行に関する社内規程の周知も、徹底されていなかったようです。'
-    await skipCollectResultAndClose(page, buchoLine)
+    const buchoLine1 =
+      '今月は取引先の請求サイクルが集中していてね。多少雑な件名でも、本物と思い込みやすい状況だった。……マクロ実行に関する社内規程も、正直、周知が徹底できていなかった。私の責任だ。'
+    const buchoLine2 =
+      '規程はあっても、現場に届いていなければ機能しません。ここは後の再発防止と説明責任に効いてくる論点です。覚えておいて。'
+    await expect(page.getByText('経理部長 夏目', { exact: true }).first()).toBeVisible()
+    await skipCollectResultAndClose(page, buchoLine1)
+    await skipCollectResultAndClose(page, buchoLine2)
 
     // --- 執務室: book(資料棚。collectを2件持つ=1件選ぶたびにシートが閉じるため開き直す) ---
     const bookHotspot = page.getByRole('button', { name: '資料棚（書籍）' })
@@ -282,7 +367,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await page.getByRole('button', { name: 'セキュリティ注意喚起情報を確認する' }).click()
     await expect(page.getByRole('group', { name: '資料棚の操作' })).toBeHidden()
     const advisoryLine =
-      '業界団体の注意喚起を確認した。取引先を装った請求書メールにマクロ付きファイルを添付し、開封後にC2サーバへ接続させる手口が、直近全国で報告されている。今回の型と一致する。'
+      '業界団体の注意喚起だ。取引先を装った請求書メールにマクロ付きファイルを添付し、開封後にC2サーバへ接続させる手口が、直近で全国的に報告されている。今回の型と一致する。'
     await skipCollectResultAndClose(page, advisoryLine)
 
     await bookHotspot.click()
@@ -290,7 +375,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await page.getByRole('button', { name: 'インシデント対応ガイドラインを確認する' }).click()
     await expect(page.getByRole('group', { name: '資料棚の操作' })).toBeHidden()
     const guidelineLine =
-      'インシデント対応ガイドラインを確認しました。感染が疑われる端末は、まずネットワークから論理的に隔離し、電源は落とさないこと。揮発性メモリに乗った証拠を失わないためです。'
+      'インシデント対応ガイドライン。感染が疑われる端末は、まずネットワークから論理的に隔離し、電源は落とさないこと。揮発性メモリの証拠を失わないためです。'
     await skipCollectResultAndClose(page, guidelineLine)
     await expect(bookHotspot).toHaveAccessibleName('資料棚（書籍）・調査済み')
 
@@ -300,14 +385,17 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await expect(page.getByRole('img', { name: 'サーバ室の背景' })).toBeVisible()
 
     // device(プロキシサーバ・メールサーバ)は単一action=即実行。
+    // プロキシサーバは霧島の2ターン(問いかけ→答え合わせ、台本v2.2)。
     await page.getByRole('button', { name: 'プロキシサーバ（機器）', exact: true }).click()
-    const proxyLine =
-      '深夜帯、中野のPCから見覚えのない海外IPアドレスへ、約30分間隔で通信が続いている。典型的なビーコン通信のパターンだ。'
-    await skipCollectResultAndClose(page, proxyLine)
+    const proxyLine1 = '新人、この通信の“間隔”に注目しろ。何か気づかないか？'
+    const proxyLine2 =
+      '深夜帯、中野のPCから見覚えのない海外IPへ、約30分間隔できっちり通信が続いている。人間の操作ではありえない規則正しさ――典型的なビーコンだ。'
+    await skipCollectResultAndClose(page, proxyLine1)
+    await skipCollectResultAndClose(page, proxyLine2)
 
     await page.getByRole('button', { name: 'メールサーバ（機器）', exact: true }).click()
     const mailLine =
-      '問題のメールを確認した。取引先名を騙った件名で、送信元は正規ドメインによく似た別ドメインだ。手口としては典型的だが、手が込んでいる。'
+      '問題のメールを確認した。取引先名を騙った件名で、送信元は正規ドメインによく似た別ドメイン。手口は典型的だが、手が込んでいる。'
     await skipCollectResultAndClose(page, mailLine)
 
     // person(サーバ管理者。旧・解析用端末(pc)＋旧・情シス担当(person)を統合したホットスポット、
@@ -321,21 +409,32 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
       page.getByRole('heading', { name: 'サーバ管理者「どうしましたか？」' }),
     ).toBeVisible()
 
+    // 「PCを確認する」は霧島→橘(用語クッション・IoC)→霧島の3ターン(台本v2.2/#100/#103)。
     await page.getByRole('button', { name: 'PCを確認する' }).click()
     await expect(adminSheet).toBeHidden()
-    const sandboxLine =
-      '回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加のプログラムを取得し、プロキシログと同じ宛先へビーコン通信している。IoCとして他端末の調査にも使える。'
-    await skipCollectResultAndClose(page, sandboxLine)
+    const sandboxLine1 =
+      '回収した添付ファイルをサンドボックスで動かした。マクロが外部URLから追加プログラムを取得し、プロキシログと同じ宛先へビーコンを送っている。この宛先はIoC――侵害の痕跡として、他端末の調査にも使える。'
+    const sandboxLine2 = 'そのIoCというのは、具体的には何を指すの？'
+    const sandboxLine3 =
+      '「この通信先が出たら感染を疑え」という手掛かりの一覧だ。今回はビーコンの宛先がそれにあたる。一つ掴めば他端末への横展開調査が早くなる。'
+    await skipCollectResultAndClose(page, sandboxLine1)
+    await skipCollectResultAndClose(page, sandboxLine2)
+    await skipCollectResultAndClose(page, sandboxLine3)
 
     // 調査結果は証言ベースの台詞のみで、対策カードの本文は表示されない(#62回帰確認は
-    // 別テストで独立確認する)。
+    // 別テストで独立確認する)。「話を聞く」はNPC「サーバ管理者」の直接発話→橘の2ターン。
     await adminHotspot.click()
     await expect(adminSheet).toBeVisible()
     await page.getByRole('button', { name: '話を聞く' }).click()
     await expect(adminSheet).toBeHidden()
-    const itStaffLine =
-      '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。'
-    await skipCollectResultAndClose(page, itStaffLine)
+    const itStaffLine1 =
+      '発覚した直後、正直、反射的に経理部PCの電源ケーブルに手をかけたんです。でも……抜いていいのか判断がつかなくて。結局ためらって、対策室の到着を待ちました。'
+    const itStaffLine2 =
+      'その判断、結果的に正解です。抜かずに待ったから、私たちはまだメモリの証拠を取れる。初動の“ためらい”が保全に効くこともあります。'
+    // NPC直接発話のターンでは、トリガー元のホットスポットが□で強調される(装飾用マーカー)。
+    await expect(page.getByTestId('npc-hotspot-marker')).toBeVisible()
+    await skipCollectResultAndClose(page, itStaffLine1)
+    await skipCollectResultAndClose(page, itStaffLine2)
 
     // これが9件目(最後)の調査のため、ここで「解決へ」の活性条件を満たし、探索完了への誘導
     // (#71・T045)の会話オーバーレイが入れ替わりで自動的に開く(conversationSlotが会話状態を
@@ -420,8 +519,7 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     // PCはcollect/danger/noopの3action=シート経由。「EDRアラートを確認する」を実行する。
     await page.getByRole('button', { name: 'EDRアラートを確認する' }).click()
 
-    const edrLine =
-      '中野の端末でExcelのマクロ実行に続いて、見慣れないPowerShellプロセスが起動した記録がある。侵入の起点はここだろう。'
+    const edrLine = '新人、このプロセス名――どう見る？'
     await expect(page.getByText(edrLine, { exact: false })).toBeVisible()
 
     // タイプライターが進行中(スキップ前)でも「ヒント確認」は押せる(右上移設によりisComplete
@@ -444,10 +542,11 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     await page.getByRole('tab', { name: 'サーバ室' }).click()
 
     // #78・T046-ui-dataで「サーバ管理者」に統合されたホットスポット経由(複数action=シート)。
+    // 「話を聞く」はNPC「サーバ管理者」の直接発話が1ターン目(台本v2.2/#100/#103)。
     await page.getByRole('button', { name: 'サーバ管理者（人物）' }).click()
     await page.getByRole('button', { name: '話を聞く' }).click()
     const itStaffLine =
-      '情シス担当に聞きました。発覚直後、反射的に経理部PCの電源ケーブルに手をかけたものの、判断がつかず抜くのをためらい、対策室の到着を待ったそうです。'
+      '発覚した直後、正直、反射的に経理部PCの電源ケーブルに手をかけたんです。でも……抜いていいのか判断がつかなくて。結局ためらって、対策室の到着を待ちました。'
     await expect(page.getByText(itStaffLine, { exact: false })).toBeVisible()
     // #62の症状(対策カードの本文が証言として表示される)が再現しないことを確認する。
     await expect(
