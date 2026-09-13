@@ -54,7 +54,14 @@ import { uniqueArraySchema } from './util.ts'
 // intro.character_intros / resolution.clear_explanation でのみ話者にでき、それ以外
 // (collect.dialogue[]・questions[].speaker・questions[].explanations)への出現は superRefine で拒否する
 // (探索・解決の会話フレームは2枠のままで描画先が無いため)。詳細は docs/scenario_schema.md §2.6。
-export const scenarioSchemaVersionSchema = z.literal('0.7.0')
+// 0.8.0（#119/#120, 2026-09-14）: 背景を画面の向き(横16:9／縦9:16)で切り替える方式に対応するため、
+// scenes[].hotspots[].position を単一の [x, y] タプルから横・縦の組を持つオブジェクト
+// ({ landscape: [x, y], portrait?: [x, y] })へ変更する破壊的変更。landscape は必須、portrait は
+// 縦の背景がまだ無いシーン向けに当面省略可(4マップすべてに縦座標が揃った時点で必須化を検討)。
+// 旧 [x, y] 配列形式は廃止し、既存4マップ(S1/S2/S3/SL)の座標値は変更せず landscape へ機械移植した
+// (#120)。portrait の実データ投入は #123、縦背景の解決・食い違い検出 UI は #124。詳細は
+// docs/scenario_schema.md §2.7。
+export const scenarioSchemaVersionSchema = z.literal('0.8.0')
 
 /** マップID。ファイル名(拡張子除く)と一致させる（実在チェックは validate-collection.ts）。 */
 export const scenarioIdSchema = z.string().regex(/^[a-z][a-z0-9_-]*$/)
@@ -164,8 +171,21 @@ export const sceneIdSchema = slugIdSchema
 export const hotspotObjectTypeSchema = z.enum(['pc', 'person', 'book', 'device', 'door'])
 export type HotspotObjectType = z.infer<typeof hotspotObjectTypeSchema>
 
-/** 背景画像に対する相対座標(0〜1)。[x, y] の2要素タプル。 */
-export const hotspotPositionSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])
+/** 背景画像に対する相対座標(0〜1)。[x, y] の2要素タプル。position オブジェクトの1軸(横 or 縦)分。 */
+export const hotspotCoordinateSchema = z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)])
+export type HotspotCoordinate = z.infer<typeof hotspotCoordinateSchema>
+
+// 0.8.0（#119/#120、docs/scenario_schema.md §2.7）: 画面の向き(横16:9／縦9:16)ごとの相対座標の組。
+// landscape は必須、portrait は縦の背景がまだ無いシーン向けに当面省略可(4マップすべてに縦座標が
+// 揃った時点で必須化を検討)。portrait 省略時は縦長の画面でも landscape の座標をそのまま使う
+// (背景の箱を16:9のまま画面幅にフィットさせる方針。UI側の表示ロジックは #124 の範囲)。
+// 旧 0.4.0〜0.7.0 の単一 [x, y] タプル形式は廃止した(破壊的変更)。
+export const hotspotPositionSchema = z
+  .object({
+    landscape: hotspotCoordinateSchema,
+    portrait: hotspotCoordinateSchema.optional(),
+  })
+  .strict()
 export type HotspotPosition = z.infer<typeof hotspotPositionSchema>
 
 // 探索の collect アクション限定で使う会話行の union(0.7.0・#100/#101、docs/scenario_schema.md §2.6)。

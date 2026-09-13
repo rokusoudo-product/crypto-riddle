@@ -26,7 +26,7 @@
 # 注記: S1 と同じ理由(scripts/build-data.test.ts の S2 フィクスチャ一致テストが折り返しの
 # 空白挿入を検出する)で、本文フィールド(body/description/line 等)は1行で記述している。
 
-schema_version: "0.7.0"
+schema_version: "0.8.0"
 id: s2-vpn-ransomware
 title: VPN装置の脆弱性放置とランサムウェア感染
 status: draft
@@ -124,7 +124,8 @@ scenes:
     background: bg-s2-office
     hotspots:
       - object_type: pc
-        position: [0.4, 0.65]
+        position:
+          landscape: [0.4, 0.65]
         label: 情シス管理端末
         actions:
           - kind: collect
@@ -143,7 +144,8 @@ scenes:
           - kind: noop
             label: 今は触らない
       - object_type: person
-        position: [0.2, 0.4]
+        position:
+          landscape: [0.2, 0.4]
         label: 情シス担当
         actions:
           - kind: collect
@@ -152,7 +154,8 @@ scenes:
             line: 情シス担当に聞きました。VPN装置は数年前に保守業者へ設置してもらったきりで、資産管理台帳には登録されておらず、ファームウェア更新の通知が来ていたことにも気づいていなかったそうです。
             speaker: 橘
       - object_type: person
-        position: [0.78, 0.55]
+        position:
+          landscape: [0.78, 0.55]
         label: 管理部門長
         actions:
           - kind: collect
@@ -161,7 +164,8 @@ scenes:
             line: 管理部門長に伺いました。すでに一部の生産ラインの稼働に影響が出ており、一刻も早い復旧のためなら身代金の支払いも検討すべきではないか、との声が社内で出ているそうです。
             speaker: 橘
       - object_type: book
-        position: [0.6, 0.16]
+        position:
+          landscape: [0.6, 0.16]
         label: 資料棚
         actions:
           - kind: collect
@@ -175,7 +179,8 @@ scenes:
             line: バックアップ運用ガイドラインを確認しました。バックアップは複数世代を保持し、本番環境とは別の媒体・別の場所に、ネットワークから切り離した状態でも保管すること(3-2-1ルール)。常時オンライン接続のバックアップは、侵入時に本体ごと暗号化される危険があるためです。
             speaker: 橘
       - object_type: door
-        position: [0.95, 0.5]
+        position:
+          landscape: [0.95, 0.5]
         label: サーバ室への扉
         actions:
           - kind: goto
@@ -186,7 +191,8 @@ scenes:
     background: bg-s2-server
     hotspots:
       - object_type: person
-        position: [0.51, 0.43]
+        position:
+          landscape: [0.51, 0.43]
         label: 保守業者
         prompt: "保守業者「点検に伺いました。何かありましたか？」"
         actions:
@@ -203,7 +209,8 @@ scenes:
           - kind: noop
             label: 何でもない
       - object_type: device
-        position: [0.18, 0.45]
+        position:
+          landscape: [0.18, 0.45]
         label: バックアップサーバ
         actions:
           - kind: collect
@@ -212,7 +219,8 @@ scenes:
             line: バックアップサーバを確認した。本番ネットワークに常時オンラインで接続されており、同じ管理者アカウントでアクセスできる状態だった。直近の世代のバックアップも、横展開の過程で他のファイルと同様に暗号化されており、そのままでは復旧に使えない。
             speaker: 霧島
       - object_type: door
-        position: [0.5, 0.9]
+        position:
+          landscape: [0.5, 0.9]
         label: 執務室への扉
         actions:
           - kind: goto

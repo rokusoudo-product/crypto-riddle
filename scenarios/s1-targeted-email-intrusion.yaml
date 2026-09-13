@@ -37,7 +37,7 @@
 # 無線LAN)へ置き換えた(台詞・被害企業説明・カード本文・問2正解選択肢)。修正案ファイルは
 # 引き続き本リポジトリにコミットしない。
 
-schema_version: "0.7.0"
+schema_version: "0.8.0"
 id: s1-targeted-email-intrusion
 title: 標的型メールからの侵入
 status: reviewed
@@ -215,7 +215,8 @@ scenes:
     background: bg-s1-office
     hotspots:
       - object_type: pc
-        position: [0.52, 0.57]
+        position:
+          landscape: [0.52, 0.57]
         label: 経理部 中野の端末
         actions:
           - kind: collect
@@ -234,7 +235,8 @@ scenes:
           - kind: noop
             label: 今は触らない
       - object_type: person
-        position: [0.53, 0.4]
+        position:
+          landscape: [0.53, 0.4]
         label: 中野
         actions:
           - kind: collect
@@ -247,7 +249,8 @@ scenes:
                 expression: neutral
                 line: ……ご本人も認めているわ。件名の巧妙さと、月末の油断が重なった。よくある入口ね。
       - object_type: person
-        position: [0.39, 0.27]
+        position:
+          landscape: [0.39, 0.27]
         label: 経理部長
         actions:
           - kind: collect
@@ -260,7 +263,8 @@ scenes:
                 expression: serious
                 line: 規程はあっても、現場に届いていなければ機能しないわ。ここは後の再発防止と説明責任に効いてくる論点ね。覚えておいて。
       - object_type: book
-        position: [0.62, 0.2]
+        position:
+          landscape: [0.62, 0.2]
         label: 資料棚
         actions:
           - kind: collect
@@ -278,7 +282,8 @@ scenes:
                 expression: neutral
                 line: インシデント対応ガイドライン。感染が疑われる端末は、まずネットワークから論理的に隔離し、電源は落とさないこと。揮発性メモリの証拠を失わないためね。
       - object_type: door
-        position: [0.84, 0.54]
+        position:
+          landscape: [0.84, 0.54]
         label: サーバ室への扉
         actions:
           - kind: goto
@@ -289,7 +294,8 @@ scenes:
     background: bg-s1-server
     hotspots:
       - object_type: device
-        position: [0.18, 0.45]
+        position:
+          landscape: [0.18, 0.45]
         label: プロキシサーバ
         actions:
           - kind: collect
@@ -303,7 +309,8 @@ scenes:
                 expression: serious
                 line: 深夜帯、中野のPCから見覚えのない海外IPへ、約30分間隔できっちり通信が続いている。人間の操作ではありえない規則正しさ――典型的なビーコンだ。
       - object_type: device
-        position: [0.82, 0.45]
+        position:
+          landscape: [0.82, 0.45]
         label: メールサーバ
         actions:
           - kind: collect
@@ -314,7 +321,8 @@ scenes:
                 expression: neutral
                 line: 問題のメールを確認した。取引先名を騙った件名で、送信元は正規ドメインによく似た別ドメイン。手口は典型的だが、手が込んでいるな。
       - object_type: person
-        position: [0.51, 0.43]
+        position:
+          landscape: [0.51, 0.43]
         label: サーバ管理者
         prompt: "サーバ管理者「どうしましたか？」"
         actions:
@@ -343,7 +351,8 @@ scenes:
           - kind: noop
             label: 何でもない
       - object_type: door
-        position: [0.5, 0.9]
+        position:
+          landscape: [0.5, 0.9]
         label: 執務室への扉
         actions:
           - kind: goto

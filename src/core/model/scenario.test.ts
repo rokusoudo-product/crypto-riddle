@@ -4,7 +4,7 @@ import { scenarioSchema, type Scene, type Scenario } from './scenario.ts'
 
 function validScenario(): Scenario {
   return {
-    schema_version: '0.7.0',
+    schema_version: '0.8.0',
     id: 's0-sample',
     title: 'アルファテック社 顧客データ流出事件(テスト用)',
     status: 'sample',
@@ -365,7 +365,7 @@ function validScenes(): Scene[] {
       hotspots: [
         {
           object_type: 'pc',
-          position: [0.3, 0.42],
+          position: { landscape: [0.3, 0.42] },
           label: '経理担当のPC',
           actions: [
             {
@@ -384,7 +384,7 @@ function validScenes(): Scene[] {
         },
         {
           object_type: 'person',
-          position: [0.7, 0.38],
+          position: { landscape: [0.7, 0.38] },
           label: '田中さん',
           actions: [
             { kind: 'collect', investigation_point_id: 'ip-witness-tanaka', label: '話を聞く' },
@@ -408,27 +408,36 @@ describe('scenes(探索の背景シーン, #52/T037)', () => {
     expect(scenarioSchema.safeParse(scenario).success).toBe(true)
   })
 
-  it('境界: position [0, 0] と [1, 1] を受理する', () => {
+  it('境界: position.landscape [0, 0] と [1, 1] を受理する', () => {
     const scenario = validScenario()
     const scenes = validScenes()
-    scenes[0].hotspots[0].position = [0, 0]
-    scenes[0].hotspots[1].position = [1, 1]
+    scenes[0].hotspots[0].position = { landscape: [0, 0] }
+    scenes[0].hotspots[1].position = { landscape: [1, 1] }
     scenario.scenes = scenes
     expect(scenarioSchema.safeParse(scenario).success).toBe(true)
   })
 
-  it('reject: position の要素が1を超える場合を拒否する', () => {
+  it('reject: position.landscape の要素が1を超える場合を拒否する', () => {
     const scenario = validScenario()
     const scenes = validScenes()
-    scenes[0].hotspots[0].position = [1.5, 0.5]
+    scenes[0].hotspots[0].position = { landscape: [1.5, 0.5] }
     scenario.scenes = scenes
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 
-  it('reject: position の要素が0未満の場合を拒否する', () => {
+  it('reject: position.landscape の要素が0未満の場合を拒否する', () => {
     const scenario = validScenario()
     const scenes = validScenes()
-    scenes[0].hotspots[0].position = [-0.1, 0.5]
+    scenes[0].hotspots[0].position = { landscape: [-0.1, 0.5] }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: 未定義フィールドを含む position を拒否する(.strict())', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // @ts-expect-error 意図的に未定義フィールドを渡す
+    scenes[0].hotspots[0].position = { landscape: [0.3, 0.42], unknown_field: 'x' }
     scenario.scenes = scenes
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
@@ -626,18 +635,81 @@ describe('scenes[].hotspots[].actions collect の line/speaker(#52 Phase4.7/T043
   })
 })
 
-describe('schema_version 0.7.0(#100/#101)', () => {
-  it('reject: schema_version が旧版(0.6.0)を拒否する', () => {
+describe('schema_version 0.8.0(#119/#120)', () => {
+  it('reject: schema_version が旧版(0.7.0)を拒否する', () => {
     const scenario = validScenario()
     // @ts-expect-error 意図的に旧バージョンを渡す
-    scenario.schema_version = '0.6.0'
+    scenario.schema_version = '0.7.0'
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 
-  it('正常系: schema_version が 0.7.0 を受理する', () => {
+  it('正常系: schema_version が 0.8.0 を受理する', () => {
     const scenario = validScenario()
-    expect(scenario.schema_version).toBe('0.7.0')
+    expect(scenario.schema_version).toBe('0.8.0')
     expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+})
+
+// position を横・縦の組にする改訂(#119/#120、docs/scenario_schema.md §2.7)。
+// landscape は必須・portrait は当面省略可。旧 0.4.0〜0.7.0 の単一 [x, y] タプル形式は廃止した。
+describe('scenes[].hotspots[].position 横・縦の組(#119/#120)', () => {
+  it('正常系: landscape のみ(portrait省略)を受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].position = { landscape: [0.3, 0.42] }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: landscape と portrait の両方を受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].position = { landscape: [0.3, 0.42], portrait: [0.45, 0.55] }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('境界: portrait も [0, 0]〜[1, 1] の範囲を受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].position = { landscape: [0.3, 0.42], portrait: [0, 1] }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('reject: portrait の要素が範囲(0〜1)外の場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].hotspots[0].position = { landscape: [0.3, 0.42], portrait: [1.2, 0.5] }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: 旧形式の [x, y] 配列を拒否する(0.7.0以前の形式は廃止)', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // @ts-expect-error 意図的に旧 0.4.0〜0.7.0 の配列形式を渡す
+    scenes[0].hotspots[0].position = [0.3, 0.42]
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: landscape を欠く場合を拒否する(landscapeは必須)', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // @ts-expect-error 意図的に必須フィールド landscape を欠落させる
+    scenes[0].hotspots[0].position = { portrait: [0.45, 0.55] }
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: position が空オブジェクトの場合を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    // @ts-expect-error 意図的に必須フィールド landscape を欠落させる
+    scenes[0].hotspots[0].position = {}
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 })
 
@@ -648,7 +720,7 @@ function validTwoSceneScenesWithDoor(): Scene[] {
   const scenes = validScenes()
   scenes[0].hotspots.push({
     object_type: 'door',
-    position: [0.92, 0.5],
+    position: { landscape: [0.92, 0.5] },
     label: 'サーバ室への扉',
     actions: [{ kind: 'goto', scene_id: 'scene-server', label: 'サーバ室へ移動する' }],
   })
@@ -659,7 +731,7 @@ function validTwoSceneScenesWithDoor(): Scene[] {
     hotspots: [
       {
         object_type: 'door',
-        position: [0.08, 0.5],
+        position: { landscape: [0.08, 0.5] },
         label: '執務室への扉',
         actions: [{ kind: 'goto', scene_id: 'scene-office', label: '執務室へ戻る' }],
       },

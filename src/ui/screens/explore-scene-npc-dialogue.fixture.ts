@@ -15,7 +15,7 @@ import { scenarioSchema } from '@/core/model'
 import type { Scenario } from '@/core/model'
 
 const rawScenario: Scenario = {
-  schema_version: '0.7.0',
+  schema_version: '0.8.0',
   id: 's-test-scene-npc-dialogue',
   title: 'NPC発話・多ターン送りテスト用マップ',
   status: 'draft',
@@ -56,7 +56,7 @@ const rawScenario: Scenario = {
       hotspots: [
         {
           object_type: 'person',
-          position: [0.4, 0.6],
+          position: { landscape: [0.4, 0.6] },
           label: '経理部長',
           actions: [
             {

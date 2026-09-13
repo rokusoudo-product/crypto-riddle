@@ -18,7 +18,7 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const slConsignmentBreachFixture: Scenario = {
-  schema_version: '0.7.0',
+  schema_version: '0.8.0',
   id: 'sl-consignment-breach',
   title: '委託先クラウドストレージからの個人データ漏えい',
   status: 'draft',
@@ -68,7 +68,8 @@ export const slConsignmentBreachFixture: Scenario = {
       id: 'ip-appi-guideline',
       category: '文献を引く',
       label: '個人情報保護法ガイドライン(委託先の監督義務)の確認',
-      description: '個人データの取扱いを委託した場合の委託元の監督義務について、ガイドラインで確認する。',
+      description:
+        '個人データの取扱いを委託した場合の委託元の監督義務について、ガイドラインで確認する。',
     },
     {
       id: 'ip-vendor-initial-report',
@@ -103,7 +104,7 @@ export const slConsignmentBreachFixture: Scenario = {
       hotspots: [
         {
           object_type: 'book',
-          position: [0.17, 0.32],
+          position: { landscape: [0.17, 0.32] },
           label: '委託契約書棚',
           actions: [
             {
@@ -124,7 +125,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'pc',
-          position: [0.56, 0.45],
+          position: { landscape: [0.56, 0.45] },
           label: '委託先の一次報告を受けた端末',
           actions: [
             {
@@ -136,7 +137,8 @@ export const slConsignmentBreachFixture: Scenario = {
             },
             {
               kind: 'danger',
-              label: '委託先からの一次報告メールを、事実関係の確認や公表判断を待たずにそのまま社内外へ転送する',
+              label:
+                '委託先からの一次報告メールを、事実関係の確認や公表判断を待たずにそのまま社内外へ転送する',
               feedback:
                 '橘「事実関係が固まる前に未確認の情報を広めると、後で内容が変わった場合に混乱と説明責任の問題を招きます。まずは委託先に詳細を確認し、社内の情報管理体制に沿って共有してください。」',
             },
@@ -152,7 +154,7 @@ export const slConsignmentBreachFixture: Scenario = {
       hotspots: [
         {
           object_type: 'device',
-          position: [0.19, 0.68],
+          position: { landscape: [0.19, 0.68] },
           label: '委託先のクラウドストレージ管理端末',
           actions: [
             {
@@ -166,7 +168,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.44, 0.55],
+          position: { landscape: [0.44, 0.55] },
           label: '委託先担当者',
           prompt: '委託先担当者「何かご質問はありますか？」',
           actions: [
@@ -182,7 +184,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'book',
-          position: [0.84, 0.62],
+          position: { landscape: [0.84, 0.62] },
           label: '委託先の安全管理措置報告書',
           actions: [
             {
@@ -196,7 +198,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: [0.6, 0.5],
+          position: { landscape: [0.6, 0.5] },
           label: '執務室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-office', label: '執務室へ移動する' }],
         },
@@ -353,7 +355,8 @@ export const slConsignmentBreachFixture: Scenario = {
           {
             text: '個人データを取り扱う委託元である自社にも個人情報保護委員会への報告義務があり、委託先と連携して対応する必要がある',
             is_correct: true,
-            reply: 'その理解が正しいです。委託しているからといって、自社が報告義務から外れるわけではありません。',
+            reply:
+              'その理解が正しいです。委託しているからといって、自社が報告義務から外れるわけではありません。',
           },
           {
             text: '事故が起きたのは委託先の管理領域なので、委託先が単独で個人情報保護委員会に報告すればよく、自社に義務はない',

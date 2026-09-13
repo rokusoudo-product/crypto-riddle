@@ -112,7 +112,7 @@ import type {
   Character,
   Expression,
   HotspotAction,
-  HotspotPosition,
+  HotspotCoordinate,
   InvestigationPoint,
   Scenario,
   Scene,
@@ -254,8 +254,10 @@ function resolveDangerTurns(action: DangerAction): ConversationTurn[] {
 interface ConversationContent {
   kind: 'collect' | 'danger'
   hotspotLabel: string
-  /** NPC発話ターンでトリガー元のホットスポットを□で強調するための位置(#100/#102、下記JSX参照)。 */
-  hotspotPosition: HotspotPosition
+  /** NPC発話ターンでトリガー元のホットスポットを□で強調するための位置(#100/#102、下記JSX参照)。
+   * 0.8.0（#119/#120）: position が横・縦の組になったため、表示は現状どおり横(landscape)を使う
+   * (縦の背景への切り替えは #124)。 */
+  hotspotPosition: HotspotCoordinate
   turns: readonly ConversationTurn[]
 }
 
@@ -487,7 +489,7 @@ export function SceneExplorer({
       setConversation({
         kind: 'collect',
         hotspotLabel: hotspot.label,
-        hotspotPosition: hotspot.position,
+        hotspotPosition: hotspot.position.landscape,
         turns,
       })
       return
@@ -502,7 +504,7 @@ export function SceneExplorer({
       setConversation({
         kind: 'danger',
         hotspotLabel: hotspot.label,
-        hotspotPosition: hotspot.position,
+        hotspotPosition: hotspot.position.landscape,
         turns,
       })
       return
@@ -649,7 +651,9 @@ export function SceneExplorer({
               DOMに置かない=誤操作防止・キーボード到達順の単純化、DESIGN.md「探索シーン」節)。 */}
           {!isConversationActive &&
             activeScene.hotspots.map((hotspot, hotspotIndex) => {
-              const [x, y] = hotspot.position
+              // 0.8.0（#119/#120）: position が横・縦の組になったため、表示は現状どおり横(landscape)を
+              // 使う(縦の背景への切り替えは #124)。
+              const [x, y] = hotspot.position.landscape
               const investigated = isHotspotInvestigated(hotspot, investigatedPointIds)
               const needsSheet = hotspot.actions.length > 1
               return (
