@@ -15,7 +15,8 @@ status: reviewed
 created: 2026-08-07
 updated: 2026-09-13（#101/PR #105 で zod 実装完了。schema_version 0.7.0 化・全 YAML/fixture の
   schema_version 更新（内容無変更）を含む。#103 のスコープが S1 データ本体の移植のみに変更されたことを
-  §2.6 に反映）
+  §2.6 に反映。§2.7 追加: ホットスポット座標を横・縦の組にするスキーマ 0.8.0 の仕様を #119 で確定
+  〔実装は #120〕）
 ---
 
 # crypto-riddle — シナリオ記述フォーマット
@@ -81,23 +82,23 @@ scripts/
 
 `src/core/model/scenario.ts`（zod, `scenarioSchema`）が構造上の正。ここでは spec.md との対応を中心に説明する。
 
-| フィールド | spec 対応 | 説明 |
-|---|---|---|
-| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.7.0"`（S1 会話フロー刷新、#100 で仕様確定・#101/PR #105 で zod 実装・全 YAML/fixture の値反映。詳細は §2.6） |
-| `id` | - | マップID。**ファイル名(拡張子除く)と一致必須**(`validate-collection.ts` の `checkScenarioFilenames` がチェック) |
-| `title` | §4 | マップタイトル(事件名) |
-| `status` | - | `draft`/`reviewed`/`published`/`sample`。省略時 `draft` |
-| `map_order` | §9 難易度カーブ | 進行順(任意) |
-| `subject_tags` | §9 | 分野タグ。**7種で固定**（Issue #22 決定・2026-09-09）: `暗号`/`認証`/`Web`/`攻撃手法`/`インシデント対応`/`法制度`/`ネットワーク基盤`。値集合の正本は `src/core/model/tags.ts` の `SUBJECT_TAGS` |
-| `difficulty` | §9 | 1(易)〜5(難) |
-| `estimated_minutes` | US-1 | 想定プレイ時間(分)。目安10〜15分 |
-| `references` | FR-7 | 出典表記(§3 参照)。配列・省略可 |
-| `related_terms` | #4 | 用語カードマスタへの緩い参照(§6 参照) |
-| `intro` | §4.1 導入 | 背景・被害会社・サポート役の導入台詞 |
-| `investigation_points` | §7 探索 | 調査ポイント(3系統)。**カードの出所の正**（`scenes` 有無に関わらず維持） |
-| `scenes` | §7.1 探索 | **背景シーン表示層（#52・T037 で追加・省略可）**: 背景アセット・複数シーン・ホットスポット。省略時は一覧表示（§2.5） |
-| `cards` | §7 探索 | ヒントカード(正解・ダミーを含む) |
-| `resolution` | §8 解決 | **会話モード**（#42）: `cipher_stages`（暗号・維持／S1 は0件）＋ `questions[]`（問い列）。旧 `attack_identification`／`countermeasure` は `questions` へ統合（§2.4） |
+| フィールド             | spec 対応       | 説明                                                                                                                                                                                                                                                                 |
+| ---------------------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema_version`       | -               | このスキーマのバージョン(semver)。現行コードは `"0.7.0"`（S1 会話フロー刷新、#100 で仕様確定・#101/PR #105 で zod 実装・全 YAML/fixture の値反映。詳細は §2.6）。**`0.8.0`（ホットスポット座標を横・縦の組にする改訂）は #119 で仕様確定・実装は #120。詳細は §2.7** |
+| `id`                   | -               | マップID。**ファイル名(拡張子除く)と一致必須**(`validate-collection.ts` の `checkScenarioFilenames` がチェック)                                                                                                                                                      |
+| `title`                | §4              | マップタイトル(事件名)                                                                                                                                                                                                                                               |
+| `status`               | -               | `draft`/`reviewed`/`published`/`sample`。省略時 `draft`                                                                                                                                                                                                              |
+| `map_order`            | §9 難易度カーブ | 進行順(任意)                                                                                                                                                                                                                                                         |
+| `subject_tags`         | §9              | 分野タグ。**7種で固定**（Issue #22 決定・2026-09-09）: `暗号`/`認証`/`Web`/`攻撃手法`/`インシデント対応`/`法制度`/`ネットワーク基盤`。値集合の正本は `src/core/model/tags.ts` の `SUBJECT_TAGS`                                                                      |
+| `difficulty`           | §9              | 1(易)〜5(難)                                                                                                                                                                                                                                                         |
+| `estimated_minutes`    | US-1            | 想定プレイ時間(分)。目安10〜15分                                                                                                                                                                                                                                     |
+| `references`           | FR-7            | 出典表記(§3 参照)。配列・省略可                                                                                                                                                                                                                                      |
+| `related_terms`        | #4              | 用語カードマスタへの緩い参照(§6 参照)                                                                                                                                                                                                                                |
+| `intro`                | §4.1 導入       | 背景・被害会社・サポート役の導入台詞                                                                                                                                                                                                                                 |
+| `investigation_points` | §7 探索         | 調査ポイント(3系統)。**カードの出所の正**（`scenes` 有無に関わらず維持）                                                                                                                                                                                             |
+| `scenes`               | §7.1 探索       | **背景シーン表示層（#52・T037 で追加・省略可）**: 背景アセット・複数シーン・ホットスポット。省略時は一覧表示（§2.5）                                                                                                                                                 |
+| `cards`                | §7 探索         | ヒントカード(正解・ダミーを含む)                                                                                                                                                                                                                                     |
+| `resolution`           | §8 解決         | **会話モード**（#42）: `cipher_stages`（暗号・維持／S1 は0件）＋ `questions[]`（問い列）。旧 `attack_identification`／`countermeasure` は `questions` へ統合（§2.4）                                                                                                 |
 
 ### 2.1 カード種別（7種で固定）
 
@@ -144,13 +145,13 @@ spec §7 の「①ログを見る ②人に聞く ③文献を引く」を `inve
 
 ```yaml
 resolution:
-  cipher_stages: []          # 暗号（維持）。S1 は 0 件
+  cipher_stages: [] # 暗号（維持）。S1 は 0 件
   questions:
     - id: q-entry-point
-      subject_tag: 攻撃手法    # この問いの分野（src/core/model/tags.ts の SUBJECT_TAGS）
-      speaker: 霧島            # 出題キャラ（必須。src/core/model/common.ts の characterSchema）
-      prompt: この攻撃、どこから入られたと見る？   # 問い（キャラの台詞）
-      choices:                 # 2〜3個。判断は2択、知識を要する候補は3択（#42）
+      subject_tag: 攻撃手法 # この問いの分野（src/core/model/tags.ts の SUBJECT_TAGS）
+      speaker: 霧島 # 出題キャラ（必須。src/core/model/common.ts の characterSchema）
+      prompt: この攻撃、どこから入られたと見る？ # 問い（キャラの台詞）
+      choices: # 2〜3個。判断は2択、知識を要する候補は3択（#42）
         - text: 取引先を装ったメールの添付ファイル
           is_correct: true
         - text: 公開サーバーの脆弱性を突かれた
@@ -159,9 +160,9 @@ resolution:
         - text: USBメモリの持ち込み
           is_correct: false
           reply: その線なら入退室ログか資産管理に痕跡が出る。今回はどちらも異常なしだ。
-      explanations:            # 外すたびに深まる段階解説（教育的失敗の統合。任意・多段）
+      explanations: # 外すたびに深まる段階解説（教育的失敗の統合。任意・多段）
         - 一次情報（ログ）と証言のどちらを裏取りに使えるかを考えてみよう。
-      consult_hint: 手元の手掛かり（メールゲートウェイ/EDR/証言）を分野で整理して提示  # 相談時の詳細ヒント（必須）
+      consult_hint: 手元の手掛かり（メールゲートウェイ/EDR/証言）を分野で整理して提示 # 相談時の詳細ヒント（必須）
 ```
 
 - `speaker` は必須（省略時に `subject_tag` から自動導出する案は T030 で見送り、明示指定に確定した）。
@@ -188,30 +189,39 @@ resolution:
 
 ```yaml
 investigation_points:
-  - { id: ip-maillog, category: ログ, ... }   # 従来どおり（カードの出所の正）
+  - { id: ip-maillog, category: ログ, ... } # 従来どおり（カードの出所の正）
   - { id: ip-witness, category: 証言, ... }
 scenes:
   - id: scene-office
     title: 執務室
-    background: bg-s1-office        # DESIGN.md アセット節の背景アセットID
+    background: bg-s1-office # DESIGN.md アセット節の背景アセットID
     hotspots:
-      - object_type: pc              # pc | person | book | device
-        position: [0.30, 0.42]       # 背景に対する相対座標(0〜1)
+      - object_type: pc # pc | person | book | device
+        position: [0.30, 0.42] # 背景に対する相対座標(0〜1)。0.8.0（#119/#120）で横・縦の組に変更予定。§2.7 参照
         label: 経理担当のPC
         actions:
           # collect は省略可能な line（台詞）と speaker を持てる（#52 Phase 4.7・0.5.0）。
-          - { kind: collect, investigation_point_id: ip-maillog, label: メール受信ログを取る,
-              speaker: 霧島, line: 受信ログを追った。問題のメールは取引先を騙る別ドメインからだ。 }
-          - { kind: collect, investigation_point_id: ip-edr,     label: EDRのアラートを確認 }   # line/speaker 省略→既定文＋カード本文
-          - { kind: danger,  label: 感染端末の電源を落とす, feedback: "橘「ここで電源を落とすと揮発性メモリの証拠が消えます。」" }
-          - { kind: noop,    label: 今は触らない }
+          - {
+              kind: collect,
+              investigation_point_id: ip-maillog,
+              label: メール受信ログを取る,
+              speaker: 霧島,
+              line: 受信ログを追った。問題のメールは取引先を騙る別ドメインからだ。,
+            }
+          - { kind: collect, investigation_point_id: ip-edr, label: EDRのアラートを確認 } # line/speaker 省略→既定文＋カード本文
+          - {
+              kind: danger,
+              label: 感染端末の電源を落とす,
+              feedback: '橘「ここで電源を落とすと揮発性メモリの証拠が消えます。」',
+            }
+          - { kind: noop, label: 今は触らない }
       - object_type: person
         position: [0.70, 0.38]
         label: 中野さん
         actions:
           - { kind: collect, investigation_point_id: ip-witness, label: 話を聞く }
       # ドア＝シーン移動（#52 T046・0.6.0）。goto は investigation_point を参照しない。
-      - object_type: door             # pc | person | book | device | door
+      - object_type: door # pc | person | book | device | door
         position: [0.92, 0.5]
         label: サーバ室への扉
         actions:
@@ -224,11 +234,16 @@ scenes:
       - object_type: person
         position: [0.51, 0.43]
         label: サーバ管理者
-        prompt: "サーバ管理者「どうしましたか？」"   # 省略可。アクションシート見出しに出す
+        prompt: 'サーバ管理者「どうしましたか？」' # 省略可。アクションシート見出しに出す
         actions:
           - { kind: collect, investigation_point_id: ip-itstaff, label: 話を聞く, speaker: 橘 }
-          - { kind: collect, investigation_point_id: ip-sandbox, label: PCを確認する, speaker: 霧島 }
-          - { kind: noop,    label: 何でもない }
+          - {
+              kind: collect,
+              investigation_point_id: ip-sandbox,
+              label: PCを確認する,
+              speaker: 霧島,
+            }
+          - { kind: noop, label: 何でもない }
       - object_type: door
         position: [0.08, 0.5]
         label: 執務室への扉
@@ -241,8 +256,8 @@ scenes:
 - **`goto`／`door`／`prompt`（T046・0.6.0）**: `goto` はシーン移動アクション（`scene_id` で移動先を指定・`investigation_point` は参照しない）。`object_type: door` はドア用の種別（不可視・□マーカーは共通・`aria-label` は「〜への扉」）。`prompt` はホットスポットの省略可能な挨拶台詞で、アクションシートの見出しに出す（省略時はラベルのみ）。**系統をまたぐ統合**（人＋機器を1ホットスポットに）は複数 `collect` を並べるだけで表現でき、スキーマ追加は不要。
 - **1オブジェクトが複数ポイントを束ねられる**（hotspot→point は 1:N。例: 1台のPCにメールログとEDRの2点／サーバ管理者に証言＋PCログ）。
 - **整合性チェック（`scenes` があるとき）**: ①各 `investigation_point` が**ちょうど1つの `collect` action** から参照されること。②各 **`goto.scene_id` が `scenes[]` に実在**し、かつ**自シーン以外**を指すこと（`superRefine`）。`scenes` 省略時はチェックしない。
-- **背景アセット**は image_agent 自作（16:9・アニメ調で立ち絵と統一。DESIGN.md「探索シーン」「アセット」節）。`background` はアセットIDで参照し、YAML にパスを直書きしない。
-- `scenes`/`hotspots`/`object_type`/座標系は **T037（0.4.0）で確定済**。`collect` の `line`/`speaker` は **T043（0.5.0）で確定**。`goto`/`door`/`prompt` は **T046（0.6.0）で確定**。
+- **背景アセット**は image_agent 自作（横16:9／縦9:16（#119）・アニメ調で立ち絵と統一。DESIGN.md「探索シーン」「アセット」節）。`background` はアセットIDで参照し、YAML にパスを直書きしない。
+- `scenes`/`hotspots`/`object_type`/座標系は **T037（0.4.0）で確定済**。`collect` の `line`/`speaker` は **T043（0.5.0）で確定**。`goto`/`door`/`prompt` は **T046（0.6.0）で確定**。**`hotspots[].position` を横・縦の組にする改訂は 0.8.0（#119 で仕様確定・#120 で実装予定）。詳細は §2.7**。
 
 ### 2.6 スキーマ 0.7.0（S1 会話フロー刷新・#100 で仕様確定／#101・PR #105 で zod 実装完了）
 
@@ -344,6 +359,48 @@ resolution:
 - `dialogue`／`explanations`／`npc` 発話とも、**S2/S3/SL の既存 YAML は無改訂で有効**（`schema_version` の
   値は #101/PR #105 で更新済み）。
 
+### 2.7 スキーマ 0.8.0（ホットスポット座標を横・縦の組にする改訂・#119 で仕様確定／#120 で zod 実装予定）
+
+> **背景**: #119（本 Issue・docs のみ）で、背景を**画面の向き**（横長の画面＝16:9／縦長の画面＝9:16）で
+> 切り替える方式に改訂した（`DESIGN.md`「探索シーン」節「背景の箱」）。ホットスポットの相対座標は
+> 背景1枚に対して決まるため、横・縦で背景画像が変わる場合は**座標も横・縦で別に持つ**必要がある。
+> zod 改訂は **core Issue #120**、S1 の縦座標データ投入は **data Issue #123**。UI 実装は **#124**。
+
+`scenes[].hotspots[].position` を、単一の `[x, y]` 配列から**横・縦の組を持つオブジェクト**へ変更する。
+
+```yaml
+scenes:
+  - id: scene-office
+    title: 執務室
+    background: bg-s1-office # DESIGN.md アセット節の背景アセットID（従来どおり）
+    hotspots:
+      - object_type: pc
+        position:
+          landscape: [0.30, 0.42] # 横長の画面（16:9の箱）に対する相対座標(0〜1)。必須
+          portrait: [0.45, 0.55] # 縦長の画面（9:16の箱）に対する相対座標(0〜1)。当面は省略可
+        label: 経理担当のPC
+        actions: [...] # actions[] の構造は §2.5 のまま変更なし
+```
+
+- **`position` はオブジェクト必須**（`z.object({ landscape: <座標>, portrait: <座標>.optional() })`）。
+  旧 `[x, y]` 配列形式（0.4.0〜0.7.0）は**廃止**し、既存4マップ（S1/S2/S3/SL）の全ホットスポットは
+  現在の座標値をそのまま `landscape` へ機械移植する（値は変更しない。**#120 で実施**）。
+- **`landscape` は必須・`portrait` は当面省略可**（縦の背景がまだ無いシーン向け。現時点では S1 の
+  #121・#123 反映前も含め全シーンが該当）。**4マップすべてに縦の背景・縦座標が揃った時点で `portrait` を
+  必須に変更する**（将来の後続 Issue で判断。本節はその前段の「当面は省略可」の状態を定義する）。
+- **`portrait` 省略時の表示**: `portrait` を持たないホットスポットは、縦長の画面でも `landscape` の座標を
+  そのまま使う（縦長の画面でも横の背景を背景の箱（9:16）に収めて表示する方針。`DESIGN.md`「探索シーン」節
+  「背景」参照）。この対応づけは UI 側の表示ロジック（#124）が担い、スキーマ側に分岐フィールドは持たせない。
+- **縦の背景アセットの解決はスキーマの範囲外**: `scenes[].background` はアセットIDを1つ持つのみで、
+  縦専用の背景アセットID（`DESIGN.md`「アセット」節の `bg-s1-office-portrait` 等）を指す**専用フィールドは
+  本節では追加しない**（判断に迷った点。導入(③)の背景が `intro-screen.tsx` 側の UI 定数であるのと同様に、
+  「`background` のIDから縦版IDを導出する対応表、または UI 定数」で解決する案を想定しているが、確定は
+  #120/#124 の実装判断に委ねる）。
+- **整合性チェック**: 既存の collect/goto 系チェック（§2.5）に変更はない。`position` の形が変わるのみで、
+  参照関係のチェック対象・ロジックは影響を受けない。
+- **`schema_version` を `0.8.0` に更新**（#120 で zod 実装・全 `scenarios/*.yaml`・fixture の値反映を
+  同時に行う。手順は 0.4.0〜0.7.0 の版数追随と同様）。
+
 ## 3. 出典表記（`references`）
 
 FR-7「IPA 過去問由来素材に出典表記を明示する」に対応するフィールド。フィールド構成の正本は
@@ -351,13 +408,13 @@ FR-7「IPA 過去問由来素材に出典表記を明示する」に対応する
 
 ```yaml
 references:
-  - exam: SC                # SC | NW（省略可。テーマ参考のみの場合は省略する）
-    year_jp: "令和6年度"      # 省略可
-    season: "春期"           # 春期 | 秋期。省略可
-    division: "午後"         # 省略可
-    question: "問2"          # 省略可
-    material_kind: 攻撃手口   # 攻撃手口 | 技術要素 | 事例類型 | 用語（必須）
-    note: "自由記述"          # 省略可
+  - exam: SC # SC | NW（省略可。テーマ参考のみの場合は省略する）
+    year_jp: '令和6年度' # 省略可
+    season: '春期' # 春期 | 秋期。省略可
+    division: '午後' # 省略可
+    question: '問2' # 省略可
+    material_kind: 攻撃手口 # 攻撃手口 | 技術要素 | 事例類型 | 用語（必須）
+    note: '自由記述' # 省略可
 ```
 
 - `material_kind` のみが必須。特定の年度・問題からの引用ではなく**テーマ知識のみを参考にした場合**は
