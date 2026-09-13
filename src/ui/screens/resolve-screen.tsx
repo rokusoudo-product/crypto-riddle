@@ -129,7 +129,18 @@ export function ResolveScreen() {
         )}
 
         {progress.resolutionStage === 'question' && question && (
-          <ConversationFrame speaker={question.speaker} line={question.prompt}>
+          <ConversationFrame
+            speaker={question.speaker}
+            // 左右2枠の並び(#108/#110): 解決は問1→問2に進んでも並びを保つ(DESIGN.md「左右2枠の
+            // 入れ替わり方式」節「並びのリセット」)。questions全体の話者列のうち、現在の問いまでを
+            // 履歴として渡すことで、問いをまたいでも並びが連続する(src/ui/lib/two-slot-frame.ts
+            // が履歴から並びを導出する純粋関数のため、リセット用のstateは不要)。「解決の開始」
+            // (questionIndex=0から)は履歴が[questions[0].speaker]から始まることで自然に表現される。
+            speakerHistory={scenario.resolution.questions
+              .slice(0, progress.questionIndex + 1)
+              .map((q) => q.speaker)}
+            line={question.prompt}
+          >
             {progress.lastAnswerFeedback?.correct === true && progress.lastAnswerFeedback.reply && (
               <p className="border-border bg-background rounded-lg border p-3 text-sm">
                 {progress.lastAnswerFeedback.reply}

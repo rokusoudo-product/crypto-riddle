@@ -603,7 +603,7 @@ export function SceneExplorer({
             <img
               src={BACKGROUND_SRC[activeScene.background]}
               alt={`${activeScene.title}の背景`}
-              className="absolute inset-0 h-full w-full object-cover"
+              className="absolute inset-0 h-full w-full rounded-lg object-cover"
             />
           ) : (
             <div
@@ -677,61 +677,24 @@ export function SceneExplorer({
               )
             })}
 
-          {/* 会話状態(T047): 調査結果/dangerの教育的フィードバック(自身のconversation)、
-              または呼び出し側の会話(conversationSlot、探索完了→解決への誘導)を排他的に
-              重ねる。背景シーンは暗転させずそのまま保持する(DESIGN.md「探索シーン」節)。
-              多ターン化(#100/#102): conversation.turns[conversationTurnIndex]が現在のターン。
-              最終ターンでない間はonDismiss/onEscapeで「次の行へ」進め(advanceConversationTurn)、
-              最終ターンでのみ会話を閉じる(closeConversation)。onEscapeは常にcloseConversationに
-              固定する(onDismissを「次の行へ」に流用してもEscapeだけは常に閉じられるように、
-              conversation-frame.tsxのonEscape JSDoc参照)。 */}
-          {conversation && currentTurn ? (
-            <>
-              {/* NPC直接発話(collect.dialogue限定・#100/#102)のターンでは、トリガー元の
-                  ホットスポットを□で強調する(DESIGN.md「探索シーン」節「NPC直接発話の描画」)。
-                  会話状態ではホットスポット自体(実<button>)をDOMに置かない方針
-                  (#52 Phase4.7・T047)を維持したまま、位置だけ再現した装飾用の□マーカーを
-                  重ねる(非対話・aria-hidden・pointer-events-none。実ホットスポットの
-                  □マーカーと同じ見た目にするため同じクラスを使う)。 */}
-              {isNpcTurn && (
-                <div
-                  aria-hidden="true"
-                  data-testid="npc-hotspot-marker"
-                  style={{
-                    left: `${conversation.hotspotPosition[0] * 100}%`,
-                    top: `${conversation.hotspotPosition[1] * 100}%`,
-                  }}
-                  className="border-hotspot-highlight ring-hotspot-highlight/50 pointer-events-none absolute z-10 min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 ring-3"
-                />
-              )}
-              {/* 「閉じる」ボタンは置かず、会話ウィンドウ全体をクリック/タップで閉じる(または
-                  次の行へ進める)(#52 Phase4.7 追補・T048、DESIGN.md「探索シーン」節
-                  「会話ウィンドウ」)。onDismissを指定すると、タイプライターの全文表示前の
-                  クリック/タップ/Enter/Spaceはスキップ、全文表示後の同操作でonDismissを呼ぶ
-                  (2段階、ConversationFrame側の実装参照)。カード閲覧(旧・会話ウィンドウ内の
-                  ?ボタン)は右上の「ヒント確認」に統合したため、children はもう調査結果の
-                  文脈行のみで、操作要素を持たない(閉じる操作とホットスポット操作が競合しないよう、
-                  会話状態ではホットスポット自体をそもそもDOMに置かない=上記の分岐と併せて安全)。 */}
-              <ConversationFrame
-                layout="overlay"
-                speaker={currentTurn.speaker}
-                line={currentTurn.line}
-                expression={currentTurn.expression}
-                onDismiss={isLastTurn ? closeConversation : advanceConversationTurn}
-                onEscape={closeConversation}
-              >
-                <p className="text-muted-foreground text-xs">
-                  {conversation.kind === 'collect'
-                    ? `${conversation.hotspotLabel}を調べた結果`
-                    : `${conversation.hotspotLabel}を操作した結果`}
-                </p>
-              </ConversationFrame>
-            </>
-          ) : conversationSlot ? (
-            // idはisWrapUpVisibleのuseEffectが最初の操作可能要素を探すためのフック
-            // (上記コメント参照)。
-            <div id={conversationSlotId}>{conversationSlot}</div>
-          ) : null}
+          {/* NPC直接発話(collect.dialogue限定・#100/#102)のターンでは、トリガー元の
+              ホットスポットを□で強調する(DESIGN.md「探索シーン」節「NPC直接発話の描画」)。
+              会話状態ではホットスポット自体(実<button>)をDOMに置かない方針(#52 Phase4.7・
+              T047)を維持したまま、位置だけ再現した装飾用の□マーカーを重ねる(非対話・
+              aria-hidden・pointer-events-none。実ホットスポットの□マーカーと同じ見た目に
+              するため同じクラスを使う)。マーカーの位置は背景の箱の座標系(%指定)に依存するため
+              箱の中に残す(会話フレーム自体は#108/#110で箱の外=下記へ移動した)。 */}
+          {conversation && currentTurn && isNpcTurn && (
+            <div
+              aria-hidden="true"
+              data-testid="npc-hotspot-marker"
+              style={{
+                left: `${conversation.hotspotPosition[0] * 100}%`,
+                top: `${conversation.hotspotPosition[1] * 100}%`,
+              }}
+              className="border-hotspot-highlight ring-hotspot-highlight/50 pointer-events-none absolute z-10 min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 ring-3"
+            />
+          )}
 
           {/* アクションシート: 複数actionを持つホットスポット用(固定順・並べ替えない)。中央への
               オーバーレイ化・選択肢ボタン半透明80%・「戻る」選択肢の必須化は#52 追補・代表FB
@@ -815,6 +778,54 @@ export function SceneExplorer({
             </div>
           )}
         </div>
+
+        {/* 会話状態(T047): 調査結果/dangerの教育的フィードバック(自身のconversation)、
+            または呼び出し側の会話(conversationSlot、探索完了→解決への誘導)を排他的に
+            表示する。背景シーンは暗転させずそのまま保持する(DESIGN.md「探索シーン」節)。
+            #108/#110: 立ち絵の拡大(デスクトップ240×320px・モバイル120×160px)に伴い、
+            背景の箱に`absolute inset-0`で重畳する形から、箱の**直後の兄弟要素**として
+            通常のドキュメントフローに置く形に変更した(会話フレーム側のコメント参照)。
+            箱の中の右上ボタン群・ホットスポットと重ならなくなる。
+            多ターン化(#100/#102): conversation.turns[conversationTurnIndex]が現在のターン。
+            最終ターンでない間はonDismiss/onEscapeで「次の行へ」進め(advanceConversationTurn)、
+            最終ターンでのみ会話を閉じる(closeConversation)。onEscapeは常にcloseConversationに
+            固定する(onDismissを「次の行へ」に流用してもEscapeだけは常に閉じられるように、
+            conversation-frame.tsxのonEscape JSDoc参照)。 */}
+        {conversation && currentTurn ? (
+          // 「閉じる」ボタンは置かず、会話ウィンドウ全体をクリック/タップで閉じる(または
+          // 次の行へ進める)(#52 Phase4.7 追補・T048、DESIGN.md「探索シーン」節
+          // 「会話ウィンドウ」)。onDismissを指定すると、タイプライターの全文表示前の
+          // クリック/タップ/Enter/Spaceはスキップ、全文表示後の同操作でonDismissを呼ぶ
+          // (2段階、ConversationFrame側の実装参照)。カード閲覧(旧・会話ウィンドウ内の
+          // ?ボタン)は右上の「ヒント確認」に統合したため、children はもう調査結果の
+          // 文脈行のみで、操作要素を持たない(閉じる操作とホットスポット操作が競合しないよう、
+          // 会話状態ではホットスポット自体をそもそもDOMに置かない=上記の分岐と併せて安全)。
+          <ConversationFrame
+            layout="overlay"
+            speaker={currentTurn.speaker}
+            // 左右2枠の並び(#108/#110): 会話1つ(=このconversationオブジェクト)ぶんの
+            // 発話者履歴。conversationは呼び出し側(runAction)が新しい調査結果/danger
+            // ごとに新規生成するため、ここで並びのリセット(「探索の会話1つの開始」)が
+            // 自然に表現される(src/ui/lib/two-slot-frame.ts参照)。
+            speakerHistory={conversation.turns
+              .slice(0, conversationTurnIndex + 1)
+              .map((t) => t.speaker)}
+            line={currentTurn.line}
+            expression={currentTurn.expression}
+            onDismiss={isLastTurn ? closeConversation : advanceConversationTurn}
+            onEscape={closeConversation}
+          >
+            <p className="text-muted-foreground text-xs">
+              {conversation.kind === 'collect'
+                ? `${conversation.hotspotLabel}を調べた結果`
+                : `${conversation.hotspotLabel}を操作した結果`}
+            </p>
+          </ConversationFrame>
+        ) : conversationSlot ? (
+          // idはisWrapUpVisibleのuseEffectが最初の操作可能要素を探すためのフック
+          // (上記コメント参照)。
+          <div id={conversationSlotId}>{conversationSlot}</div>
+        ) : null}
       </div>
 
       {/* 「調査ポイント一覧」トグルパネル(#66→T047でトグル化)。中身は呼び出し側

@@ -234,19 +234,26 @@ describe('ConversationFrame(#64/T042 タイプライター表示)', () => {
   })
 
   describe('layout="overlay"(探索の会話オーバーレイ・#52・T047)', () => {
-    it('絶対配置のオーバーレイとして両立ち絵と会話ウィンドウを描画し、タイプライター等の挙動はstackedと同じ', () => {
+    it('会話フレームの外枠を持ち、タイプライター等の挙動はstackedと同じ', () => {
       render(
-        <ConversationFrame speaker="橘" line={LINE} layout="overlay">
+        <ConversationFrame
+          speaker="橘"
+          speakerHistory={['霧島', '橘']}
+          line={LINE}
+          layout="overlay"
+        >
           <button type="button">閉じる</button>
         </ConversationFrame>,
       )
 
-      // 絶対配置の外枠を持つ(scene-explorer.tsxの`position: relative`な背景の箱に重ねる前提)。
+      // 呼び出し側(scene-explorer.tsx/intro-screen.tsx)が背景の箱の直後に配置する前提の
+      // 外枠を持つ(#108/#110で`absolute inset-0`による箱への重畳から変更)。
       const skipButton = screen.getByRole('button', { name: LINE })
-      const overlayRoot = skipButton.closest('.absolute.inset-0')
+      const overlayRoot = skipButton.closest('[data-testid="conversation-frame-overlay"]')
       expect(overlayRoot).not.toBeNull()
 
-      // 霧島=左・橘=右は変わらず、話者(橘)のみフルカラー・もう一方はグレーアウトのまま。
+      // 左右2枠の入れ替わり方式(#108): 霧島が先に話したため左、橘は画面にいない人として
+      // 右に入る。話者(橘)のみフルカラー・もう一方はグレーアウト。
       expect(screen.getByAltText('霧島（待機中）')).toBeInTheDocument()
       expect(screen.getByAltText('橘（発話中）')).toBeInTheDocument()
 
@@ -369,31 +376,146 @@ describe('ConversationFrame(#64/T042 タイプライター表示)', () => {
     })
   })
 
-  describe('layout="intro"(導入の対策室レイアウト・#100/#102)', () => {
-    it('霧島=左・橘=右に加えて小鳥遊を中央後方に1体追加した3枠を描画する', () => {
-      render(<ConversationFrame speaker="霧島" line={LINE} layout="intro" />)
+  describe('左右2枠の入れ替わり方式(speakerHistory・#108/#110)', () => {
+    it('speakerHistory省略時は履歴なし([speaker]相当)として扱い、話者が左1枠だけに入る', () => {
+      render(<ConversationFrame speaker="霧島" line={LINE} />)
       expect(screen.getByAltText('霧島（発話中）')).toBeInTheDocument()
-      expect(screen.getByAltText('橘（待機中）')).toBeInTheDocument()
-      expect(screen.getByAltText('小鳥遊（待機中）')).toBeInTheDocument()
+      expect(screen.queryByAltText('橘（待機中）')).not.toBeInTheDocument()
+      // 空いている右枠は同寸法の不可視プレースホルダーで埋め、位置がずれないようにする
+      // (data-slot="empty"、DESIGN.md「左右2枠の入れ替わり方式」節「枠の位置そのものは
+      // 動かさず」)。
+      expect(document.querySelector('[data-slot="empty"]')).not.toBeNull()
     })
 
-    it('小鳥遊が話者のときは小鳥遊がフルカラー、他2名がグレーアウトする(発話者以外は全員グレーアウト)', () => {
-      render(<ConversationFrame speaker="小鳥遊" line={LINE} layout="intro" />)
-      expect(screen.getByAltText('小鳥遊（発話中）')).toBeInTheDocument()
-      expect(screen.getByAltText('霧島（待機中）')).toBeInTheDocument()
-      expect(screen.getByAltText('橘（待機中）')).toBeInTheDocument()
+    it('speakerHistoryを渡すと、最初に話した人が左に入り、後から話した画面にいない人が右に入れ替わりで入る', () => {
+      render(<ConversationFrame speaker="橘" speakerHistory={['霧島', '橘']} line={LINE} />)
+      const leftPortrait = document.querySelector('[data-slot="left"] img')
+      const rightPortrait = document.querySelector('[data-slot="right"] img')
+      expect(leftPortrait).toHaveAttribute('alt', '霧島（待機中）')
+      expect(rightPortrait).toHaveAttribute('alt', '橘（発話中）')
+    })
+
+    it('画面にいる人(既に枠にいる)が再度話すと、位置はそのままカラーが入れ替わる', () => {
+      render(
+        <ConversationFrame speaker="霧島" speakerHistory={['霧島', '橘', '霧島']} line={LINE} />,
+      )
+      const leftPortrait = document.querySelector('[data-slot="left"] img')
+      const rightPortrait = document.querySelector('[data-slot="right"] img')
+      expect(leftPortrait).toHaveAttribute('alt', '霧島（発話中）')
+      expect(rightPortrait).toHaveAttribute('alt', '橘（待機中）')
+    })
+
+    it('3人目(画面にいない人)が話すと、直前の話者ではない方の枠と入れ替わる(代表の例: A→B→A→C)', () => {
+      render(
+        <ConversationFrame
+          speaker="小鳥遊"
+          speakerHistory={['霧島', '橘', '霧島', '小鳥遊']}
+          line={LINE}
+        />,
+      )
+      const leftPortrait = document.querySelector('[data-slot="left"] img')
+      const rightPortrait = document.querySelector('[data-slot="right"] img')
+      expect(leftPortrait).toHaveAttribute('alt', '霧島（待機中）')
+      expect(rightPortrait).toHaveAttribute('alt', '小鳥遊（発話中）')
     })
   })
 
-  describe('NPC直接発話(speakerがConversationSpeakerオブジェクト・#100/#102)', () => {
-    it('speakerに{npc}を渡すと、名札にnpcの値がそのまま表示され、既知の立ち絵は全員グレーアウトする', () => {
-      render(<ConversationFrame speaker={{ npc: '中野' }} line={LINE} layout="overlay" />)
+  describe('NPC直接発話(speakerがConversationSpeakerオブジェクト・#100/#102、#108で2枠へ統一)', () => {
+    it('speakerに{npc}を渡すと、名札にnpcの値がそのまま表示され、現在枠にいる立ち絵は両方グレーアウトする(枠は動かさない)', () => {
+      render(
+        <ConversationFrame
+          speaker={{ npc: '中野' }}
+          speakerHistory={['霧島', '橘', { npc: '中野' }]}
+          line={LINE}
+          layout="overlay"
+        />,
+      )
       // 名札(会話ウィンドウ左上のピル)にはnpcの値がそのまま表示される(色だけに頼らない、WCAG 1.4.1)。
       expect(screen.getAllByText('中野').length).toBeGreaterThan(0)
-      // 霧島・橘のどちらも発話者に一致しない(=全員グレーアウト)。
+      // NPC発話時は枠を動かさず、既に枠にいる霧島・橘の両方がグレーアウトする。
       expect(screen.getByAltText('霧島（待機中）')).toBeInTheDocument()
       expect(screen.getByAltText('橘（待機中）')).toBeInTheDocument()
       expect(screen.queryByAltText(/（発話中）/)).not.toBeInTheDocument()
+    })
+
+    it('NPCが最初の発話(履歴なし)では立ち絵は描画されない(まだ誰も枠にいない)', () => {
+      render(<ConversationFrame speaker={{ npc: '中野' }} line={LINE} layout="overlay" />)
+      expect(screen.getAllByText('中野').length).toBeGreaterThan(0)
+      expect(screen.queryByAltText(/霧島|橘|小鳥遊/)).not.toBeInTheDocument()
+    })
+  })
+
+  describe('dismissAnywhere(画面全体クリックでの進行・#108/#110・導入専用)', () => {
+    // 他のonDismiss系テストと同様、タイプライターの実タイマー進行によるフレークを避けるため
+    // fake timersに固定する(このdescribe内はタイマーを実際には進めない=即時クリックのみ検証)。
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('dismissAnywhere指定時、会話ウィンドウ以外(背景・立ち絵を含む外枠)のクリックでも2段階操作(スキップ→次へ)が働く', () => {
+      const onDismiss = vi.fn()
+      render(
+        <ConversationFrame
+          speaker="霧島"
+          line={LINE}
+          layout="overlay"
+          onDismiss={onDismiss}
+          onEscape={() => {}}
+          dismissAnywhere
+        />,
+      )
+      const overlayRoot = document.querySelector(
+        '[data-testid="conversation-frame-overlay"]',
+      ) as HTMLElement
+      const conversationWindow = screen.getByRole('button', { name: LINE })
+
+      // 1回目: ウィンドウ以外(外枠)のクリックはまずスキップ(全文表示)。
+      fireEvent.click(overlayRoot)
+      expect(onDismiss).not.toHaveBeenCalled()
+      expect(screen.getByText(LINE).tagName).toBe('P')
+
+      // 2回目: 全文表示後の外枠クリックでonDismissが呼ばれる。
+      fireEvent.click(overlayRoot)
+      expect(onDismiss).toHaveBeenCalledTimes(1)
+
+      // 外枠クリック後もキーボード操作を続けられるよう、ウィンドウへフォーカスが戻る。
+      expect(document.activeElement).toBe(conversationWindow)
+    })
+
+    it('会話ウィンドウ自体のクリックは外枠のonClickへ伝播せず、1回のクリックで2重発火しない', () => {
+      const onDismiss = vi.fn()
+      render(
+        <ConversationFrame
+          speaker="霧島"
+          line={LINE}
+          layout="overlay"
+          onDismiss={onDismiss}
+          onEscape={() => {}}
+          dismissAnywhere
+        />,
+      )
+      const conversationWindow = screen.getByRole('button', { name: LINE })
+      // 1回目: ウィンドウ自体のクリックでスキップのみ(2重発火してonDismissまで呼ばれない)。
+      fireEvent.click(conversationWindow)
+      expect(onDismiss).not.toHaveBeenCalled()
+      expect(screen.getByText(LINE).tagName).toBe('P')
+    })
+
+    it('dismissAnywhereを指定しない場合、ウィンドウ以外のクリックでは何も起きない', () => {
+      const onDismiss = vi.fn()
+      render(
+        <ConversationFrame speaker="霧島" line={LINE} layout="overlay" onDismiss={onDismiss} />,
+      )
+      const overlayRoot = document.querySelector(
+        '[data-testid="conversation-frame-overlay"]',
+      ) as HTMLElement
+      fireEvent.click(overlayRoot)
+      expect(onDismiss).not.toHaveBeenCalled()
+      expect(screen.queryByText(LINE)).not.toHaveProperty('tagName', 'P')
     })
   })
 

@@ -301,11 +301,14 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
 
       // 会話状態: ホットスポットはDOMに存在せず、立ち絵(名札)と会話ウィンドウが出る。
       // 会話ウィンドウには専用の「閉じる」ボタンは無い(T048。ウィンドウ自体が
-      // クリック/タップ可能な1つの操作領域になっている)。
+      // クリック/タップ可能な1つの操作領域になっている)。左右2枠の入れ替わり方式
+      // (#108/#110)では、このテストセッションで最初に話したのは橘(証言=人に聞くの既定話者)
+      // のみのため、橘だけが左枠に入り、霧島はまだどちらの枠にも入っていない
+      // (旧・霧島=左/橘=右の固定2枠とは異なる)。
       expect(screen.queryByRole('button', { name: /経理担当のPC（PC）/ })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: /田中さん（人物）/ })).not.toBeInTheDocument()
-      expect(screen.getAllByText('霧島').length).toBeGreaterThan(0)
       expect(screen.getAllByText('橘').length).toBeGreaterThan(0)
+      expect(screen.queryByAltText(/霧島/)).not.toBeInTheDocument()
       // 右上のボタン群(「ヒント確認」「調査ポイント一覧」)は探索・会話のどちらでも常時表示される
       // (発見性の担保。T048で不透明化・「ヒント確認」を会話ウィンドウ内から移設した)。
       expect(screen.getByRole('button', { name: '調査ポイント一覧' })).toBeInTheDocument()
@@ -779,12 +782,14 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
         await user.click(window1)
         expect(screen.queryByText(line1)).not.toBeInTheDocument()
 
-        // 2ターン目: NPC「中野」の直接発話。霧島・橘の両立ち絵がグレーアウトし、
-        // 名札には「中野」がそのまま表示される(名札=霧島/橘ではない)。
+        // 2ターン目: NPC「中野」の直接発話。左右2枠の入れ替わり方式(#108/#110)では、
+        // ここまでに実際に話したのは霧島のみ(左枠)のため、橘はまだどちらの枠にも
+        // 入っていない(旧・霧島=左/橘=右の固定2枠とは異なる)。枠は動かさず霧島の枠が
+        // グレーアウトし、名札には「中野」がそのまま表示される(名札=霧島/橘ではない)。
         const line2 = '取引先からの見積依頼だと思って、普通に開いてしまって……'
         expect(await screen.findByText(line2)).toBeInTheDocument()
         expect(screen.getByAltText('霧島（待機中）')).toBeInTheDocument()
-        expect(screen.getByAltText('橘（待機中）')).toBeInTheDocument()
+        expect(screen.queryByAltText(/橘/)).not.toBeInTheDocument()
         expect(screen.queryByAltText(/（発話中）/)).not.toBeInTheDocument()
         expect(screen.getAllByText('中野').length).toBeGreaterThan(0)
         // トリガー元のホットスポットが□で強調される(装飾用マーカー、非対話)。
@@ -795,10 +800,14 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
         await user.click(window2)
         expect(screen.queryByText(line2)).not.toBeInTheDocument()
 
-        // 3ターン目(最終): 橘。NPCターンではないため□マーカーは消える。
+        // 3ターン目(最終): 橘。NPCターンではないため□マーカーは消える。NPCの前に話していた
+        // 支援役(霧島)を「直前の話者」として扱うため、画面にいない橘は直前の話者ではない
+        // 方の枠(右、空いていたのでそこ)に入り、霧島はグレーアウトする(#108/#110)。
         const line3 = '添付ファイルの拡張子は確認しましたか？'
         expect(await screen.findByText(line3)).toBeInTheDocument()
         expect(screen.queryByTestId('npc-hotspot-marker')).not.toBeInTheDocument()
+        expect(screen.getByAltText('霧島（待機中）')).toBeInTheDocument()
+        expect(screen.getByAltText('橘（発話中）')).toBeInTheDocument()
 
         const window3 = screen.getByRole('button', { name: line3 })
         await user.click(window3)
