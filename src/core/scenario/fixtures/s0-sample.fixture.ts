@@ -17,7 +17,7 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const s0SampleFixture: Scenario = {
-  schema_version: '0.7.0',
+  schema_version: '0.8.0',
   id: 's0-sample',
   title: 'アルファテック社 顧客データ流出事件(スキーマサンプル)',
   status: 'sample',
@@ -246,7 +246,8 @@ export const s0SampleFixture: Scenario = {
           {
             text: 'ネットワーク境界への新たなファイアウォール追加',
             is_correct: false,
-            reply: '境界を固めるだけでは今回の原因は防げません。根本原因に効く対策を選んでください。',
+            reply:
+              '境界を固めるだけでは今回の原因は防げません。根本原因に効く対策を選んでください。',
           },
         ],
         explanations: [

@@ -17,7 +17,7 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const s3EcCardLeakFixture: Scenario = {
-  schema_version: '0.7.0',
+  schema_version: '0.8.0',
   id: 's3-ec-card-leak',
   title: 'ECサイトのカード情報漏洩',
   status: 'draft',
@@ -128,7 +128,7 @@ export const s3EcCardLeakFixture: Scenario = {
       hotspots: [
         {
           object_type: 'pc',
-          position: [0.4, 0.65],
+          position: { landscape: [0.4, 0.65] },
           label: 'EC運営担当者の端末',
           actions: [
             {
@@ -156,7 +156,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.2, 0.4],
+          position: { landscape: [0.2, 0.4] },
           label: 'EC運営担当者',
           actions: [
             {
@@ -170,7 +170,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.78, 0.55],
+          position: { landscape: [0.78, 0.55] },
           label: '管理部門長',
           actions: [
             {
@@ -184,7 +184,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'book',
-          position: [0.6, 0.16],
+          position: { landscape: [0.6, 0.16] },
           label: '資料棚',
           actions: [
             {
@@ -205,9 +205,11 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: [0.95, 0.5],
+          position: { landscape: [0.95, 0.5] },
           label: 'システム運用ルームへの扉',
-          actions: [{ kind: 'goto', scene_id: 'scene-ops-room', label: 'システム運用ルームへ移動する' }],
+          actions: [
+            { kind: 'goto', scene_id: 'scene-ops-room', label: 'システム運用ルームへ移動する' },
+          ],
         },
       ],
     },
@@ -218,7 +220,7 @@ export const s3EcCardLeakFixture: Scenario = {
       hotspots: [
         {
           object_type: 'device',
-          position: [0.18, 0.45],
+          position: { landscape: [0.18, 0.45] },
           label: '運用監視端末',
           actions: [
             {
@@ -239,7 +241,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.51, 0.43],
+          position: { landscape: [0.51, 0.43] },
           label: '開発委託先の担当者',
           prompt: '開発委託先「何かお困りですか？」',
           actions: [
@@ -255,7 +257,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: [0.5, 0.9],
+          position: { landscape: [0.5, 0.9] },
           label: '執務室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-office', label: '執務室へ移動する' }],
         },
@@ -444,7 +446,8 @@ export const s3EcCardLeakFixture: Scenario = {
           {
             text: '決済ページを一時停止するかカード決済の受付を止め、改ざんされたファイルと通信先を保全した上で、脆弱性のあるプラグインを修正してから正規のファイルに戻す',
             is_correct: true,
-            reply: 'それが正しい流れだ。証拠を保全しつつ攻撃の経路を断てば、被害の全容も後から検証できる。',
+            reply:
+              'それが正しい流れだ。証拠を保全しつつ攻撃の経路を断てば、被害の全容も後から検証できる。',
           },
           {
             text: '気づかれないよう不正なスクリプトだけをそっと削除し、サイトの運営は普段どおり続ける',
@@ -463,7 +466,8 @@ export const s3EcCardLeakFixture: Scenario = {
           '電源を落とす・ファイルを消す・様子を見るといった対応で、それぞれ何が失われ、何が止まらないままなのかを整理しよう。',
           '証拠保全と被害の拡大防止は両立できる。決済の受付を止めて送信を断ち切りつつ、改ざんされたファイルと通信先はそのまま保全し、原因(脆弱なプラグイン)を修正してから正規の状態に戻す—この順番が鉄則だ。',
         ],
-        consult_hint: '改ざんされたファイル・通信先の保全の必要性と、脆弱性が残ったまま放置するリスクを整理して提示する。',
+        consult_hint:
+          '改ざんされたファイル・通信先の保全の必要性と、脆弱性が残ったまま放置するリスクを整理して提示する。',
       },
       {
         id: 'q-response-policy',

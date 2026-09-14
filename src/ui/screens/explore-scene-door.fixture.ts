@@ -18,7 +18,7 @@ import { scenarioSchema } from '@/core/model'
 import type { Scenario } from '@/core/model'
 
 const rawScenario: Scenario = {
-  schema_version: '0.7.0',
+  schema_version: '0.8.0',
   id: 's-test-scene-door',
   title: 'ドア移動UIテスト用マップ',
   status: 'draft',
@@ -75,7 +75,7 @@ const rawScenario: Scenario = {
           // 系統をまたぐ統合ホットスポット(#78・T046-ui-data): 人物(証言)＋機器(ログ)を
           // 1つに束ね、prompt(挨拶台詞)をアクションシート見出しに表示する。
           object_type: 'person',
-          position: [0.5, 0.4],
+          position: { landscape: [0.5, 0.4] },
           label: 'サーバ管理者',
           prompt: 'サーバ管理者「どうしましたか？」',
           actions: [
@@ -97,7 +97,7 @@ const rawScenario: Scenario = {
         {
           // ドア(#78・T046-ui-data): 通常不可視・単一goto action=即座に移動する。
           object_type: 'door',
-          position: [0.92, 0.5],
+          position: { landscape: [0.92, 0.5] },
           label: '執務室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-b', label: '執務室へ移動する' }],
         },
@@ -110,7 +110,7 @@ const rawScenario: Scenario = {
       hotspots: [
         {
           object_type: 'door',
-          position: [0.08, 0.5],
+          position: { landscape: [0.08, 0.5] },
           label: 'サーバ室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-a', label: 'サーバ室へ移動する' }],
         },
