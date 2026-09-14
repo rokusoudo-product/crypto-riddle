@@ -5,7 +5,8 @@ feature: 001-mvp
 status: active
 created: 2026-08-06
 updated: 2026-09-13 (Phase 4.9 追加: 会話フレーム左右2枠入れ替わり・立ち絵拡大・導入クリック送り〔#108/#110〕。T053-docsは#108で完了・T054-uiは後続Issue。
-  Phase 4.10 追加: 背景を画面の向きで切替・重ね配置一般化・話者枠・対策室背景新規作成〔#119〜#124〕。T055-docsは本Issue（#119）・T056-core以降は後続Issue)
+  Phase 4.10 追加: 背景を画面の向きで切替・重ね配置一般化・話者枠・対策室背景新規作成〔#119〜#124〕。T055-docsは本Issue（#119）・T056-core以降は後続Issue。
+  2026-09-14 Phase 4.11 追加: サイバーパンク配色・トーン改訂と解決画面の中央選択パネル構成〔#132〜#143〕。T061-docsは本Issue（#132）・T062-ui以降は後続Issue)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -528,6 +529,45 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 ---
 
+## Phase 4.11: サイバーパンク UI 刷新（#132〜#143）
+
+> 2026-09-14 の改善レビューで、代表から解決画面（会話モード）のモック画像と変更メモが出た（配色をサイバーパンク風に全面変更・画面構成をサンプルに合わせる・選択肢の強調表示／相談ボタンの表示改善／解決中のXPバー／ゲーム内の時刻表示）。**docs 先行 Issue #132**（本 Issue・コード変更なし。例外: コントラスト検証スクリプト `scripts/check-contrast.mjs` のみ新規追加）で DESIGN/spec/characters/tasks の仕様を改訂し、承認ゲートを経たうえで実装 Issue（#133〜#143）に進む。#13（カラートークン AA 実測）は #132 に含めて完了させる。詳細仕様は `DESIGN.md`「基本方針」「カラートークン」「半透明（ガラス風）パネル」「会話フレーム」「探索シーン」「ゲーム内時刻」「縦長（9:16）の構成」「アセット」各節、`docs/design-contrast.md`。
+
+- [ ] **T061-docs** DESIGN/spec/characters/tasks へのサイバーパンク改訂の反映（#132・本 Issue・docs のみ。例外: コントラスト検証スクリプト）
+  - `DESIGN.md`: トーン&マナー・単一ダーク文脈への統一・カラートークン全面改訂（CSS変数対応表を含む）・半透明パネルの最小不透明度と合成検証規則・解決⑤の中央選択パネル構成・名前箱（立ち絵の下・初期サイズ・NPC発話時の位置）・選択肢5状態・相談ボタン・XPバー・ゲーム内時刻・縦長（9:16）の構成表・アセット節（作り直し方針・色名翻訳例・立ち絵のCSS補正）を改訂。
+  - `docs/design-contrast.md`（新設）: 全トークンペアの AA コントラスト検証結果・旧→新トークン対応（#13 の受け入れ基準を満たす）。
+  - `specs/001-mvp/spec.md`・`docs/characters.md`: トーン・世界観の記述を追随（人物設定・関係性は変更しない）。
+  - `specs/001-mvp/tasks.md`: 本 Phase 4.11 を追加。
+  - 完了条件: 代表が改訂内容を承認（PR マージ）。`docs/design-contrast.md` の全ペアが基準を満たす（未達は値修正または使用禁止の明記）。**docs/DESIGN.md/specs は `.prettierignore` の対象のため prettier を掛けない**。新規スクリプト（`scripts/check-contrast.mjs`）のみ `npx prettier --check` を通す。
+- [ ] **T062-ui** カラートークンと半透明パネルの刷新・全画面（#133・依存: T061-docs のマージ・代表承認）
+  - `src/index.css` の色トークンを #132 確定値へ置換（success/warning/info/error の新規 CSS 変数追加を含む）。半透明パネルの共通スタイルを会話ウィンドウ・アクションシート・カードドロワー等に適用。
+  - 完了条件: 全画面で新配色を確認（横長・縦長のスクリーンショットを秘書が確認）。`npm run test`/`typecheck`/`lint`/`build`/Playwright（axe含む）成功。
+- [ ] **T063-core** シナリオスキーマ 0.9.0 ゲーム内時刻フィールドの追加（#136・依存: T061-docs のマージ・代表承認。T062-ui と並行可）
+  - 導入・探索の各シーン・解決に `HH:MM` の省略可能フィールドを追加。`schema_version` 0.8.0→0.9.0。
+  - 完了条件: 新旧データで zod 検証が通り `npm run build:data` 成功。**スキーマ差分は commit 前に報告して停止**。
+- [ ] **T064-ui** 解決画面の中央選択パネルと選択肢の強調（#134・依存: T062-ui のマージ）
+  - 問い・選択肢・相談ボタンを中央選択パネルへ移設。5状態（通常/ホバー/フォーカス/押下/無効）を実装。`prefers-reduced-motion` 対応。
+  - 完了条件: 横長・縦長のS1解決の撮影を秘書が確認。テスト・axe成功。
+- [ ] **T065-ui** 相談ボタンの改善・解決中のXPバー（#135・依存: T062-ui のマージ）
+  - 残り回数カウンタ・XP減警告アイコン（lucide-react）・aria-label。XPバー（見込みXP）を `save-integration.ts` の式と共有する純粋関数で実装。
+  - 完了条件: XP計算の一致を確認する単体テストがある。横長・縦長の撮影を秘書が確認。
+- [ ] **T066-ui** 会話フレームの名前箱を立ち絵の下へ移動（#138・依存: T062-ui のマージ）
+  - 話者名を立ち絵下の名前箱（#132 初期サイズ）に表示。会話ウィンドウ内の名札ピルを廃止。NPC発話時は会話ウィンドウ上端左に同じ見た目で表示。
+  - 完了条件: 左右2枠入れ替わりの既存単体テストが通る。横長・縦長の撮影を秘書が確認。
+- [ ] **T067-ui** ゲーム内時刻の表示（#137・依存: T063-core のマージ）
+  - `HH:MM` を #132 で定めた位置（箱右下、探索④のみ会話ウィンドウ帯右上端）に表示。
+  - 完了条件: 横長・縦長で時刻表示が他要素と重ならないことを確認。
+- [ ] **T068-img** 対策室背景の作り直し（横・縦）（#139・独立・依存: 代表の見本画像承認）
+  - 窓・壁のモニタ群・ホワイトボードのある明るい部屋へ。4人分の机とPCは維持、お茶の小物は紅茶のティーポットとティーカップに変更。
+  - 完了条件: 代表承認画像を `assets/backgrounds/` に配置、`DESIGN.md` P-12 を更新。
+- [ ] **T069-img** 探索背景12枚の作り直し（#140〜#143・依存: T061-docs のマージ・代表承認）
+  - S1〜SL・量産マップの探索背景をサイバーパンク配色で作り直す（`DESIGN.md`「アセット」節の色名翻訳方針に従う）。
+  - 完了条件: 各マップの背景が代表承認画像に差し替わり、`DESIGN.md` アセット節を更新。
+
+**チェックポイント（Phase 4.11 完了後）**: 代表が S1 通しプレイ（横・縦双方の画面）でサイバーパンク UI を最終確認する。
+
+---
+
 ## Phase 5: マップ量産（plan §11-5）= プロダクション
 
 > **⚠️ 量産ゲート（#42・#52）**: **③''''（2026-09-11）の「MVP としては OK」で量産ゲートは開放可**。Phase 4.5（会話モード）・4.6（背景シーン化）・4.7（会話フレーム化）は main マージ済。**T046（ドア動線・管理者統合）は量産と並行**でよいが、**`goto` スキーマ（T046-core・0.6.0）は量産 YAML の執筆開始前に main へ入れる**（量産マップは複数シーンでドア移動を最初から使うため）。旧フォーマット（`required_card_ids`／背景なし／台詞なし）は全て書き直しになるため、量産は schema 0.6.0 確定後の様式で開始する。各量産マップには**背景2〜3枚（IMAGE_WORKFLOW）**を各制作 Issue に含める。着手可否（ゲートを開けるか）は代表判断。
@@ -585,7 +625,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#4](https://github.com/rokusoudo-product/crypto-riddle/issues/4) 用語カードマスタ＋習得機構 | closed（完了・PR #20、2026-08-07） | **T023**（T024 が後続） | 成果物: `schemas/term_card.schema.json`/`schemas/quiz_misuse.schema.json`（暫定, T005で削除済み）・`terms/terms_core.yaml`（45語）・`terms/quiz_misuse_sample.yaml`・`scripts/validate_terms.py`（T010で削除済み）・`docs/term_cards.md` |
 | [#5](https://github.com/rokusoudo-product/crypto-riddle/issues/5) シナリオS1完全版 | closed（完了・PR #40、2026-09-10） | **T015・T016・T017**（T018 で会話モード刷新を決定） | 成果物: `scenarios/s1-targeted-email-intrusion.yaml`・S1 縦スライス。解決パートは #42（Phase 4.5・T035）で会話モードへ移植 |
 | [#6](https://github.com/rokusoudo-product/crypto-riddle/issues/6) S2-S8 バックログ | future | **T019〜T021** | フォーマット確定後に個別 Issue 切り出し。MVP は計4本 |
-| [#13](https://github.com/rokusoudo-product/crypto-riddle/issues/13) カラートークン AA 実測 | future | **T012** に合流 | 採用時は T012 の完了条件に AA 実測値の確定を含める |
+| [#13](https://github.com/rokusoudo-product/crypto-riddle/issues/13) カラートークン AA 実測 | future→#132 で検証完了（クローズは代表判断） | **T061-docs**（#132）に合流 | 旧「T012 に合流」を改訂。サイバーパンク改訂（#132）で AA 実測を実施し `docs/design-contrast.md` に確定値・検証結果を記載。`scripts/check-contrast.mjs` で再実行可能 |
 | [#14](https://github.com/rokusoudo-product/crypto-riddle/issues/14) IPA 過去問の出典表記規則 | future | **T015 の前提** | 採用時は T015 より先に完了させる |
 | [#22](https://github.com/rokusoudo-product/crypto-riddle/issues/22) 分野タグ（subject_tags）の値集合統一 | proposal（本 PR マージで closed 予定・`Closes #22`） | **T005**（zod 移行と同時実施） | 案2（7種に統一・`ネットワーク基盤`を正式採用）を採用。決定理由は `specs/001-mvp/spec.md` §9 に記載。値集合の正本は `src/core/model/tags.ts` |
 | [#42](https://github.com/rokusoudo-product/crypto-riddle/issues/42) 解決パートを会話モードに刷新 | closed（ドキュメント改訂 PR マージ済み） | **T014 を supersede**・**Phase 4.5（T030〜T036）** | T018 プレイテスト由来。spec §8＝会話モード。実装は #44（T030〜T032, core）・#45（T033/T034, UI）で完了済み。#46（T035/T036, データ本執筆・結線）も実装完了（本PR、代表マージ待ち）でPhase 4.5が完了する |
