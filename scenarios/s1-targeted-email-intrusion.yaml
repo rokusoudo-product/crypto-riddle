@@ -37,7 +37,7 @@
 # 無線LAN)へ置き換えた(台詞・被害企業説明・カード本文・問2正解選択肢)。修正案ファイルは
 # 引き続き本リポジトリにコミットしない。
 
-schema_version: "0.8.0"
+schema_version: "0.9.0"
 id: s1-targeted-email-intrusion
 title: 標的型メールからの侵入
 status: reviewed

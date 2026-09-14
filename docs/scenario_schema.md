@@ -13,7 +13,10 @@ related:
   - scripts/build-data.ts（YAML→JSON ビルドパイプライン。T010）
 status: reviewed
 created: 2026-08-07
-updated: 2026-09-14（#101/PR #105 で zod 実装完了。schema_version 0.7.0 化・全 YAML/fixture の
+updated: 2026-09-15（§2.8 追加: ゲーム内時刻を表す省略可能な `game_time`（`HH:MM`・24時間表記）を
+  introSchema・sceneSchema・resolutionSchema にそれぞれ追加するスキーマ 0.9.0 の仕様を #136 で確定・
+  実装（`schema_version` を 0.8.0→0.9.0 に更新、全 YAML/fixture の値も反映。内容無変更）。UI 表示は
+  #137。2026-09-14: #101/PR #105 で zod 実装完了。schema_version 0.7.0 化・全 YAML/fixture の
   schema_version 更新（内容無変更）を含む。#103 のスコープが S1 データ本体の移植のみに変更されたことを
   §2.6 に反映。§2.7 追加: ホットスポット座標を横・縦の組にするスキーマ 0.8.0 の仕様を #119 で確定
   〔実装は #120〕。§2.7「`portrait` 省略時の表示」を「縦長の画面は常に9:16の箱」に改訂
@@ -88,7 +91,7 @@ scripts/
 
 | フィールド | spec 対応 | 説明 |
 |---|---|---|
-| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.8.0"`（ホットスポット座標を横・縦の組にする改訂、#119 で仕様確定・#120/PR #126 で zod 実装・全 YAML/fixture の値反映。詳細は §2.7。0.7.0=S1 会話フロー刷新、#100 で仕様確定・#101/PR #105 で zod 実装。詳細は §2.6） |
+| `schema_version` | - | このスキーマのバージョン(semver)。現行コードは `"0.9.0"`（ゲーム内時刻フィールド `game_time` の追加、#136 で仕様確定・zod 実装・全 YAML/fixture の値反映。詳細は §2.8。0.8.0=ホットスポット座標を横・縦の組にする改訂、#119 で仕様確定・#120/PR #126 で zod 実装・全 YAML/fixture の値反映。詳細は §2.7。0.7.0=S1 会話フロー刷新、#100 で仕様確定・#101/PR #105 で zod 実装。詳細は §2.6） |
 | `id` | - | マップID。**ファイル名(拡張子除く)と一致必須**(`validate-collection.ts` の `checkScenarioFilenames` がチェック) |
 | `title` | §4 | マップタイトル(事件名) |
 | `status` | - | `draft`/`reviewed`/`published`/`sample`。省略時 `draft` |
@@ -98,11 +101,11 @@ scripts/
 | `estimated_minutes` | US-1 | 想定プレイ時間(分)。目安10〜15分 |
 | `references` | FR-7 | 出典表記(§3 参照)。配列・省略可 |
 | `related_terms` | #4 | 用語カードマスタへの緩い参照(§6 参照) |
-| `intro` | §4.1 導入 | 背景・被害会社・サポート役の導入台詞 |
+| `intro` | §4.1 導入 | 背景・被害会社・サポート役の導入台詞。省略可能な `game_time`（ゲーム内時刻）を持つ（§2.8） |
 | `investigation_points` | §7 探索 | 調査ポイント(3系統)。**カードの出所の正**（`scenes` 有無に関わらず維持） |
-| `scenes` | §7.1 探索 | **背景シーン表示層（#52・T037 で追加・省略可）**: 背景アセット・複数シーン・ホットスポット。省略時は一覧表示（§2.5） |
+| `scenes` | §7.1 探索 | **背景シーン表示層（#52・T037 で追加・省略可）**: 背景アセット・複数シーン・ホットスポット。省略時は一覧表示（§2.5）。各シーンは省略可能な `game_time`（ゲーム内時刻）を持つ（§2.8） |
 | `cards` | §7 探索 | ヒントカード(正解・ダミーを含む) |
-| `resolution` | §8 解決 | **会話モード**（#42）: `cipher_stages`（暗号・維持／S1 は0件）＋ `questions[]`（問い列）。旧 `attack_identification`／`countermeasure` は `questions` へ統合（§2.4） |
+| `resolution` | §8 解決 | **会話モード**（#42）: `cipher_stages`（暗号・維持／S1 は0件）＋ `questions[]`（問い列）。旧 `attack_identification`／`countermeasure` は `questions` へ統合（§2.4）。省略可能な `game_time`（ゲーム内時刻）を持つ（§2.8） |
 
 ### 2.1 カード種別（7種で固定）
 
@@ -403,6 +406,60 @@ scenes:
   参照関係のチェック対象・ロジックは影響を受けない。
 - **`schema_version` を `0.8.0` に更新**（#120 で zod 実装・全 `scenarios/*.yaml`・fixture の値反映を
   同時に行う。手順は 0.4.0〜0.7.0 の版数追随と同様）。
+
+### 2.8 スキーマ 0.9.0（ゲーム内時刻フィールド `game_time` の追加・#136 で仕様確定・zod 実装完了）
+
+> **背景**: 2026-09-14 の改善レビューで、代表は「ゲーム内の時刻表示」（画面右下のタイムスタンプ）を
+> 採用した（`DESIGN.md`「ゲーム内時刻」節）。時刻はシナリオごと・場面ごとに異なる**データ**であり、
+> UI の定数ではなくスキーマに持たせる。UI 実装（表示位置・アイコン）は **UI Issue #137** の範囲で、
+> 本節（#136）は**スキーマへのフィールド追加のみ**を扱う。
+
+`introSchema`・`sceneSchema`・`resolutionSchema` に、省略可能な**ゲーム内時刻**フィールド
+`game_time` を追加する。
+
+```yaml
+intro:
+  # ...(background/victim_company/character_intros は §2 のまま)
+  game_time: "09:42"           # ゲーム内時刻(HH:MM・24時間表記・00:00〜23:59)。省略可
+
+scenes:
+  - id: scene-office
+    title: 執務室
+    background: bg-s1-office
+    game_time: "10:15"          # シーンごとに省略可(場面が進むにつれ時刻を進める演出に使う)
+    hotspots: [...]              # 構造は §2.5〜§2.7 のまま変更なし
+
+resolution:
+  cipher_stages: []
+  questions: [...]
+  clear_explanation: [...]
+  game_time: "11:30"            # 省略可
+```
+
+- **粒度（代表回答 2026-09-14）**: マップに1つではなく、**導入（`intro`）・探索の各シーン
+  （`scenes[]` の各要素）・解決（`resolution`）にそれぞれ1つ**を持たせる。場面が進むにつれて時刻が
+  進む演出（例: 導入09:42→執務室シーン10:15→サーバ室シーン10:40→解決11:30）をデータ側で表現できる。
+- **形式（代表回答 2026-09-14）**: `HH:MM` の**24時間表記に固定**する（例 `09:42`）。自由記述（例
+  「発覚から3時間後」）は採用しない。`00:00`〜`23:59` の範囲を正規表現
+  （`gameTimeSchema`、`src/core/model/common.ts`）で検証する。ゼロ埋め必須（`9:42` は不可）、秒は
+  持たない（`09:42:00` は不可）。
+- **フィールド名**: `game_time`（snake_case、既存フィールドの命名規則に合わせる）。`schema_version`
+  同様、時刻を表す複合語なので `_` で連結した。
+- **共有スキーマの置き場所**: `gameTimeSchema` は `intro`/`scenes`/`resolution` の3箇所で共有するため、
+  `scenario.ts` 内ではなく `src/core/model/common.ts`（`expressionSchema` 等と同じ、複数スキーマから
+  参照される共通定義の置き場所）に置く。
+- **`scenes[].background`（背景アセットID）とは独立**: `game_time` は表示専用のデータで、背景画像の
+  選択・ホットスポット座標など他のフィールドとは連動しない。
+- **すべて省略可能**: 既存4マップ（S1/S2/S3/SL）・サンプル（s0-sample）は、本 Issue の範囲では
+  `game_time` を書かずスキーマ更新のみを行う(**値の記入は #137**)。省略時、UI は時刻表示を出さない
+  想定（表示ロジックは #137）。
+- **表示先**: `DESIGN.md`「ゲーム内時刻」節。背景の箱の右下（探索④のみ会話ウィンドウ帯右上端。
+  「解決へ進む」ボタンとの衝突を避けるため）に、`lucide-react` の時計アイコン＋テキストで表示する
+  （UI 実装は #137）。
+- **整合性チェック**: `game_time` は表示専用の独立フィールドのため、`scenarioSchema` の
+  `superRefine` に新規チェックは追加しない。
+- **`schema_version` を `0.9.0` に更新**（#136 で zod 実装・全 `scenarios/*.yaml`・fixture の値反映を
+  同時に行う。値のみの機械的な置き換えで内容・構造は無変更。手順は 0.4.0〜0.8.0 の版数追随と同様）。
 
 ## 3. 出典表記（`references`）
 

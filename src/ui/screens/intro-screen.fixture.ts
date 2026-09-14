@@ -9,7 +9,7 @@ import type { Scenario } from '@/core/model'
 
 function buildRawScenario(id: string, background?: string) {
   return {
-    schema_version: '0.8.0' as const,
+    schema_version: '0.9.0' as const,
     id,
     title: '導入UIテスト用マップ',
     status: 'draft' as const,

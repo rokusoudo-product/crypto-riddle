@@ -4,7 +4,7 @@ import { scenarioSchema, type Scene, type Scenario } from './scenario.ts'
 
 function validScenario(): Scenario {
   return {
-    schema_version: '0.8.0',
+    schema_version: '0.9.0',
     id: 's0-sample',
     title: 'アルファテック社 顧客データ流出事件(テスト用)',
     status: 'sample',
@@ -635,17 +635,17 @@ describe('scenes[].hotspots[].actions collect の line/speaker(#52 Phase4.7/T043
   })
 })
 
-describe('schema_version 0.8.0(#119/#120)', () => {
-  it('reject: schema_version が旧版(0.7.0)を拒否する', () => {
+describe('schema_version 0.9.0(#136)', () => {
+  it('reject: schema_version が旧版(0.8.0)を拒否する', () => {
     const scenario = validScenario()
     // @ts-expect-error 意図的に旧バージョンを渡す
-    scenario.schema_version = '0.7.0'
+    scenario.schema_version = '0.8.0'
     expect(scenarioSchema.safeParse(scenario).success).toBe(false)
   })
 
-  it('正常系: schema_version が 0.8.0 を受理する', () => {
+  it('正常系: schema_version が 0.9.0 を受理する', () => {
     const scenario = validScenario()
-    expect(scenario.schema_version).toBe('0.8.0')
+    expect(scenario.schema_version).toBe('0.9.0')
     expect(scenarioSchema.safeParse(scenario).success).toBe(true)
   })
 })
@@ -1093,5 +1093,67 @@ describe('resolution.questions.explanations の union 化と小鳥遊ガード(0
     if (!result.success) {
       expect(result.error.issues.some((issue) => issue.message.includes('小鳥遊'))).toBe(true)
     }
+  })
+})
+
+describe('game_time(ゲーム内時刻, 0.9.0・#136)', () => {
+  it('正常系: intro/scenes/resolution のいずれも game_time を省略した場合を受理する', () => {
+    const scenario = validScenario()
+    scenario.scenes = validScenes()
+    expect(scenario.intro.game_time).toBeUndefined()
+    expect(scenario.scenes[0].game_time).toBeUndefined()
+    expect(scenario.resolution.game_time).toBeUndefined()
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: intro.game_time に 09:42 を指定した場合を受理する', () => {
+    const scenario = validScenario()
+    scenario.intro.game_time = '09:42'
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: scenes[].game_time に 09:42 を指定した場合を受理する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].game_time = '09:42'
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it('正常系: resolution.game_time に 09:42 を指定した場合を受理する', () => {
+    const scenario = validScenario()
+    scenario.resolution.game_time = '09:42'
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+  })
+
+  it.each(['9:42', '24:00', '09:60', '0942', '', '9:5', '09:042', '12:00:00', '正午'])(
+    'reject: intro.game_time が形式外の値(%s)を拒否する',
+    (value) => {
+      const scenario = validScenario()
+      scenario.intro.game_time = value
+      expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+    },
+  )
+
+  it('reject: scenes[].game_time が形式外の値(9:42)を拒否する', () => {
+    const scenario = validScenario()
+    const scenes = validScenes()
+    scenes[0].game_time = '9:42'
+    scenario.scenes = scenes
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('reject: resolution.game_time が形式外の値(24:00)を拒否する', () => {
+    const scenario = validScenario()
+    scenario.resolution.game_time = '24:00'
+    expect(scenarioSchema.safeParse(scenario).success).toBe(false)
+  })
+
+  it('境界: 00:00 と 23:59 を受理する', () => {
+    const scenario = validScenario()
+    scenario.intro.game_time = '00:00'
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
+    scenario.intro.game_time = '23:59'
+    expect(scenarioSchema.safeParse(scenario).success).toBe(true)
   })
 })

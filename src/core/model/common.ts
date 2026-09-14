@@ -59,3 +59,14 @@ export type NpcDialogueLine = z.infer<typeof npcDialogueLineSchema>
 /** 制作ステータス共通スキーマ。省略時は draft 扱い（呼び出し側で .default('draft') する）。 */
 export const productionStatusSchema = z.enum(['draft', 'reviewed', 'published'])
 export type ProductionStatus = z.infer<typeof productionStatusSchema>
+
+/**
+ * ゲーム内時刻(`HH:MM`・24時間表記、`00:00`〜`23:59`)。schema_version 0.9.0 で新設(#136)。
+ * 導入(introSchema)・探索の各シーン(sceneSchema)・解決(resolutionSchema)にそれぞれ省略可能な
+ * `game_time` として持たせる(DESIGN.md「ゲーム内時刻」節、docs/scenario_schema.md §2.8)。
+ * UI 表示(背景の箱右下・探索④のみ会話ウィンドウ帯右上端)は #137 の範囲。
+ */
+export const gameTimeSchema = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, {
+  message: 'game_time は HH:MM (24時間表記、00:00〜23:59) 形式である必要があります。',
+})
+export type GameTime = z.infer<typeof gameTimeSchema>

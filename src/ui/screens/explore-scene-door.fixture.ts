@@ -18,7 +18,7 @@ import { scenarioSchema } from '@/core/model'
 import type { Scenario } from '@/core/model'
 
 const rawScenario: Scenario = {
-  schema_version: '0.8.0',
+  schema_version: '0.9.0',
   id: 's-test-scene-door',
   title: 'ドア移動UIテスト用マップ',
   status: 'draft',
