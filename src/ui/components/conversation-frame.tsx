@@ -185,14 +185,18 @@ const PORTRAIT_BOX_RELATIVE_SIZE_CLASS: Record<BoxOrientation, string> = {
 }
 
 // 話者の枠(#119/#124): いま話している人の立ち絵カードを、フルカラー表示に加えて黒または白の
-// 枠線で囲む(DESIGN.md「会話フレーム」節「話者の枠」)。色は代表未決のため、index.cssの
-// --speaker-frame-black/--speaker-frame-whiteトークン経由で両方用意し、切り替えはこの定数
-// 1箇所で行う(PRに黒・白それぞれのスクリーンショットを添付し代表が選ぶ)。既定は黒。
-const SPEAKER_FRAME_COLOR: 'black' | 'white' = 'black'
-const SPEAKER_FRAME_RING_CLASS =
-  SPEAKER_FRAME_COLOR === 'black'
-    ? 'ring-4 ring-speaker-frame-black'
-    : 'ring-4 ring-speaker-frame-white'
+// 枠線で囲む(DESIGN.md「会話フレーム」節「話者の枠」)。index.cssの
+// --speaker-frame-black/--speaker-frame-whiteトークン経由で両方用意してあり、切り替えは
+// この定数1箇所で行う。代表決定(2026-09-14)により白に確定した。
+const SPEAKER_FRAME_COLOR: 'black' | 'white' = 'white'
+// `SPEAKER_FRAME_COLOR`をリテラル比較(===)で分岐すると、tscがconst初期化値からの
+// 制御フロー narrowing により反対側の分岐を「到達不能(no overlap)」と誤判定して
+// TS2367 を出す(値をどちらに変えても同様)。ルックアップテーブル参照にすることで回避する。
+const SPEAKER_FRAME_RING_CLASS_BY_COLOR: Record<'black' | 'white', string> = {
+  black: 'ring-4 ring-speaker-frame-black',
+  white: 'ring-4 ring-speaker-frame-white',
+}
+const SPEAKER_FRAME_RING_CLASS = SPEAKER_FRAME_RING_CLASS_BY_COLOR[SPEAKER_FRAME_COLOR]
 
 /** 名札(色だけに頼らず発話者を示す、WCAG 1.4.1)。会話ウィンドウ内のこの1箇所だけに出す
  * (#119/#124: 旧実装は立ち絵カードの下にも同じ名札を重複表示しており、二重表示になっていた。
