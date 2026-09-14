@@ -79,8 +79,10 @@
 // アクションシートの表示位置・半透明化・「戻る」選択肢の必須化(#52 追補・代表FB 2026-09-11):
 // 旧・画面下部/ホットスポット近傍のパネル表示から、見出し(prompt/ラベル)＋2〜3個の選択肢を
 // 背景シーンの箱(aspect-video)の中央にオーバーレイ表示する形に変更した(会話オーバーレイと
-// 同じ`absolute inset-0`のコンテナに重ねる)。選択肢ボタンは不透明度80%程度の半透明にし
-// (`/80`のトークン、カラーコード直書きはしない)、背景シーンがうっすら透けて見えるようにする。
+// 同じ`absolute inset-0`のコンテナに重ねる)。見出し・選択肢ボタンは共通の半透明（ガラス風）
+// パネル(`glass-panel`ユーティリティ、DESIGN.md「半透明（ガラス風）パネル」節・#133で
+// 旧`bg-card/80`直書きから移行。最小不透明度は`--glass-panel-min-alpha`=0.81)にし、
+// 背景シーンがうっすら透けて見えるようにする。
 // 右上の「ヒント確認」「調査ポイント一覧」は発見性のため従来どおり不透明のまま(別要件、
 // 半透明化の対象外)。外側のラッパーはpointer-events-noneにし、中央のカード自体にだけ
 // pointer-events-autoを付ける: ホットスポットは会話オーバーレイと違いアクションシート表示中も
@@ -845,7 +847,7 @@ export function SceneExplorer({
                 closeActionSheet()
               }}
             >
-              <div className="bg-card/80 flex items-center justify-between gap-2 rounded-lg px-4 py-2 shadow-lg">
+              <div className="glass-panel flex items-center justify-between gap-2 rounded-lg px-4 py-2 shadow-lg">
                 {/* 見出し=挨拶台詞(prompt、#78・T046-ui-data)。省略時はラベルのみ(現行どおり)。
                       系統をまたぐ統合ホットスポット(人＋機器を1つに束ねる)で、何用の操作かを
                       挨拶台詞で示す(DESIGN.md「探索シーン」節)。 */}
@@ -873,7 +875,7 @@ export function SceneExplorer({
                         type="button"
                         variant="outline"
                         id={actionIndex === 0 ? sheetFirstActionId : undefined}
-                        className="bg-card/80 hover:bg-muted/80 dark:bg-card/80 dark:hover:bg-muted/80 h-12 min-w-12 w-full justify-start px-4 text-left shadow-lg"
+                        className="glass-panel hover:brightness-125 h-12 min-w-12 w-full justify-start px-4 text-left shadow-lg"
                         onClick={() => runAction(openHotspot, action)}
                       >
                         {action.label}
@@ -890,7 +892,7 @@ export function SceneExplorer({
                     <Button
                       type="button"
                       variant="outline"
-                      className="bg-card/80 hover:bg-muted/80 dark:bg-card/80 dark:hover:bg-muted/80 h-12 min-w-12 w-full justify-start px-4 text-left shadow-lg"
+                      className="glass-panel hover:brightness-125 h-12 min-w-12 w-full justify-start px-4 text-left shadow-lg"
                       onClick={closeActionSheet}
                     >
                       閉じる（何もしない）

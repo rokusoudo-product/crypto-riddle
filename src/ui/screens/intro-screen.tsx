@@ -150,10 +150,12 @@ export function IntroScreen() {
             alt="対策室の背景"
             imageRect={introImageRect}
           >
-            {/* 会社名・説明パネル(#124): 箱の左上に半透明のsurfaceパネルで重ねる。台詞の
-                会話ウィンドウ・立ち絵(箱の下端側)とは重ならない位置。ConversationFrameの
-                外側の兄弟要素のため、dismissAnywhereのクリック進行とは二重発火しない。 */}
-            <div className="border-border bg-card/80 absolute top-2 left-2 z-20 flex max-w-[min(70%,32rem)] flex-col gap-1 rounded-lg border p-3">
+            {/* 会社名・説明パネル(#124): 箱の左上に半透明（ガラス風）パネル(glass-panel、
+                DESIGN.md「半透明（ガラス風）パネル」節・#133で旧`bg-card/80`直書きから移行)で
+                重ねる。台詞の会話ウィンドウ・立ち絵(箱の下端側)とは重ならない位置。
+                ConversationFrameの外側の兄弟要素のため、dismissAnywhereのクリック進行とは
+                二重発火しない。 */}
+            <div className="border-border glass-panel absolute top-2 left-2 z-20 flex max-w-[min(70%,32rem)] flex-col gap-1 rounded-lg border p-3">
               <h2 className="font-heading text-base sm:text-lg">
                 {scenario.intro.victim_company.name}
               </h2>

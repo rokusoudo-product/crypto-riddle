@@ -10,6 +10,13 @@
 @import '@fontsource/noto-serif-jp/japanese-500.css';
 @import '@fontsource/noto-serif-jp/japanese-700.css';
 
+/* #133: `dark:` バリアント自体は button.tsx/card-drawer.tsx/scene-explorer.tsx の一部の
+   微調整（例: outline variant の `dark:bg-input/30`）で引き続き使うため残す。ただし本プロジェクトは
+   単一のダークテーマに固定（DESIGN.md「基本方針」節「単一のダーク文脈に統一」・OS のライト/
+   ダークモード設定には追従しない）のため、`.dark` 側に元の :root と異なる値を定義する使い方は
+   廃止し、`class="dark"` を全画面（タイトル/メニュー/図鑑を含む）へ常時適用することで
+   `dark:` バリアント自体は有効にしたまま、参照する CSS 変数の値は下記 :root 1つに一本化する
+   （src/ui/layouts/dark-layout.tsx・src/ui/routes.tsx 参照）。 */
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
@@ -29,6 +36,26 @@
   html {
     @apply font-sans;
   }
+}
+
+/* 半透明（ガラス風）パネルの共通スタイル（DESIGN.md「半透明（ガラス風）パネル」節・#133）。
+   パネル地は surface トークン（--card）を、最小不透明度トークン（--glass-panel-min-alpha=0.81）で
+   合成する。0.81 は `scripts/check-contrast.mjs` が本文の WCAG 2.1 AA（4.5:1）を「純白」「純黒」
+   両方の合成背景で満たす最小値として自動算出した値（詳細は docs/design-contrast.md）。
+   `color-mix(in srgb, ...)` を使うのは、検証スクリプトの合成計算（sRGB チャンネルの線形補間）と
+   実際の描画結果を一致させるため（oklab 等の知覚色空間で混色すると検証値からずれる）。
+   ぼかしは --glass-panel-blur（12px）。コントラストの担保には寄与しない演出用途のみ。
+   適用先: 会話ウィンドウ・探索のアクションシート・カードドロワー・導入の会社名説明パネル
+   （旧 bg-card/80 等のカラーコード直書きに準ずる不透明度指定をすべてこのトークン経由に統一）。
+   適用しない: 右上のボタン群（ヒント確認・調査ポイント一覧、発見性のため不透明を維持・代表指定）。 */
+@utility glass-panel {
+  background-color: color-mix(
+    in srgb,
+    var(--card) calc(var(--glass-panel-min-alpha) * 100%),
+    transparent
+  );
+  backdrop-filter: blur(var(--glass-panel-blur));
+  -webkit-backdrop-filter: blur(var(--glass-panel-blur));
 }
 
 @theme inline {
@@ -51,8 +78,16 @@
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
   --color-hotspot-highlight: var(--hotspot-highlight);
-  --color-speaker-frame-black: var(--speaker-frame-black);
   --color-speaker-frame-white: var(--speaker-frame-white);
+  --color-speaker-frame-neon-blue: var(--speaker-frame-neon-blue);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-error: var(--error);
+  --color-error-foreground: var(--error-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -80,78 +115,77 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* カラートークン（DESIGN.md「カラートークン」節・2026-09-14 サイバーパンク改訂・#132/#133）。
+   全画面（タイトル／マップ選択／導入／探索／解決／結果／カード図鑑）を単一のダーク文脈に統一した
+   ため（DESIGN.md「基本方針」節「単一のダーク文脈に統一」）、旧「ライト値(:root) / ダーク値(.dark)」
+   の2系統は廃止し、値1本を :root に定義する（OS のライト/ダークモード設定には追従しない）。
+   すべての hex 値は docs/design-contrast.md で WCAG 2.1 AA 検証済みの確定値
+   （scripts/check-contrast.mjs の TOKENS と同期させること。値を変更したらスクリプト側も
+   同時に更新して再実行する）。 */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  /* background（画面背景・ダークブルー基調） */
+  --background: #0a0c18;
+  /* text-primary（本文） */
+  --foreground: #eaf0ff;
+  /* surface（カード・パネル地） */
+  --card: #11142a;
+  --card-foreground: #eaf0ff;
+  --popover: #11142a;
+  --popover-foreground: #eaf0ff;
+  /* primary（accent・ネオンブルー。60-30-10のアクセント1色） */
+  --primary: #4fd8ff;
+  /* primary-foreground（primary塗りボタンの上の文字色=background） */
+  --primary-foreground: #0a0c18;
+  /* surface-2（二次面・入力枠・中央選択パネルのボタン地） */
+  --secondary: #1a1f3d;
+  --secondary-foreground: #eaf0ff;
+  --muted: #1a1f3d;
+  /* text-secondary（補助テキスト） */
+  --muted-foreground: #a6b0d6;
+  --accent: #1a1f3d;
+  --accent-foreground: #eaf0ff;
+  /* error（誤答・破壊的操作）。既存 shadcn 変数 --destructive はエイリアスとして流用する
+     （DESIGN.md「旧→新トークン対応」節: 「`--error`（新規。`--destructive` のエイリアスでも
+     よい）」。#133 の実装判断として、新規に独立した値を持たせず --destructive: var(--error) で
+     一本化した。理由: Button の destructive variant・aria-invalid 系のスタイル
+     （src/ui/components/ui/button.tsx）が既存の --destructive を参照しており、値を分離すると
+     今後どちらか一方だけ更新し忘れて2色に分岐するおそれがあるため）。 */
+  --error: #ff5c7a;
+  --error-foreground: #0a0c18;
+  --destructive: var(--error);
+  --success: #4cffa8;
+  --success-foreground: #0a0c18;
+  --warning: #ffc24c;
+  --warning-foreground: #0a0c18;
+  --info: #8fa6ff;
+  --info-foreground: #0a0c18;
   /* 探索ホットスポット□マーカーの強調色(#71・T045)。危険操作(destructive/warning)とは別扱いの
-     赤系トークン(DESIGN.md「探索シーン」節)。destructiveより明度をやや上げ、ライト文脈の
-     surface上でも視認できるよう調整した仮値。 */
-  --hotspot-highlight: oklch(0.637 0.237 25.331);
-  /* 話者の枠(#119/#124): いま話している人の立ち絵カードを囲む枠線の色。DESIGN.md「会話フレーム」節
-     「話者の枠」のとおり、黒・白の両方をトークン化し、conversation-frame.tsx の
-     SPEAKER_FRAME_COLOR 定数1箇所で切替できるようにしてある(ライト/ダーク文脈で値を変える必要はない
-     絶対色のため、.dark 側での再定義は不要)。代表決定(2026-09-14)により白に確定した。 */
-  --speaker-frame-black: oklch(0 0 0);
+     赤系トークン(DESIGN.md「探索シーン」節)。#132/#133 でも維持・変更なし（代表指定、
+     視認性のため赤系を継続）。 */
+  --hotspot-highlight: oklch(0.749 0.202 22.86);
+  /* 話者の枠(#119/#124/#132): いま話している人の立ち絵カードを囲む枠線の色。
+     conversation-frame.tsx の SPEAKER_FRAME_COLOR 定数1箇所で white↔neon-blue を切替できる
+     （既定は white）。旧 speaker-frame-black は、ダーク統一の背景では成立しないため(#132・
+     docs/design-contrast.md で NG 確認)使用禁止としてトークン自体を削除した。 */
   --speaker-frame-white: oklch(1 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --speaker-frame-neon-blue: #4fd8ff;
+  /* border（枠線・区切り。非テキスト3:1） */
+  --border: #6870ad;
+  /* surface-2（入力枠の地色。outline variant の dark:bg-input/30 等で背景として使う） */
+  --input: #1a1f3d;
+  --ring: #4fd8ff;
+  /* ガラス風パネルの最小不透明度・ぼかし（DESIGN.md「半透明（ガラス風）パネル」節・新規）。
+     上記 @utility glass-panel から参照する。 */
+  --glass-panel-min-alpha: 0.81;
+  --glass-panel-blur: 12px;
+  /* 以下、DESIGN.md のカラートークン表に定めのないトークン（本アプリでは未使用）。
+     旧 .dark ブロックの値をそのまま引き継ぐ（単一テーマ化に伴う整理のみで、意味のある変更なし）。 */
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  /* ダーク文脈(探索は常時ダーク文脈、DESIGN.md基本方針)向け: 暗い背景シーン画像の上でも
-     視認できるよう、明度をより高めた赤にする(#71・T045)。 */
-  --hotspot-highlight: oklch(0.749 0.202 22.86);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
   --sidebar-primary: oklch(0.488 0.243 264.376);

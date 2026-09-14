@@ -87,10 +87,13 @@ export function CardDrawer({ cards, triggerVariant = 'text' }: CardDrawerProps) 
         </Button>
       )}
       {open && (
+        // カードドロワーの中身は半透明（ガラス風）パネル(glass-panel、DESIGN.md「半透明（ガラス風）
+        // パネル」節・#133の適用対象)。開閉トリガーのボタン自体(上のButton、右上ボタン群の一員)は
+        // 発見性のため不透明のまま(対象外)。
         <div
           id={panelId}
           className={cn(
-            'border-border bg-background flex flex-col gap-2 rounded-lg border p-3',
+            'border-border glass-panel flex flex-col gap-2 rounded-lg border p-3',
             triggerVariant === 'label' && 'max-h-64 w-72 max-w-[85vw] overflow-y-auto',
           )}
         >
