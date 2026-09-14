@@ -18,16 +18,18 @@ import { routeForProgress } from '@/ui/screens/navigation'
 import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
 
-import introBackgroundFallback from '../../../assets/backgrounds/bg-sl-office.png'
+import introBackgroundLandscape from '../../../assets/backgrounds/bg-hq-taskforce.png'
+import introBackgroundPortrait from '../../../assets/backgrounds/bg-hq-taskforce-portrait.png'
 
-// 導入の背景アセット対応表(#119/#124): 本来は対策室の新規背景`bg-hq-taskforce`
-// (横)/`bg-hq-taskforce-portrait`(縦)を使う予定だが、これらはまだ生成されていない
-// (#122で承認ゲートを経て生成予定)。画像は本Issue(#124)の範囲では生成しない方針のため、
-// 生成されるまでの暫定として旧・流用背景bg-sl-office(法務SLシナリオの自社執務室背景)を
-// 'bg-hq-taskforce'の横用として使う(#123で実アセットに差し替え予定。DESIGN.md「アセット」節)。
-// 縦(-portrait)は未登録のため、縦長の画面でも箱は16:9のまま(resolveBoxOrientation参照)。
+// 導入の背景アセット対応表(#119/#124/#123): 対策室の背景`bg-hq-taskforce`(横)/
+// `bg-hq-taskforce-portrait`(縦、#122で生成)に差し替えた(DESIGN.md「会話フレーム」節
+// 「導入③の背景」)。旧・流用背景bg-sl-office(法務SLシナリオの自社執務室背景)の暫定使用は
+// #123で終了。introはscenes[]を使わないため、アセットIDはシナリオスキーマに持たせず
+// このファイル側のUI定数として持つ(scene-explorer.tsxのBACKGROUND_SRCと同じ、Viteの
+// importでアセットurlを解決する方式)。
 const INTRO_BACKGROUND_SRC: BackgroundSrcMap = {
-  'bg-hq-taskforce': introBackgroundFallback,
+  'bg-hq-taskforce': introBackgroundLandscape,
+  'bg-hq-taskforce-portrait': introBackgroundPortrait,
 }
 const INTRO_BACKGROUND_ASSET_ID = 'bg-hq-taskforce'
 
@@ -77,9 +79,10 @@ const INTRO_BACKGROUND_ASSET_ID = 'bg-hq-taskforce'
 //   `ConversationFrame`(`dismissAnywhere`で箱全体クリックの進行を持つ)の**外側の兄弟**として
 //   置くことで、SKIPやパネルのクリックが台詞送りへ二重発火しない(DOM上で子孫関係にないため
 //   イベントバブリングの影響を受けない)。
-// - 縦の背景(bg-hq-taskforce-portrait)はまだ無いため、縦長の画面では箱自体は9:16になる
-//   (#124で「縦長の画面は常に9:16」に改訂・代表決定2026-09-14)が、画像は箱の上部に横画像を
-//   幅いっぱいで表示する(resolveBackgroundImageRect、DESIGN.md「探索シーン」節「背景の箱」)。
+// - 縦長の画面では箱自体は9:16になる(#124で「縦長の画面は常に9:16」に改訂・代表決定
+//   2026-09-14)。縦の背景(bg-hq-taskforce-portrait)は#123で登録したため、縦長の画面では
+//   箱いっぱいに縦の背景画像を表示する(resolveBackgroundImageRect、DESIGN.md「探索シーン」節
+//   「背景の箱」)。
 export function IntroScreen() {
   const state = useScreenState()
   const navigate = useNavigate()

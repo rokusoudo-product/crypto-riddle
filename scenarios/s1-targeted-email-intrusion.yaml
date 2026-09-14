@@ -209,6 +209,27 @@ investigation_points:
 # - door(サーバ室への扉): [0.95, 0.5] → [0.84, 0.54](扉が画面内に収まる位置へ)
 # - book(資料棚): [0.6, 0.16] → [0.62, 0.2](天板際でなく書棚本体にかかるよう微調整)
 # 各ホットスポットの当たり判定(48px)同士は重ならないことを座標間の距離で確認済み。
+#
+# 2026-09-14(#123): schema 0.8.0(§2.7)の `position.portrait` を、生成済み縦の背景
+# `assets/backgrounds/bg-s1-office-portrait.png`/`bg-s1-server-portrait.png`(768×1344、#121)
+# を実際に目視・ピクセル計測して全ホットスポットに追加した(横の座標=landscapeは変更しない)。
+# 手順: system の python3+Pillow で10%刻みのグリッド線を引いた確認用画像→候補座標に十字マーカーを
+# 描いた確認用画像(tmp/、コミットしない)を作り、対象(人物の顔・PC画面・書棚・ラック・ドア)の
+# 中心に合うまで座標を追い込んだ。縦の画面は上部(〜15%)にシーンタブ・右上ボタン群、下部に
+# 会話ウィンドウが重なるため、どのホットスポットもy=0.38以上に配置し隠れないようにしている。
+# 執務室(scene-office, bg-s1-office-portrait):
+# - pc(経理部 中野の端末): portrait [0.54, 0.61](ノートPC画面の中央)
+# - person(中野): portrait [0.55, 0.52](着席した中野の顔付近)
+# - person(経理部長): portrait [0.25, 0.38](画面左に立つ経理部長の顔付近)
+# - book(資料棚): portrait [0.59, 0.44](中野の頭上・扉の左、人物と重ならない書棚部分)
+# - door(サーバ室への扉): portrait [0.79, 0.51](扉の装飾パネル中央)
+# サーバ室(scene-server, bg-s1-server-portrait): 縦版では通路奥に扉が描かれているため、
+# 横版の「扉なし=通路手前を仮置き」([0.5, 0.9])とは別に実際の扉の位置を使う。
+# - device(プロキシサーバ): portrait [0.11, 0.45](通路左のラック)
+# - device(メールサーバ): portrait [0.89, 0.47](通路右のラック)
+# - person(サーバ管理者): portrait [0.51, 0.42](奥の運用端末前に立つ人物の頭部)
+# - door(執務室への扉): portrait [0.70, 0.41](運用端末の右に描かれた扉の装飾パネル中央)
+# 各ホットスポットの当たり判定(48px、モバイル幅想定)同士は座標間の距離で重ならないことを確認済み。
 scenes:
   - id: scene-office
     title: 執務室
@@ -217,6 +238,7 @@ scenes:
       - object_type: pc
         position:
           landscape: [0.52, 0.57]
+          portrait: [0.54, 0.61]
         label: 経理部 中野の端末
         actions:
           - kind: collect
@@ -237,6 +259,7 @@ scenes:
       - object_type: person
         position:
           landscape: [0.53, 0.4]
+          portrait: [0.55, 0.52]
         label: 中野
         actions:
           - kind: collect
@@ -251,6 +274,7 @@ scenes:
       - object_type: person
         position:
           landscape: [0.39, 0.27]
+          portrait: [0.25, 0.38]
         label: 経理部長
         actions:
           - kind: collect
@@ -265,6 +289,7 @@ scenes:
       - object_type: book
         position:
           landscape: [0.62, 0.2]
+          portrait: [0.59, 0.44]
         label: 資料棚
         actions:
           - kind: collect
@@ -284,6 +309,7 @@ scenes:
       - object_type: door
         position:
           landscape: [0.84, 0.54]
+          portrait: [0.79, 0.51]
         label: サーバ室への扉
         actions:
           - kind: goto
@@ -296,6 +322,7 @@ scenes:
       - object_type: device
         position:
           landscape: [0.18, 0.45]
+          portrait: [0.11, 0.45]
         label: プロキシサーバ
         actions:
           - kind: collect
@@ -311,6 +338,7 @@ scenes:
       - object_type: device
         position:
           landscape: [0.82, 0.45]
+          portrait: [0.89, 0.47]
         label: メールサーバ
         actions:
           - kind: collect
@@ -323,6 +351,7 @@ scenes:
       - object_type: person
         position:
           landscape: [0.51, 0.43]
+          portrait: [0.51, 0.42]
         label: サーバ管理者
         prompt: "サーバ管理者「どうしましたか？」"
         actions:
@@ -353,6 +382,7 @@ scenes:
       - object_type: door
         position:
           landscape: [0.5, 0.9]
+          portrait: [0.7, 0.41]
         label: 執務室への扉
         actions:
           - kind: goto

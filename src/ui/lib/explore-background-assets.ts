@@ -14,14 +14,17 @@
 // PNG追加だけでは自動配線されず、bg-s2系・bg-s3系のように「PNGは存在するのに
 // ここへの登録漏れでプレースホルダ表示のまま」という既発生の不具合(#88)を繰り返す。
 //
-// 【縦の背景(#119/#124)】`${id}-portrait`キーで登録する(例: 'bg-s1-office-portrait')。
-// 現時点(#124時点)ではどの縦背景もまだ生成されていない(#121/#122以降で追加予定)ため
-// 未登録=空。追加時は `src/ui/lib/background-box.ts` の `hasPortraitAsset`/`resolveBackgroundSrc`
-// が自動的に拾う(このマップへの追加以外の配線変更は不要)。
+// 【縦の背景(#119/#124/#123)】`${id}-portrait`キーで登録する(例: 'bg-s1-office-portrait')。
+// S1の執務室・サーバ室(#121で生成)は#123でここに登録した。他マップ(S2/S3/SL)はまだ縦の
+// 背景が生成されていないため未登録=空のまま(生成後の後続Issueで追加予定)。追加時は
+// `src/ui/lib/background-box.ts` の `hasPortraitAsset`/`resolveBackgroundSrc` が自動的に拾う
+// (このマップへの追加以外の配線変更は不要)。
 import type { BackgroundSrcMap } from '@/ui/lib/background-box'
 
 import bgS1Office from '../../../assets/backgrounds/bg-s1-office.png'
+import bgS1OfficePortrait from '../../../assets/backgrounds/bg-s1-office-portrait.png'
 import bgS1Server from '../../../assets/backgrounds/bg-s1-server.png'
+import bgS1ServerPortrait from '../../../assets/backgrounds/bg-s1-server-portrait.png'
 import bgS2Office from '../../../assets/backgrounds/bg-s2-office.png'
 import bgS2Server from '../../../assets/backgrounds/bg-s2-server.png'
 import bgS3Office from '../../../assets/backgrounds/bg-s3-office.png'
@@ -31,7 +34,9 @@ import bgSlVendor from '../../../assets/backgrounds/bg-sl-vendor.png'
 
 export const EXPLORE_BACKGROUND_SRC: BackgroundSrcMap = {
   'bg-s1-office': bgS1Office,
+  'bg-s1-office-portrait': bgS1OfficePortrait,
   'bg-s1-server': bgS1Server,
+  'bg-s1-server-portrait': bgS1ServerPortrait,
   'bg-s2-office': bgS2Office,
   'bg-s2-server': bgS2Server,
   'bg-s3-office': bgS3Office,
