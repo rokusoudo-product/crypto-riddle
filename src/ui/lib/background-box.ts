@@ -139,8 +139,11 @@ export interface OrientationMismatch {
 /**
  * 縦の背景の解決方法・食い違い検出(docs/scenario_schema.md §2.7)。
  * 縦の背景アセットが対応表にあるシーン(hasPortraitAsset)で、`position.portrait`を持たない
- * ホットスポットを列挙する。現状(#124時点)はどのシーンも縦の背景を持たないため必ず空配列を返す
- * (S1の縦座標投入は#123、縦背景アセットの追加は#121/#122以降)。
+ * ホットスポットを列挙する。#123でS1(執務室・サーバ室)に縦の背景`bg-s1-office-portrait`/
+ * `bg-s1-server-portrait`を登録し、全ホットスポットに`portrait`座標を投入したため、S1は
+ * この関数の食い違い検出対象になる(実データでは空配列=食い違いなしを返す。
+ * src/ui/lib/background-box.test.tsの実データ回帰テスト参照)。S2/S3/SLはまだ縦の背景を
+ * 持たないため対象外のまま。
  */
 export function findOrientationMismatches(
   scenes: readonly OrientationCheckScene[],
