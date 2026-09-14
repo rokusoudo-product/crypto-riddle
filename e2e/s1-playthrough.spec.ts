@@ -76,13 +76,16 @@ async function selectS1Map(page: import('@playwright/test').Page) {
 }
 
 /**
- * 導入③の character_intros を1行ずつタップ送りする(台本v2.2・#100/#103で小鳥遊の入電から
- * 始まる9行の会話劇になった)。各行についてタイプライターをスキップし、「タップで進行」を押す。
- * 最終行は呼び出し側でSKIPするか、この関数で最後まで送り切る。
+ * 導入③の character_intros を1行ずつ画面クリックで送る(台本v2.2・#100/#103で小鳥遊の入電から
+ * 始まる9行の会話劇になった。#108/#110で旧「タップで進行」ボタンを廃止し、探索と同じく
+ * 会話ウィンドウ全体〔画面のどこでも〕のクリックで送る2段階操作〔スキップ→次へ〕に統一した)。
+ * アクセシブルネームは会話文(line)のままスキップ前後で変わらないため、同じ問い合わせを
+ * 2回使う(1回目=スキップ、2回目=次の行/探索へ進む)。最終行は呼び出し側でSKIPするか、
+ * この関数で最後まで送り切る。
  */
 async function advanceIntroLine(page: import('@playwright/test').Page, line: string) {
-  await skipTypewriter(page, line)
-  await page.getByRole('button', { name: 'タップで進行' }).click()
+  await skipTypewriter(page, line) // 1回目: 全文表示(スキップ)。
+  await page.getByRole('button', { name: line, exact: true }).click() // 2回目: 次の行/探索へ進む。
 }
 
 /** 探索を最後まで終え、解決パート(会話モード, q-entry-point)へ進める共通手順。 */
@@ -174,17 +177,17 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
     ).toBeVisible()
   })
 
-  test('導入③: character_intros を9行タップ送りでき、小鳥遊→霧島→橘の対策室レイアウトで会話劇が進行する(台本v2.2・#100/#103)', async ({
+  test('導入③: character_intros を9行画面クリックで送れ、左右2枠の入れ替わり方式で会話劇が進行する(台本v2.2・#100/#103、#108/#110で2枠へ刷新)', async ({
     page,
   }) => {
     await page.getByRole('link', { name: 'つづきから' }).click()
     await selectS1Map(page)
     await expect(page.getByRole('heading', { name: '導入' })).toBeVisible()
 
-    // 1行目(小鳥遊)は発話中、霧島・橘は待機中(対策室レイアウト=3枠、#100/#102)。
+    // 1行目(小鳥遊): 最初の話者は左に入る(右は空、旧・霧島/橘/小鳥遊の3枠固定は廃止、#108/#110)。
     await expect(page.getByAltText('小鳥遊（発話中）')).toBeVisible()
-    await expect(page.getByAltText('霧島（待機中）')).toBeVisible()
-    await expect(page.getByAltText('橘（待機中）')).toBeVisible()
+    await expect(page.getByAltText('霧島（待機中）')).not.toBeVisible()
+    await expect(page.getByAltText('橘（待機中）')).not.toBeVisible()
 
     const introLines = [
       'あらあら〜、新人さん、ちょうど良いところに。今、浜通(はまどおり)商事さんから緊急のお電話が入りまして……。はい、お茶どうぞ〜。',
@@ -198,12 +201,37 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
       'わたしは対策室で待機して、資料や各所への連絡をまわしておきますね〜。いってらっしゃい、新人さん。',
     ]
 
-    for (const line of introLines) {
+    for (const [index, line] of introLines.entries()) {
       await expect(page.getByText(line, { exact: false })).toBeVisible()
+
+      // DESIGN.md「会話フレーム」節の導入9行の見え方の表(左右2枠の入れ替わり方式、#108/#110、
+      // src/ui/lib/two-slot-frame.test.tsの単体テストと同じ話者列)と一致することを、
+      // 節目の行(3行目=霧島が右へ加わる・6行目=橘が小鳥遊と入れ替わりで左へ・9行目=小鳥遊が
+      // 橘と入れ替わりで左へ)で実ブラウザでも確認する(9行目=最終行は送ると探索へ遷移して
+      // しまうため、送る前のこの時点で確認する)。
+      if (index === 2) {
+        // 3行目(霧島): 左=小鳥遊(グレー)・右=霧島(発話中)。
+        await expect(page.getByAltText('小鳥遊（待機中）')).toBeVisible()
+        await expect(page.getByAltText('霧島（発話中）')).toBeVisible()
+        await expect(page.getByAltText('橘（待機中）')).not.toBeVisible()
+      }
+      if (index === 5) {
+        // 6行目(橘): 左=橘(発話中・小鳥遊と入れ替わり)・右=霧島(グレー)。
+        await expect(page.getByAltText('橘（発話中）')).toBeVisible()
+        await expect(page.getByAltText('霧島（待機中）')).toBeVisible()
+        await expect(page.getByAltText('小鳥遊（待機中）')).not.toBeVisible()
+      }
+      if (index === 8) {
+        // 9行目(小鳥遊、最終行): 左=小鳥遊(発話中・橘と入れ替わり)・右=霧島(グレー)。
+        await expect(page.getByAltText('小鳥遊（発話中）')).toBeVisible()
+        await expect(page.getByAltText('霧島（待機中）')).toBeVisible()
+        await expect(page.getByAltText('橘（待機中）')).not.toBeVisible()
+      }
+
       await advanceIntroLine(page, line)
     }
 
-    // 最終行(9行目・小鳥遊)の「タップで進行」で探索へ遷移する。
+    // 最終行(9行目・小鳥遊)のクリックで探索へ遷移する(#108/#110で「タップで進行」ボタンを廃止)。
     await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
   })
 
@@ -474,6 +502,13 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     // ここでは代替経路(解決へ進む)を確認する。
     await enterResolution.click()
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
+
+    // #119/#124: 解決画面は「解決へ進む」を押した時点で表示していた探索シーンの背景を
+    // そのまま引き継ぐ(lastExploredSceneId、新しい画像は作らない)。ここではサーバ室タブを
+    // 表示したまま解決へ進んだため、解決画面でもサーバ室の背景が表示されることを確認する
+    // (この行が無いと、resolve-screen.tsxがscenario.scenes[0]=執務室へ既定フォールバック
+    // しても偶然テストが通ってしまい、lastExploredSceneIdの配線が壊れても検知できない)。
+    await expect(page.getByRole('img', { name: 'サーバ室の背景' })).toBeVisible()
   })
 
   test('ドア(object_type: door)でも執務室↔サーバ室を移動でき、シーンタブと併用できる(#78・T046-ui-data)', async ({
