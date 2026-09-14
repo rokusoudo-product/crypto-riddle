@@ -8,6 +8,8 @@ import { SceneExplorer } from '@/ui/components/explore/scene-explorer'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
+import { resolveBoxOrientation } from '@/ui/lib/background-box'
+import { useIsPortraitScreen } from '@/ui/lib/orientation'
 import { routeForProgress } from '@/ui/screens/navigation'
 import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
@@ -84,6 +86,17 @@ export function ExploreScreen() {
   // 代表FB。上記コンポーネント冒頭コメント参照)。一度trueにしたら自動的にはfalseへ戻さない
   // (ナグ防止=再表示しない)。
   const [isWrapUpPromptDismissed, setIsWrapUpPromptDismissed] = useState(false)
+  const setLastExploredSceneId = useGameStore((s) => s.setLastExploredSceneId)
+  const screenIsPortrait = useIsPortraitScreen()
+
+  // SceneExplorerの`onActiveSceneChange`から都度反映する: `lastExploredSceneId`
+  // (解決⑤の背景の引き継ぎ、game-store.ts参照)を更新する。#124(縦長の画面は常に9:16)で
+  // 箱の向きが画面の向きのみで決まるようになったため、シーンidそのものをこの画面のstateとして
+  // 持つ必要は無くなった(wrapUpPromptのboxOrientationはresolveBoxOrientation(screenIsPortrait)
+  // だけで求まる)。
+  function handleActiveSceneChange(sceneId: string) {
+    setLastExploredSceneId(sceneId)
+  }
 
   if (progress.part !== 'exploration') {
     return (
@@ -189,10 +202,17 @@ export function ExploreScreen() {
   // (PR#92追補・代表FB。上記コンポーネント冒頭コメント参照)。onOutsideDismissは
   // ウィンドウ**外側**のクリック/タップ・Escapeでのみ発火し、ウィンドウ自体や「わかった」
   // ボタンのクリックとは競合しない(conversation-frame.tsxのJSDoc参照)。
+  // wrapUpPrompt自身のboxOrientation(#124・代表決定2026-09-14「縦長の画面は常に9:16」):
+  // 箱の向きは画面の向きのみで決まるため、SceneExplorer側の会話オーバーレイと常に同じ値になる
+  // (シーンごとの背景アセット有無には依存しない。#119時点の「活動中シーンの背景アセット有無」
+  // 計算は不要になった)。
+  const wrapUpBoxOrientation = resolveBoxOrientation(screenIsPortrait)
+
   const wrapUpPrompt =
     canProceed && !isExplorerConversationOpen && !isWrapUpPromptDismissed ? (
       <ConversationFrame
         layout={hasScenes ? 'overlay' : 'stacked'}
+        boxOrientation={wrapUpBoxOrientation}
         speaker="橘"
         line="材料は揃ったわ。そろそろ問題を整理しましょう。"
         onOutsideDismiss={handleDismissWrapUpPrompt}
@@ -200,7 +220,7 @@ export function ExploreScreen() {
         <div className="flex items-center justify-between gap-2">
           <p className="text-muted-foreground text-xs">
             必要な手がかりは出揃った。まとめるなら「わかった」、もう少し調べたいなら画面をタップ
-            （Escapeでも可）して探索を続けよう。あとからでも下の「解決へ進む」から進める。
+            （Escapeでも可）して探索を続けよう。あとからでも右下の「解決へ進む」から進める。
           </p>
           <Button
             type="button"
@@ -214,8 +234,27 @@ export function ExploreScreen() {
       </ConversationFrame>
     ) : null
 
+  // 「解決へ進む」(#124・代表決定2026-09-14): scenesがある場合は箱の右下に重ねる
+  // (SceneExplorerのenterResolutionSlotへ渡す)。誘導会話(wrapUpPrompt)の表示状態に関わらず
+  // 表示する(PR#92追補・代表FB「誘導が導線を隠さない」を維持)。ただし
+  // SceneExplorer自身の会話(調査結果・danger)が開いている間はSceneExplorer側の判定で
+  // 非表示になる(#124秘書レビュー2回目・2026-09-14: 会話ウィンドウとの重なり解消。
+  // scene-explorer.tsxのenterResolutionSlot JSDoc参照。本ファイルはボタン要素を渡すだけで
+  // その表示条件には関与しない)。scenesが無い場合(一覧フォールバックのみ)は背景の箱自体が
+  // 無いため、従来どおりページ下部に直接描画する。
+  const enterResolutionButton = (
+    <Button
+      type="button"
+      className="h-12 min-w-12 self-start px-6 text-base"
+      disabled={!canProceed}
+      onClick={handleEnterResolution}
+    >
+      解決へ進む
+    </Button>
+  )
+
   return (
-    <ScreenContainer title="探索">
+    <ScreenContainer title="探索" variant={hasScenes ? 'immersive' : 'default'}>
       <StateFrame
         state={state}
         loading={<p className="text-muted-foreground">判定しています…</p>}
@@ -230,24 +269,18 @@ export function ExploreScreen() {
             ownedCardIds={progress.ownedCardIds}
             onCollect={handleInvestigate}
             onConversationOpenChange={setIsExplorerConversationOpen}
+            onActiveSceneChange={handleActiveSceneChange}
             investigationList={investigationListNode}
             conversationSlot={wrapUpPrompt}
+            enterResolutionSlot={enterResolutionButton}
           />
         ) : (
           <>
             {investigationListNode}
             {wrapUpPrompt}
+            {enterResolutionButton}
           </>
         )}
-
-        <Button
-          type="button"
-          className="h-12 min-w-12 self-start px-6 text-base"
-          disabled={!canProceed}
-          onClick={handleEnterResolution}
-        >
-          解決へ進む
-        </Button>
       </StateFrame>
     </ScreenContainer>
   )

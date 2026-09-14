@@ -2,26 +2,42 @@
 // タイプライター表示は#52 Phase4.7/#64/T042、探索の会話オーバーレイ化は#52 Phase4.7 追補/
 // T047・`layout` prop、会話ウィンドウのクリック/タップ閉じ化は#52 Phase4.7 追補/T048・
 // `onDismiss` prop、探索完了への誘導を「閉じて再探索も可・ロックしない」形にした
-// #92追補・代表FBで`onOutsideDismiss` prop を追加、導入の対策室レイアウト(`layout="intro"`)・
-// NPC発話(`speaker`がConversationSpeaker型に拡張)・表情フォールバック(`expression` prop)・
+// #92追補・代表FBで`onOutsideDismiss` prop を追加、表情フォールバック(`expression` prop)・
 // `onEscape` prop は #100/#102 で追加)。
 //
+// 2026-09-13(S1実装台本レビュー第1回・代表FB・#108/#110): 左右2枠の入れ替わり方式へ刷新した。
+// 旧「導入のみ3枠(対策室レイアウト、layout="intro")・探索④/解決⑤は霧島=左・橘=右で固定2枠」
+// (#100/#102)は撤回し、導入・探索・解決のすべてで「左右2枠の入れ替わり方式」に統一した。
+// `layout="intro"`・固定`PORTRAIT_ORDER`・`compact` propは削除済み(このコメントでは以後
+// 言及しない。旧実装の経緯を知りたい場合はgit historyを参照)。
+//
 // DESIGN.md「会話フレーム(共通コンポーネント・#42で導入)」節が正本:
-// - レイアウト: 画面下部に会話ウィンドウ、ステージ中央に立ち絵。探索④・解決⑤は現行どおり
-//   2枠(霧島=左・橘=右で固定)。導入③のみ3枠(`layout="intro"`。霧島=左/橘=右/小鳥遊=中央後方
-//   やや小さめの「対策室レイアウト」、#100/#102)。
-// - 発話者の強調: 発話中はフルカラーで手前、**発話者以外は全員グレーアウト**(グレースケール+
-//   輝度・不透明度低下。#100で「支援役2名固定・直前話者のみグレーアウト」から「人数によらず
-//   発話者以外は全員グレーアウト」へ一般化)。色(グレーアウト)だけに頼らず、名札テキストでも
-//   発話者を示す(WCAG 1.4.1)。→ 発話中の名札だけでなく、待機中の立ち絵にも常に名前ラベルを
-//   添えることで、どの立ち絵がどのキャラかを色に依存せず判別できるようにする。
-// - NPC発話(#100/#102): `speaker`に`{ npc: '名前' }`を渡すと、既知の立ち絵(霧島・橘・intro
-//   layoutならさらに小鳥遊)は全員グレーアウトし、名札にはnpcの値をそのまま表示する
-//   (ConversationSpeaker/speakerLabel参照。探索の`collect.dialogue[]`限定、
-//   docs/scenario_schema.md §2.6)。
+// - レイアウト: 画面下部に会話ウィンドウ、その上に左右2枠の立ち絵。導入③・探索④・解決⑤の
+//   すべてで共通(#108)。
+// - 左右2枠の入れ替わり方式(#108): 話者が誰であっても画面には常に左右2枠しか使わない。
+//   枠の位置そのものは動かさず、色(カラー/グレー)と中身の入れ替えで「直前に話した人」
+//   「いま話している人」を示す。並びを決めるロジックは`src/ui/lib/two-slot-frame.ts`の
+//   純粋関数(`layoutTwoSlotFrame`)に切り出してある(単体テストは two-slot-frame.test.ts)。
+//   本コンポーネントは`speakerHistory`(今の会話1つぶんの発話者履歴、古い→新しい順)を
+//   その関数に渡して現在の2枠表示を得るだけで、React state によるリセット処理は持たない
+//   (並びのリセット=導入の開始・探索の会話1つの開始・解決の開始は、呼び出し側が履歴配列を
+//   新しく空から渡し始めることで自然に表現される。intro-screen.tsx/scene-explorer.tsx/
+//   resolve-screen.tsx参照)。`speakerHistory`省略時は`[speaker]`(履歴なし=単発の会話、
+//   探索完了への誘導など1ターンしか出さない呼び出し側向け)にフォールバックする。
+// - 立ち絵の拡大(#108): 会話ウィンドウの上に大きく乗る大きさまで拡大する(デスクトップ
+//   240×320px・モバイル120×160px、DESIGN.md「立ち絵の拡大」節)。立ち絵は会話ウィンドウの
+//   上端から上へ「はみ出す」位置に置き、ウィンドウ内側の操作領域(children)には重ねない。
+//   空いている枠(まだ誰も入っていない)は、枠の位置がずれないよう同じ寸法の不可視プレース
+//   ホルダーで埋める(aria-hidden、下記EmptyPortraitSlot参照)。
+// - 発話者の強調: いま話している人の枠はフルカラー、もう一方(直前に話した人)はグレーアウト。
+//   NPCが話すときは両方の枠をグレーアウトし、名札にNPC名を出す(枠自体は動かさない)。
+//   色だけに頼らず、名札テキストでも発話者を示す(WCAG 1.4.1)。
+// - NPC発話(#100/#102、#108でも継続): `speaker`に`{ npc: '名前' }`を渡すと、現在枠にいる
+//   立ち絵は全員グレーアウトし、名札にはnpcの値をそのまま表示する(探索の`collect.dialogue[]`
+//   限定、docs/scenario_schema.md §2.6)。
 // - 表情フォールバック(#100/#102): `expression` propで発話者の立ち絵の表情差分を指定できる。
-//   該当PNGが無ければneutralにフォールバックする(resolvePortraitSrc参照。現在生成済みは
-//   3名ともneutralのみ)。待機中の立ち絵は常にneutralを使う。
+//   該当PNGが無ければneutralにフォールバックする(resolvePortraitSrc参照)。待機中の立ち絵は
+//   常にneutralを使う。
 // - 名札: 会話ウィンドウ左上に primary背景+ダーク文字のピル。
 // - 会話文は明朝(font-heading)、名札・操作UIはゴシック(既定のsans)。
 // - 主人公の立ち絵は出さない(docs/characters.md §3)。
@@ -30,31 +46,29 @@
 //   支援技術には全文を一度に渡す(演出中テキストはaria-hidden、全文はvisually-hiddenで提供)。
 //   選択肢・相談・カード閲覧等の操作要素(children)は全文表示(またはスキップ)後にのみ出す
 //   (送り途中の誤タップ防止)。詳細は下記の各関数コメントを参照。
-// - 探索の会話オーバーレイ・導入の対策室レイアウト(#52・T047、#100/#102): `layout="overlay"`
-//   または`layout="intro"`を指定すると、従来の「縦に積む」表示(`layout="stacked"`、既定・
+// - 探索の会話オーバーレイ・導入(#52・T047、#108で導入にも`layout="overlay"`を適用):
+//   `layout="overlay"`を指定すると、従来の「縦に積む」表示(`layout="stacked"`、既定・
 //   resolve-screen.tsx で使用)ではなく、絶対配置で呼び出し側のコンテナ(`position: relative`
-//   を持つ背景の箱)に重ねる表示になる。左右端に縮小した立ち絵(intro はさらに小鳥遊を中央後方に
-//   1体追加)・下部に会話ウィンドウ(帯)を1行に並べ、背景中央と重ならないように端寄せする
-//   (DESIGN.md「探索シーン」節「会話オーバーレイのレイアウト」「会話フレーム」節)。
-//   タイプライター・フォーカス管理・children の表示タイミング等のロジックは stacked と
-//   完全に共有し、JSX の外枠だけを分岐する(scene-explorer.tsx / intro-screen.tsx 参照)。
+//   を持つ背景の箱)に重ねる表示になる。タイプライター・フォーカス管理・childrenの表示タイミング
+//   等のロジックはstackedと完全に共有し、JSXの外枠(絶対配置かどうか)だけを分岐する。
 // - 会話ウィンドウのクリック/タップ閉じ(#52 Phase4.7 追補・T048): `onDismiss` を指定すると、
 //   専用の「閉じる」ボタンを置かず、会話ウィンドウ全体を1つの操作領域にする。全文表示前の
 //   クリック/タップ/Enter/Spaceはスキップ(全文表示)、全文表示後の同操作は`onDismiss`を呼ぶ
-//   (Escapeは`onEscape`があればそちら、無ければ`onDismiss`。多ターンの会話で`onDismiss`を
-//   「次の行へ進める」用途に流用する呼び出し側は、Escapeだけ別に「閉じる」へ渡せる。#102)。
-//   呼び出し側(scene-explorer.tsx)は調査結果/dangerの教育的フィードバックの会話オーバーレイに
-//   のみ指定し、探索完了への誘導(conversationSlot、独自の「わかった」ボタンを持つ)には
-//   指定しない。詳細は`onDismiss`/`onEscape`のJSDoc参照。
-// - 多ターンの会話送り(導入の`character_intros[]`・探索の`collect.dialogue[]`、#100/#102):
-//   本コンポーネント自体は常に1ターン(1つのspeaker/line)しか表示しない。複数ターンの送りは
-//   呼び出し側が`turnIndex`等の状態を持ち、`speaker`/`line`/`expression`を差し替えて
-//   再レンダーすることで実現する(intro-screen.tsx / scene-explorer.tsx 参照)。line が変わると
-//   タイプライターは自動的に先頭から再生される(既存の同期処理、変更なし)。
+//   (Escapeは`onEscape`があればそちら、無ければ`onDismiss`)。
+// - 画面全体クリックでの進行(#108/#110・導入専用): `dismissAnywhere`を`true`にすると、
+//   `onDismiss`の2段階(スキップ→次へ)を会話ウィンドウ**だけでなく背景を含む外枠全体**で
+//   受け付ける。ウィンドウ自体は従来どおり`role="button"`でキーボード操作(Tab到達・Enter/
+//   Space)を担い、外枠側はポインタ操作(onClickのみ、role・tabIndexは付けない)を追加するだけ
+//   にすることで、role="button"の入れ子(ネストした対話的ロール)を避ける(scene-explorer.tsx
+//   の`onOutsideDismiss`と同じ考え方。ただしonOutsideDismissは「外側だけ」閉じる操作領域に
+//   するのに対し、dismissAnywiereは「ウィンドウも含む全体」が進行操作領域になる点が異なる)。
+//   ウィンドウ自身のクリックは`event.stopPropagation()`で外枠への二重発火を防ぐ。外枠クリックの
+//   後はキーボード操作(Enter/Space)を引き続き使えるようウィンドウへフォーカスを戻す。
+//   探索(scene-explorer.tsx)の調査結果/danger会話オーバーレイは、閉じる操作領域を会話
+//   ウィンドウ自体に限定する従来どおりの仕様のため`dismissAnywhere`は指定しない
+//   (DESIGN.md「探索シーン」節「会話ウィンドウ」)。
 //
-// 導入(③)・探索の会話(④)・解決の会話モード(⑤)で共通して使う(DESIGN.md)。#102で③導入
-// (intro-screen.tsx)への配線が完了し、④探索(scene-explorer.tsx)・⑤解決(resolve-screen.tsx)と
-// 合わせて3画面すべての配線が揃った。
+// 導入(③)・探索の会話(④)・解決の会話モード(⑤)で共通して使う(DESIGN.md)。
 //
 // 立ち絵アセットは repo ルートの assets/(src/ 外)に置かれているため `@/*` エイリアスは使えず、
 // 相対パスで import する。vite/client.d.ts の `declare module '*.png'` により型定義は問題なく、
@@ -69,6 +83,12 @@ import {
 } from 'react'
 
 import type { Character, Expression } from '@/core/model'
+import type { BoxOrientation } from '@/ui/lib/background-box'
+import {
+  layoutTwoSlotFrame,
+  type TwoSlotDisplay,
+  type TwoSlotSpeaker,
+} from '@/ui/lib/two-slot-frame'
 import { cn } from '@/ui/lib/utils'
 
 import kirishimaPortrait from '../../../assets/characters/kirishima-neutral.png'
@@ -111,9 +131,6 @@ function usePrefersReducedMotion(): boolean {
   return prefersReducedMotion
 }
 
-// 霧島=左・橘=右で固定(docs/characters.md「霧島＝左・橘＝右」)。stacked/overlayの2枠で使う。
-const PORTRAIT_ORDER: readonly Character[] = ['霧島', '橘']
-
 // 表情差分(schema_version 0.7.0・#100/#101・DESIGN.md「表情差分の定義表」)。現在生成済みは
 // 3名とも neutral のみ(#102)。neutral 以外の PNG が無くても表示が壊れないよう、
 // resolvePortraitSrc() で該当表情が無ければ neutral にフォールバックする。
@@ -139,71 +156,104 @@ export function resolvePortraitSrc(
 /**
  * 会話フレームの発話者。通常はサポート役キャラ(Character)だが、探索の`collect.dialogue[]`限定で
  * NPC(自由記述の名前・立ち絵を持たない)が話す場合がある(#100/#101, docs/scenario_schema.md §2.6)。
- * NPC発話時は霧島・橘の両立ち絵をグレーアウトし、名札にnpcの値をそのまま表示する(DESIGN.md
- * 「探索シーン」節「NPC直接発話の描画」)。
+ * `src/ui/lib/two-slot-frame.ts`の`TwoSlotSpeaker`と同じ形(このファイルからも再exportする)。
  */
-export type ConversationSpeaker = Character | { readonly npc: string }
+export type ConversationSpeaker = TwoSlotSpeaker
 
 function speakerLabel(speaker: ConversationSpeaker): string {
   return typeof speaker === 'string' ? speaker : speaker.npc
 }
 
-/** NPC発話時はどの立ち絵も発話者に一致しない(=全員グレーアウト)ため null を返す。 */
-function speakingCharacterOf(speaker: ConversationSpeaker): Character | null {
-  return typeof speaker === 'string' ? speaker : null
+// 立ち絵の寸法:
+// - stacked(背景の箱を持たない画面、resolve-screen.tsx等)は#108で定めた固定pxのまま
+//   (DESIGN.md「立ち絵の拡大」節: デスクトップ240×320px・モバイル120×160px、3:4)。
+//   8ptグリッド上のTailwindスペーシング単位(1=4px)で表現する。
+// - overlay(#119/#124): 固定pxは撤回し、背景の箱の高さに対する比率で決める。BackgroundBox
+//   (`[container-type:size]`)を基準としたコンテナクエリ単位(cqh)で指定し、箱の実際の
+//   レンダリング高さに追従させる(DESIGN.md「会話フレーム」節「立ち絵の拡大」の目安:
+//   横長の箱=箱の高さの45〜50%程度、縦長の箱=30〜35%程度。3:4比率から幅は自動算出)。
+const PORTRAIT_SIZE_CLASS = 'h-40 w-30 sm:h-80 sm:w-60'
+// overlay限定(#119/#124、2026-09-14改訂): 固定cqh高さではなく「箱の高さに対する上限
+// (max-h、目安値はDESIGN.md「立ち絵の拡大」節の横長45〜50%/縦長30〜35%)」まで、実際に
+// 使える縦方向の空き(=立ち絵の行=h-full、下記renderPortraitRow呼び出し側のflex-1/min-h-0)
+// に収まるだけ自動で縮める。会話ウィンドウ(常に内容優先・縮めない)が大きいほど立ち絵は
+// 小さくなり、頭が箱の上端で切れることはない(flexboxのshrinkで立ち絵の行だけが縮む設計、
+// conversation-frame.tsx冒頭コメント「overlay限定」参照)。
+const PORTRAIT_BOX_RELATIVE_SIZE_CLASS: Record<BoxOrientation, string> = {
+  landscape: 'h-full max-h-[48cqh] w-auto aspect-[3/4]',
+  portrait: 'h-full max-h-[32cqh] w-auto aspect-[3/4]',
 }
 
-interface PortraitProps {
-  character: Character
-  speaking: boolean
-  /** 話している場合の表情(省略時neutral)。待機中の立ち絵は常にneutralを使う(#102)。 */
-  expression?: Expression
-  /**
-   * 探索の会話オーバーレイ(#52・T047)・導入の対策室レイアウト(#100/#102)用の縮小サイズ。
-   * 背景シーンの箱(aspect-video)の中に立ち絵を収めるため、stacked(既定)より一回り小さくする
-   * (DESIGN.md「会話オーバーレイのレイアウト」節「モバイルでも立ち絵は縮小して端に置く」は
-   * モバイルに限らずoverlay全般に適用)。
-   */
-  compact?: boolean
+// 話者の枠(#119/#124): いま話している人の立ち絵カードを、フルカラー表示に加えて黒または白の
+// 枠線で囲む(DESIGN.md「会話フレーム」節「話者の枠」)。色は代表未決のため、index.cssの
+// --speaker-frame-black/--speaker-frame-whiteトークン経由で両方用意し、切り替えはこの定数
+// 1箇所で行う(PRに黒・白それぞれのスクリーンショットを添付し代表が選ぶ)。既定は黒。
+const SPEAKER_FRAME_COLOR: 'black' | 'white' = 'black'
+const SPEAKER_FRAME_RING_CLASS =
+  SPEAKER_FRAME_COLOR === 'black'
+    ? 'ring-4 ring-speaker-frame-black'
+    : 'ring-4 ring-speaker-frame-white'
+
+/** 名札(色だけに頼らず発話者を示す、WCAG 1.4.1)。会話ウィンドウ内のこの1箇所だけに出す
+ * (#119/#124: 旧実装は立ち絵カードの下にも同じ名札を重複表示しており、二重表示になっていた。
+ * 立ち絵側はaltテキスト(発話中/待機中)のみで発話者を示し、可視の名札はウィンドウ側に一本化する)。 */
+function NamePlate({ label, speaking }: { label: string; speaking: boolean }) {
+  return (
+    <span
+      className={cn(
+        'rounded-full font-semibold',
+        'px-3 py-0.5 text-xs',
+        speaking
+          ? 'bg-primary text-primary-foreground'
+          : 'bg-muted text-muted-foreground border-border border',
+      )}
+    >
+      {label}
+    </span>
+  )
 }
 
 /**
- * 立ち絵1体分。発話中はフルカラー+手前(scale)、待機中はグレースケール+不透明度低下。
+ * 枠が空(まだ誰も入っていない)のときのプレースホルダー。立ち絵と同じ寸法の不可視要素を置き、
+ * 後から人物が入っても枠の位置(左右のアンカー)がずれないようにする(DESIGN.md「左右2枠の
+ * 入れ替わり方式」節「枠の位置そのものは動かさず」)。
+ */
+function EmptyPortraitSlot({ sizeClass }: { sizeClass: string }) {
+  return <div aria-hidden="true" className={cn('shrink-0', sizeClass)} data-slot="empty" />
+}
+
+interface PortraitProps {
+  display: TwoSlotDisplay
+  slot: 'left' | 'right'
+  /** 話している場合の表情(省略時neutral)。待機中の立ち絵は常にneutralを使う(#102)。 */
+  expression?: Expression
+  sizeClass: string
+}
+
+/**
+ * 立ち絵1体分。発話中はフルカラー+話者の枠(黒/白リング)、待機中はグレースケール+不透明度低下。
+ * 名札はここでは描画しない(#119/#124、上記NamePlateコメント参照。発話者の可視表示は会話
+ * ウィンドウ側のNamePlateに一本化し、立ち絵側はimgのalt(発話中/待機中)でのみ示す)。
  * 立ち絵アセットは切り抜き前(単色の無地背景, DESIGN.md「アセット」節「立ち絵の運用メモ」)のため
  * 現状は背景付きの矩形で表示される(切り抜きは別途 IMAGE_WORKFLOW 経由の工程。本PRのスコープ外)。
  */
-function Portrait({ character, speaking, expression, compact = false }: PortraitProps) {
+function Portrait({ display, slot, expression, sizeClass }: PortraitProps) {
+  const { character, speaking } = display
   return (
     <div
-      className={cn(
-        'flex shrink-0 flex-col items-center',
-        compact ? 'gap-1' : 'gap-2',
-        speaking ? 'z-10' : 'z-0',
-      )}
+      data-slot={slot}
+      className={cn('flex shrink-0 items-end', sizeClass, speaking ? 'z-10' : 'z-0')}
     >
       <img
         src={resolvePortraitSrc(character, speaking ? expression : undefined)}
         alt={`${character}（${speaking ? '発話中' : '待機中'}）`}
         className={cn(
-          'rounded-lg object-cover object-top transition-all duration-200',
-          compact ? 'h-16 w-12 sm:h-28 sm:w-20' : 'h-32 w-24 sm:h-44 sm:w-32',
+          'h-full w-full rounded-lg object-cover object-top transition-all duration-200',
           speaking
-            ? 'opacity-100 grayscale-0 saturate-100'
+            ? cn(SPEAKER_FRAME_RING_CLASS, 'opacity-100 grayscale-0 saturate-100')
             : 'scale-95 opacity-60 grayscale saturate-0',
         )}
       />
-      {/* 色だけに頼らず名札テキストで発話者を明示する(WCAG 1.4.1)。待機中も常に表示する。 */}
-      <span
-        className={cn(
-          'rounded-full font-semibold',
-          compact ? 'px-2 py-0.5 text-[10px]' : 'px-3 py-0.5 text-xs',
-          speaking
-            ? 'bg-primary text-primary-foreground'
-            : 'bg-muted text-muted-foreground border-border border',
-        )}
-      >
-        {character}
-      </span>
     </div>
   )
 }
@@ -211,11 +261,23 @@ function Portrait({ character, speaking, expression, compact = false }: Portrait
 export interface ConversationFrameProps {
   /**
    * 現在の発話者。通常はサポート役キャラ(Character)。探索の`collect.dialogue[]`限定でNPCが
-   * 話す場合は`{ npc: 'NPC名' }`を渡す(#100/#102、ConversationSpeaker参照)。NPC発話時は
-   * 霧島・橘(layout='intro'ならさらに小鳥遊も)の立ち絵が全員グレーアウトし、名札には
-   * npc の値をそのまま表示する(DESIGN.md「探索シーン」節「NPC直接発話の描画」)。
+   * 話す場合は`{ npc: 'NPC名' }`を渡す(ConversationSpeaker参照)。`speakerHistory`の最後の
+   * 要素と一致させること(省略時は`speakerHistory`が`[speaker]`にフォールバックするため、
+   * 単発の会話ではこのpropだけで足りる)。
    */
   speaker: ConversationSpeaker
+  /**
+   * 「今の会話1つぶん」の発話者履歴(古い→新しい順、最後の要素=`speaker`と同じ値)。
+   * 左右2枠の並びは`src/ui/lib/two-slot-frame.ts`の`layoutTwoSlotFrame`がこの履歴全体から
+   * 導出する(#108/#110)。複数ターンの会話(導入の`character_intros[]`・探索の
+   * `collect.dialogue[]`・解決の全問い)を送る呼び出し側は、そのつど「これまでの発話者」を
+   * 蓄積してここに渡すことで、正しい入れ替わり順を得られる。省略時は`[speaker]`
+   * (履歴なし=この1ターンだけの単発会話。探索完了への誘導等)にフォールバックする。
+   * 並びのリセット(導入の開始・探索の会話1つの開始・解決の開始)は、呼び出し側がこの配列を
+   * 新しく空から蓄積し始めることで表現する(このコンポーネント自体はリセット用のstateを
+   * 持たない)。
+   */
+  speakerHistory?: readonly ConversationSpeaker[]
   /**
    * 会話文(世界観テキスト、明朝で表示)。タイプライターで1文字ずつ表示するため文字列で受け取る
    * (呼び出し側は現状すべて文字列を渡している。scene-explorer.tsx / resolve-screen.tsx 参照)。
@@ -228,17 +290,13 @@ export interface ConversationFrameProps {
    */
   expression?: Expression
   /**
-   * レイアウト種別(#52・T047、導入の3枠は#100/#102)。既定の'stacked'は従来どおり画面下部に
-   * 会話ウィンドウ・ステージ中央の左右に立ち絵を縦に積む表示(resolve-screen.tsx で使用、非破壊)。
-   * 'overlay'は探索の会話オーバーレイ(scene-explorer.tsx)専用で、絶対配置(`absolute inset-0`)
-   * になり、呼び出し側が `position: relative` を持つコンテナに重ねて使うことを前提とする
-   * (DESIGN.md「探索シーン」節「会話オーバーレイのレイアウト」)。
-   * 'intro'は導入(③)専用の「対策室レイアウト」(#100/#102、DESIGN.md「会話フレーム」節)で、
-   * 'overlay'と同じ絶対配置の仕組みを再利用しつつ、霧島=左・橘=右に加えて小鳥遊を
-   * 中央後方やや小さめに1体追加した3枠になる(呼び出し側は intro-screen.tsx の背景の箱に
-   * 重ねて使う想定)。
+   * レイアウト種別(#52・T047)。既定の'stacked'は画面の通常フローに沿って会話ウィンドウ・
+   * その上の左右2枠を縦に積む表示(resolve-screen.tsx で使用、背景画像を持たない画面向け)。
+   * 'overlay'は探索の会話オーバーレイ・導入(scene-explorer.tsx / intro-screen.tsx)専用で、
+   * 絶対配置(`absolute inset-0`)になり、呼び出し側が `position: relative` を持つコンテナに
+   * 重ねて使うことを前提とする(DESIGN.md「探索シーン」節「会話オーバーレイのレイアウト」)。
    */
-  layout?: 'stacked' | 'overlay' | 'intro'
+  layout?: 'stacked' | 'overlay'
   /**
    * 会話ウィンドウ内に載せる追加要素(選択肢・相談ボタン・カードドロワー等、DESIGN.md
    * 「解決の会話モードで会話フレーム上に載せる要素」)。
@@ -261,7 +319,7 @@ export interface ConversationFrameProps {
    * 指定した場合のみ有効(既定は従来どおり、指定しなければ何も変わらない):
    * - 全文表示前にクリック/タップ、またはEnter/Spaceで即全文表示(スキップ)。
    * - 全文表示後にクリック/タップ、またはEnter/Spaceでこのコールバックを呼ぶ(呼び出し側が
-   *   会話を閉じる。DESIGN.md「探索シーン」節「会話ウィンドウ」=旧「閉じる」ボタンの代替)。
+   *   会話を閉じる、または次のターンへ進める。DESIGN.md「探索シーン」節「会話ウィンドウ」)。
    * - Escapeキーは全文表示の途中/後を問わず常にこのコールバックを呼ぶ(即座に閉じる)。
    * 指定した場合、会話文はもうスキップ専用の内側の<button>では描画しない(操作領域が
    * ウィンドウ全体=このコールバックに一本化されるため、ボタンの入れ子を避ける)。
@@ -272,10 +330,10 @@ export interface ConversationFrameProps {
   /**
    * Escapeキー押下時に呼ぶコールバック(onDismiss指定時のみ意味を持つ)。省略時は`onDismiss`に
    * フォールバックする(従来どおり=Escapeは常に閉じる)。多ターンの会話(探索の`collect.dialogue[]`
-   * 送り、#102)で`onDismiss`を「次の行へ進める」用途に流用する呼び出し側は、Escapeまで
-   * 一緒に「次の行」扱いにされると閉じる手段が無くなってしまうため、`onEscape`に
-   * 「会話を閉じる」処理を別途渡すこと(scene-explorer.tsx参照。DESIGN.md「探索シーン」節
-   * 「会話ウィンドウのクリック/タップ閉じ」はEscapeが常に閉じる仕様のまま変えていない)。
+   * 送り)で`onDismiss`を「次の行へ進める」用途に流用する呼び出し側は、Escapeまで一緒に
+   * 「次の行」扱いにされると閉じる手段が無くなってしまうため、`onEscape`に「会話を閉じる」
+   * 処理を別途渡すこと(scene-explorer.tsx参照)。導入(intro-screen.tsx)のように「閉じる」
+   * 概念自体が無い呼び出し側は、no-op(`() => {}`)を渡してEscapeを無効化してよい。
    */
   onEscape?: () => void
   /**
@@ -292,11 +350,33 @@ export interface ConversationFrameProps {
    * 付けない。キーボード操作者は Escape、または children 内の実ボタン=「わかった」を使う)。
    */
   onOutsideDismiss?: () => void
+  /**
+   * `onDismiss`の2段階操作(スキップ→次へ/閉じる)を、会話ウィンドウだけでなく画面全体
+   * (背景・立ち絵を含む外枠)でも受け付ける(#108/#110・導入専用、DESIGN.md「台詞送り」節
+   * 「画面のどこをクリック/タップしても次の行に進む」)。`onDismiss`指定時のみ意味を持ち、
+   * `layout="overlay"`と組み合わせて使う想定(intro-screen.tsx)。キーボード操作
+   * (Tab到達・Enter/Space)は従来どおり会話ウィンドウ自体(role="button")が担い、外枠側は
+   * ポインタ操作(onClickのみ)を追加するだけでrole="button"の入れ子を避ける。
+   * scene-explorer.tsx の調査結果/danger会話オーバーレイ(操作領域を会話ウィンドウ自体に
+   * 限定する従来仕様)では指定しない。
+   */
+  dismissAnywhere?: boolean
+  /**
+   * 背景の箱の向き(#119/#124)。`layout="overlay"`のときのみ意味を持ち、立ち絵の拡大率の上限
+   * (PORTRAIT_BOX_RELATIVE_SIZE_CLASS、横長/縦長で切り替え)を決める。会話ウィンドウ自体は
+   * 高さ上限を持たず内容優先で伸び、立ち絵の行が箱の残り空間に合わせて自動的に縮む
+   * (2026-09-14改訂・#124、上記layout==='overlay'のコメント参照)。
+   * 呼び出し側(scene-explorer.tsx/intro-screen.tsx/resolve-screen.tsx)は自身が描画する
+   * BackgroundBoxと同じ`resolveBoxOrientation()`の結果を渡すこと。`layout="stacked"`では
+   * 無視される(固定pxのPORTRAIT_SIZE_CLASSを使う)。省略時は'landscape'。
+   */
+  boxOrientation?: BoxOrientation
 }
 
 /** 導入・探索の会話・解決の会話モードで共通して使う会話フレーム(DESIGN.md「会話フレーム」節)。 */
 export function ConversationFrame({
   speaker,
+  speakerHistory,
   line,
   expression,
   layout = 'stacked',
@@ -305,10 +385,13 @@ export function ConversationFrame({
   onDismiss,
   onEscape,
   onOutsideDismiss,
+  dismissAnywhere = false,
+  boxOrientation = 'landscape',
 }: ConversationFrameProps) {
   const prefersReducedMotion = usePrefersReducedMotion()
   const label = speakerLabel(speaker)
-  const speakingCharacter = speakingCharacterOf(speaker)
+  // 左右2枠の並び(#108/#110): speakerHistory省略時は履歴なし(=この1ターンだけ)として扱う。
+  const twoSlot = layoutTwoSlotFrame(speakerHistory ?? [speaker])
 
   // line(または prefers-reduced-motion 設定)が変わったら、レンダー中に即座に表示位置を
   // 先頭(またはreduced-motionなら全文)へ戻す。useEffectでの事後リセットだと、変更後の最初の
@@ -421,15 +504,35 @@ export function ConversationFrame({
     }
   }
 
-  // onOutsideDismiss指定時(#92追補): ウィンドウの外側(overlayなら重なった背景、stackedなら
-  // 立ち絵・ウィンドウ周囲の余白)を1つの操作領域にする。onDismissと違いwindowRef自体には
-  // 付けない(children内の実`<button>`=「わかった」とのネスト回避のため、上記JSDoc参照)。
+  // 会話ウィンドウ自体のクリック(dismissWindowProps.onClick)は、dismissAnywhere時に外枠へも
+  // 伝播すると2重発火(スキップ+即閉じ等)してしまうため、ここで止める(下記
+  // handleContainerActivateのコメント参照)。onDismiss未指定時はこのハンドラ自体使われない。
+  function handleWindowActivate(event: MouseEvent<HTMLDivElement>) {
+    event.stopPropagation()
+    handleOverlayActivate()
+  }
+
+  // dismissAnywhere指定時(#108/#110): 会話ウィンドウを含む外枠全体でも同じ2段階操作
+  // (スキップ→次へ/閉じる)を受け付ける(DESIGN.md「台詞送り」節)。ポインタ操作のみ
+  // (role・tabIndexは付けない=role="button"の入れ子を避ける、windowRef側の実装参照)。
+  // クリック後もキーボード操作(Enter/Space)を続けられるよう、ウィンドウへフォーカスを戻す。
+  function handleContainerActivate() {
+    handleOverlayActivate()
+    windowRef.current?.focus()
+  }
+
+  // onOutsideDismiss指定時(#92追補): ウィンドウの外側(overlayなら立ち絵・周囲の余白、
+  // stackedでも同様)を1つの操作領域にする。onDismissと違いwindowRef自体には付けない
+  // (children内の実`<button>`=「わかった」とのネスト回避のため、上記JSDoc参照)。
   // ハンドラは呼び出し側(下記のoverlay/stackedそれぞれの一番外側の要素)に付け、
-  // `event.target === event.currentTarget` のときのみ発火させることで、内側の立ち絵・
-  // ウィンドウ(・その中の「わかった」ボタン)へのクリックがバブリングしてきても
-  // 誤って閉じないようにする(=クリックが実際に「外側の余白」に当たった場合のみ閉じる)。
+  // クリックが実際の会話ウィンドウ(windowRef)の**外**で起きた場合のみ発火させる
+  // (windowRef.current.containsで判定。#108/#110で立ち絵をウィンドウの上に大きく重ねる
+  // レイアウトに変えたことで、立ち絵の表示領域そのものが外枠の大半を占めるようになり、
+  // 「クリックが厳密に外枠要素自身に当たった場合のみ」(target===currentTarget)という
+  // 旧判定では立ち絵の上のクリックを拾えなくなったため、より頑健なcontains判定に変更した。
+  // 立ち絵・ウィンドウ周囲の余白のどちらも「ウィンドウの外側」として扱う点はJSDocの記述どおり)。
   function handleOutsideActivate(event: MouseEvent<HTMLDivElement>) {
-    if (event.target !== event.currentTarget) return
+    if (windowRef.current?.contains(event.target as Node)) return
     onOutsideDismiss?.()
   }
 
@@ -450,7 +553,7 @@ export function ConversationFrame({
         role: 'button' as const,
         tabIndex: 0,
         'aria-label': line,
-        onClick: handleOverlayActivate,
+        onClick: handleWindowActivate,
         onKeyDown: handleOverlayKeyDown,
       }
     : {}
@@ -460,9 +563,7 @@ export function ConversationFrame({
   const windowContent = (
     <>
       <div className="flex flex-col gap-2">
-        <span className="bg-primary text-primary-foreground w-fit rounded-full px-3 py-1 text-xs font-semibold">
-          {label}
-        </span>
+        <NamePlate label={label} speaking />
         {isComplete ? (
           <p className="font-heading text-base leading-relaxed sm:text-lg">{line}</p>
         ) : onDismiss ? (
@@ -492,50 +593,85 @@ export function ConversationFrame({
     </>
   )
 
-  if (layout === 'overlay' || layout === 'intro') {
-    // 探索の会話オーバーレイ(#52・T047・DESIGN.md「会話オーバーレイのレイアウト」節)、および
-    // 導入の対策室レイアウト(#100/#102、layout='intro')。呼び出し側(scene-explorer.tsx /
-    // intro-screen.tsx)の`position: relative`な背景の箱に`absolute inset-0`で重ね、下端に
-    // 立ち絵(左右端、intro層はさらに小鳥遊を中央後方に1体追加)+会話ウィンドウ(中央帯)を
-    // 1行で並べる(背景中央と重ならないよう端寄せ)。行の高さを`h-full`で確定させることで、
-    // ウィンドウの`max-h-[...]%`(下記コメント参照)がその高さを基準に計算されるようにしている。
-    const isIntro = layout === 'intro'
+  // 左右2枠の立ち絵(#108/#110): 空の枠は同寸法の不可視プレースホルダーで埋め、位置がずれない
+  // ようにする。NPC発話中(npcSpeaking)はどちらの枠も現在の占有者のまま・speaking=falseに
+  // なる(layoutTwoSlotFrame参照)ため、Portrait側の描画は変更不要(通常の待機中表示と同じ)。
+  // sizeClassはlayoutごとに呼び出し元が選ぶ(stacked=固定px/overlay=箱高さ比率cqh、上記
+  // PORTRAIT_SIZE_CLASS/PORTRAIT_BOX_RELATIVE_SIZE_CLASS参照)。
+  // shrink/grow挙動(overlay限定・stacked=shrink-0固定/overlay=flex-1 min-h-0で縮む)は
+  // 呼び出し側がextraClassNameで指定する(#124: 同じユーティリティを2箇所で異なる方向に
+  // 上書きするとTailwindのクラス優先順位が不定になるため、基底クラスにはshrink系を含めない)。
+  function renderPortraitRow(extraClassName: string, sizeClass: string) {
     return (
       <div
-        className="absolute inset-0 z-10 flex flex-col justify-end p-2 sm:p-4"
+        className={cn(
+          // relative+z-20: 位置指定(relative)を持つ会話ウィンドウ(z-10)より確実に手前に
+          // 描画するため。position指定の無い要素はz-indexの数値に関わらず位置指定要素の
+          // 背後に回ってしまう(CSSの積み重ね規則)。
+          'relative z-20 flex items-end justify-between gap-2 sm:gap-4',
+          extraClassName,
+        )}
+      >
+        {twoSlot.left ? (
+          <Portrait
+            display={twoSlot.left}
+            slot="left"
+            expression={twoSlot.left.speaking ? expression : undefined}
+            sizeClass={sizeClass}
+          />
+        ) : (
+          <EmptyPortraitSlot sizeClass={sizeClass} />
+        )}
+        {twoSlot.right ? (
+          <Portrait
+            display={twoSlot.right}
+            slot="right"
+            expression={twoSlot.right.speaking ? expression : undefined}
+            sizeClass={sizeClass}
+          />
+        ) : (
+          <EmptyPortraitSlot sizeClass={sizeClass} />
+        )}
+      </div>
+    )
+  }
+
+  if (layout === 'overlay') {
+    // 探索の会話オーバーレイ(#52・T047)、および導入(#108/#110)。#119/#124: 呼び出し側
+    // (scene-explorer.tsx/intro-screen.tsx/resolve-screen.tsx)がBackgroundBoxの子として
+    // このコンポーネントを配置する前提で、箱に対して`absolute inset-0`で重畳する
+    // (旧#108/#110の「箱の直後の兄弟要素として通常のドキュメントフローに置く」形は、
+    // 縦スクロールを出さない要件(#119)を満たせなかったため撤回した)。
+    // 2026-09-14改訂(#124・代表FB「解決の会話ウィンドウが窮屈」): 内側のラッパーに`h-full`
+    // (箱の実高さに確定させる)を与え、立ち絵の行を`flex-1 min-h-0`(縮小可・content優先で
+    // 縮める)、会話ウィンドウを`shrink-0`(縮めない=内容を絶対に切り詰めない)にすることで、
+    // 「立ち絵→ウィンドウ」の合計が箱の高さを超える場合は立ち絵の行**だけ**が自動的に縮む
+    // (window有りだけがshrink-0なのでflexboxの縮小配分は立ち絵の行に全て乗る、標準的な
+    // flexbox shrink計算)。立ち絵カード自身(PORTRAIT_BOX_RELATIVE_SIZE_CLASS)も`h-full`
+    // (=縮んだ行の実高さ)を基準にし、`max-h-[Xcqh]`で上限を掛ける(cqh単独だと行の実際の
+    // 空きに追従しないため、上限としてのみ使う)。会話ウィンドウは`overflow-y-auto`+
+    // `max-h-full`を最後の安全弁として残すが、通常の表示状態では発火しない設計
+    // (E2E/E2E-shot.mjsのno-scroll確認対象)。
+    const portraitSizeClass = PORTRAIT_BOX_RELATIVE_SIZE_CLASS[boxOrientation]
+    return (
+      <div
+        data-testid="conversation-frame-overlay"
+        className="absolute inset-0 z-10 flex flex-col"
+        onClick={dismissAnywhere ? handleContainerActivate : undefined}
         onKeyDown={onOutsideDismiss ? handleOutsideKeyDown : undefined}
       >
         <div
-          className="relative flex h-full items-end justify-center gap-2 sm:gap-3"
+          className="relative flex h-full min-h-0 flex-col justify-end gap-0 p-2 sm:p-4"
           onClick={onOutsideDismiss ? handleOutsideActivate : undefined}
           {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
         >
-          <Portrait
-            character={PORTRAIT_ORDER[0]}
-            speaking={PORTRAIT_ORDER[0] === speakingCharacter}
-            expression={PORTRAIT_ORDER[0] === speakingCharacter ? expression : undefined}
-            compact
-          />
-          {/* 小鳥遊(対策室レイアウト・#100/#102): 中央後方やや小さめ(DESIGN.md「会話フレーム」節)。
-              絶対配置で中央上寄りに置き、compact(縮小サイズ)+スケールダウン+低いz-indexで
-              左右の2体より「奥」にいるように見せる。他の立ち絵と同じグレーアウト/名札の
-              仕組みをそのまま使う(発話者以外は常にグレーアウト)。 */}
-          {isIntro && (
-            <div className="absolute top-0 left-1/2 z-0 -translate-x-1/2 scale-90">
-              <Portrait
-                character="小鳥遊"
-                speaking={'小鳥遊' === speakingCharacter}
-                expression={'小鳥遊' === speakingCharacter ? expression : undefined}
-                compact
-              />
-            </div>
-          )}
-          {/* 会話ウィンドウ(帯): 背景の箱(aspect-video・overflow-hidden)からはみ出さないよう
-              max-h+overflow-y-autoにする(カードドロワー展開時・長い台詞での見切れ対策)。 */}
+          {renderPortraitRow('min-h-0 flex-1 -mb-2 sm:-mb-4', portraitSizeClass)}
           <div
             ref={windowRef}
+            data-testid="conversation-window"
             className={cn(
-              'border-primary bg-card relative z-10 flex max-h-[70%] min-w-0 flex-1 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:max-h-[75%] sm:gap-4 sm:p-6',
+              'border-primary bg-card relative z-10 flex min-w-0 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
+              'max-h-full',
               onDismiss &&
                 'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
             )}
@@ -543,12 +679,6 @@ export function ConversationFrame({
           >
             {windowContent}
           </div>
-          <Portrait
-            character={PORTRAIT_ORDER[1]}
-            speaking={PORTRAIT_ORDER[1] === speakingCharacter}
-            expression={PORTRAIT_ORDER[1] === speakingCharacter ? expression : undefined}
-            compact
-          />
         </div>
       </div>
     )
@@ -561,22 +691,14 @@ export function ConversationFrame({
       onKeyDown={onOutsideDismiss ? handleOutsideKeyDown : undefined}
       {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
     >
-      {/* ステージ: 中央左右に立ち絵(霧島=左・橘=右で固定)。主人公の立ち絵は出さない。 */}
-      <div className="flex items-end justify-center gap-6 pb-4 sm:gap-12">
-        {PORTRAIT_ORDER.map((character) => (
-          <Portrait
-            key={character}
-            character={character}
-            speaking={character === speakingCharacter}
-            expression={character === speakingCharacter ? expression : undefined}
-          />
-        ))}
-      </div>
+      {/* 立ち絵(左右2枠、#108/#110): 主人公の立ち絵は出さない。stackedは背景の箱を持たない
+          画面向けのため固定pxのまま(PORTRAIT_SIZE_CLASS)、縮小しない(shrink-0)。 */}
+      {renderPortraitRow('shrink-0 px-2 sm:gap-12 -mb-4', PORTRAIT_SIZE_CLASS)}
       {/* 会話ウィンドウ: surface + 上辺に primary(ゴールド)のアクセント。 */}
       <div
         ref={windowRef}
         className={cn(
-          'border-primary bg-card flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
+          'border-primary bg-card relative z-10 flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
           onDismiss &&
             'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
         )}

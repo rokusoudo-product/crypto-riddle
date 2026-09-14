@@ -135,10 +135,11 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
 
       await playThroughExplorationToResolution(user)
 
-      // 会話フレーム: 発話者=霧島(立ち絵の名札+会話ウィンドウのピルの2箇所に表示)、問い文が表示される
-      // (会話モード, spec §8.2)。タイプライター演出中でも、問い文の全文は支援技術向けに
-      // sr-only で一度に渡されているため(#64/T042)、この時点で getByText は見つかる。
-      expect(screen.getAllByText('霧島').length).toBeGreaterThanOrEqual(2)
+      // 会話フレーム: 発話者=霧島(名札は会話ウィンドウ内の1箇所だけに表示。#119/#124で
+      // 立ち絵カード側の重複名札表示を廃止した)、問い文が表示される(会話モード, spec §8.2)。
+      // タイプライター演出中でも、問い文の全文は支援技術向けにsr-onlyで一度に渡されているため
+      // (#64/T042)、この時点で getByText は見つかる。
+      expect(screen.getAllByText('霧島').length).toBeGreaterThanOrEqual(1)
       expect(screen.getByText('この侵入、どこから入られたと見る？')).toBeInTheDocument()
 
       // 選択肢はタイプライターの全文表示(またはスキップ)後にしか出ない(#64/T042)ため、
