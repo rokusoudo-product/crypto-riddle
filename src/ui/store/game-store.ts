@@ -69,6 +69,17 @@ export interface GameStoreState {
   saveData: SaveData | null
   saveStatus: SaveStatus
   /**
+   * 探索④で最後に表示していたシーンのid(#119/#124)。解決⑤が「解決へ進む」を押した時点の
+   * 探索シーンの背景をそのまま使う(新しい画像は作らない、代表決定2026-09-13)ための配線。
+   * セーブデータのスキーマは変更しない(SaveData/ScenarioProgressStateには含めない、
+   * IndexedDBへは永続化しない)、UI専用・このストアだけが持つ一時的な値。
+   * explore-screen.tsx がSceneExplorerの`onActiveSceneChange`から都度更新し、
+   * resolve-screen.tsxが読む。scenario.scenesが無い場合や、探索を経ずに解決へ入った場合
+   * (通常は起きない)はnullのままで、呼び出し側はscenario.scenes[0]等へフォールバックする。
+   */
+  lastExploredSceneId: string | null
+  setLastExploredSceneId: (sceneId: string | null) => void
+  /**
    * core の scenarioReducer にイベントを渡し、状態を進める。
    * 戻り値は遷移後の ScenarioProgressState(呼び出し側が即座に画面遷移の判断に使えるようにする)。
    * 遷移が起きた場合は非同期で SaveStorage への保存も行う(fire-and-forget。失敗しても
@@ -106,11 +117,18 @@ async function persistProgress(
 }
 
 export const useGameStore = create<GameStoreState>()((set, get) => ({
-  scenarios: [DEFAULT_SCENARIO, s2VpnRansomwareFixture, s3EcCardLeakFixture, slConsignmentBreachFixture],
+  scenarios: [
+    DEFAULT_SCENARIO,
+    s2VpnRansomwareFixture,
+    s3EcCardLeakFixture,
+    slConsignmentBreachFixture,
+  ],
   scenario: DEFAULT_SCENARIO,
   progress: createInitialScenarioState(DEFAULT_SCENARIO),
   saveData: null,
   saveStatus: 'idle',
+  lastExploredSceneId: null,
+  setLastExploredSceneId: (sceneId) => set({ lastExploredSceneId: sceneId }),
 
   dispatch: (event) => {
     const { scenario, progress } = get()
@@ -135,7 +153,11 @@ export const useGameStore = create<GameStoreState>()((set, get) => ({
 
   restartScenario: (scenario) => {
     const nextScenario = scenario ?? get().scenario
-    set({ scenario: nextScenario, progress: createInitialScenarioState(nextScenario) })
+    set({
+      scenario: nextScenario,
+      progress: createInitialScenarioState(nextScenario),
+      lastExploredSceneId: null,
+    })
   },
 }))
 
@@ -165,5 +187,6 @@ export function resetGameStoreForTests(options?: {
     progress: createInitialScenarioState(scenario),
     saveData: null,
     saveStatus: 'idle',
+    lastExploredSceneId: null,
   })
 }

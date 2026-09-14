@@ -83,12 +83,13 @@ import {
 } from 'react'
 
 import type { Character, Expression } from '@/core/model'
-import { cn } from '@/ui/lib/utils'
+import type { BoxOrientation } from '@/ui/lib/background-box'
 import {
   layoutTwoSlotFrame,
   type TwoSlotDisplay,
   type TwoSlotSpeaker,
 } from '@/ui/lib/two-slot-frame'
+import { cn } from '@/ui/lib/utils'
 
 import kirishimaPortrait from '../../../assets/characters/kirishima-neutral.png'
 import tachibanaPortrait from '../../../assets/characters/tachibana-neutral.png'
@@ -163,13 +164,41 @@ function speakerLabel(speaker: ConversationSpeaker): string {
   return typeof speaker === 'string' ? speaker : speaker.npc
 }
 
-// 立ち絵の寸法(DESIGN.md「立ち絵の拡大」節): デスクトップ(sm以上)240×320px・モバイル120×160px
-// (いずれも3:4)。8ptグリッド上のTailwindスペーシング単位(1=4px)で表現する
-// (w-30/h-40=120×160px、sm:w-60/sm:h-80=240×320px。カラーコード同様、サイズの直書きを避け
-// Tailwindのテーマ値経由で指定する)。
+// 立ち絵の寸法:
+// - stacked(背景の箱を持たない画面、resolve-screen.tsx等)は#108で定めた固定pxのまま
+//   (DESIGN.md「立ち絵の拡大」節: デスクトップ240×320px・モバイル120×160px、3:4)。
+//   8ptグリッド上のTailwindスペーシング単位(1=4px)で表現する。
+// - overlay(#119/#124): 固定pxは撤回し、背景の箱の高さに対する比率で決める。BackgroundBox
+//   (`[container-type:size]`)を基準としたコンテナクエリ単位(cqh)で指定し、箱の実際の
+//   レンダリング高さに追従させる(DESIGN.md「会話フレーム」節「立ち絵の拡大」の目安:
+//   横長の箱=箱の高さの45〜50%程度、縦長の箱=30〜35%程度。3:4比率から幅は自動算出)。
 const PORTRAIT_SIZE_CLASS = 'h-40 w-30 sm:h-80 sm:w-60'
+const PORTRAIT_BOX_RELATIVE_SIZE_CLASS: Record<BoxOrientation, string> = {
+  landscape: 'h-[48cqh] w-auto aspect-[3/4]',
+  portrait: 'h-[32cqh] w-auto aspect-[3/4]',
+}
+// 会話ウィンドウの高さ上限(overlay限定・#119/#124): 箱の高さに対するcqh単位。立ち絵と合わせて
+// 箱の高さを超えないよう、立ち絵の比率に応じて縦長の箱ではやや余裕を持たせる。内容がこれを
+// 超える場合はoverflow-y-auto(ウィンドウ内部のスクロール)で吸収し、ページ自体はスクロール
+// させない(#119「縦スクロールを出さない」)。
+const OVERLAY_WINDOW_MAX_HEIGHT_CLASS: Record<BoxOrientation, string> = {
+  landscape: 'max-h-[58cqh]',
+  portrait: 'max-h-[64cqh]',
+}
 
-/** 名札(色だけに頼らず発話者を示す、WCAG 1.4.1)。立ち絵の有無によらず同じ見た目にする。 */
+// 話者の枠(#119/#124): いま話している人の立ち絵カードを、フルカラー表示に加えて黒または白の
+// 枠線で囲む(DESIGN.md「会話フレーム」節「話者の枠」)。色は代表未決のため、index.cssの
+// --speaker-frame-black/--speaker-frame-whiteトークン経由で両方用意し、切り替えはこの定数
+// 1箇所で行う(PRに黒・白それぞれのスクリーンショットを添付し代表が選ぶ)。既定は黒。
+const SPEAKER_FRAME_COLOR: 'black' | 'white' = 'black'
+const SPEAKER_FRAME_RING_CLASS =
+  SPEAKER_FRAME_COLOR === 'black'
+    ? 'ring-4 ring-speaker-frame-black'
+    : 'ring-4 ring-speaker-frame-white'
+
+/** 名札(色だけに頼らず発話者を示す、WCAG 1.4.1)。会話ウィンドウ内のこの1箇所だけに出す
+ * (#119/#124: 旧実装は立ち絵カードの下にも同じ名札を重複表示しており、二重表示になっていた。
+ * 立ち絵側はaltテキスト(発話中/待機中)のみで発話者を示し、可視の名札はウィンドウ側に一本化する)。 */
 function NamePlate({ label, speaking }: { label: string; speaking: boolean }) {
   return (
     <span
@@ -191,10 +220,8 @@ function NamePlate({ label, speaking }: { label: string; speaking: boolean }) {
  * 後から人物が入っても枠の位置(左右のアンカー)がずれないようにする(DESIGN.md「左右2枠の
  * 入れ替わり方式」節「枠の位置そのものは動かさず」)。
  */
-function EmptyPortraitSlot() {
-  return (
-    <div aria-hidden="true" className={cn('shrink-0', PORTRAIT_SIZE_CLASS)} data-slot="empty" />
-  )
+function EmptyPortraitSlot({ sizeClass }: { sizeClass: string }) {
+  return <div aria-hidden="true" className={cn('shrink-0', sizeClass)} data-slot="empty" />
 }
 
 interface PortraitProps {
@@ -202,32 +229,33 @@ interface PortraitProps {
   slot: 'left' | 'right'
   /** 話している場合の表情(省略時neutral)。待機中の立ち絵は常にneutralを使う(#102)。 */
   expression?: Expression
+  sizeClass: string
 }
 
 /**
- * 立ち絵1体分。発話中はフルカラー+手前(scale)、待機中はグレースケール+不透明度低下。
+ * 立ち絵1体分。発話中はフルカラー+話者の枠(黒/白リング)、待機中はグレースケール+不透明度低下。
+ * 名札はここでは描画しない(#119/#124、上記NamePlateコメント参照。発話者の可視表示は会話
+ * ウィンドウ側のNamePlateに一本化し、立ち絵側はimgのalt(発話中/待機中)でのみ示す)。
  * 立ち絵アセットは切り抜き前(単色の無地背景, DESIGN.md「アセット」節「立ち絵の運用メモ」)のため
  * 現状は背景付きの矩形で表示される(切り抜きは別途 IMAGE_WORKFLOW 経由の工程。本PRのスコープ外)。
  */
-function Portrait({ display, slot, expression }: PortraitProps) {
+function Portrait({ display, slot, expression, sizeClass }: PortraitProps) {
   const { character, speaking } = display
   return (
     <div
       data-slot={slot}
-      className={cn('flex shrink-0 flex-col items-center gap-2', speaking ? 'z-10' : 'z-0')}
+      className={cn('flex shrink-0 items-end', sizeClass, speaking ? 'z-10' : 'z-0')}
     >
       <img
         src={resolvePortraitSrc(character, speaking ? expression : undefined)}
         alt={`${character}（${speaking ? '発話中' : '待機中'}）`}
         className={cn(
-          'rounded-lg object-cover object-top transition-all duration-200',
-          PORTRAIT_SIZE_CLASS,
+          'h-full w-full rounded-lg object-cover object-top transition-all duration-200',
           speaking
-            ? 'opacity-100 grayscale-0 saturate-100'
+            ? cn(SPEAKER_FRAME_RING_CLASS, 'opacity-100 grayscale-0 saturate-100')
             : 'scale-95 opacity-60 grayscale saturate-0',
         )}
       />
-      <NamePlate label={character} speaking={speaking} />
     </div>
   )
 }
@@ -335,6 +363,14 @@ export interface ConversationFrameProps {
    * 限定する従来仕様)では指定しない。
    */
   dismissAnywhere?: boolean
+  /**
+   * 背景の箱の向き(#119/#124)。`layout="overlay"`のときのみ意味を持ち、立ち絵の拡大率
+   * (PORTRAIT_BOX_RELATIVE_SIZE_CLASS)・会話ウィンドウの高さ上限を横長/縦長で切り替える。
+   * 呼び出し側(scene-explorer.tsx/intro-screen.tsx/resolve-screen.tsx)は自身が描画する
+   * BackgroundBoxと同じ`resolveBoxOrientation()`の結果を渡すこと。`layout="stacked"`では
+   * 無視される(固定pxのPORTRAIT_SIZE_CLASSを使う)。省略時は'landscape'。
+   */
+  boxOrientation?: BoxOrientation
 }
 
 /** 導入・探索の会話・解決の会話モードで共通して使う会話フレーム(DESIGN.md「会話フレーム」節)。 */
@@ -350,6 +386,7 @@ export function ConversationFrame({
   onEscape,
   onOutsideDismiss,
   dismissAnywhere = false,
+  boxOrientation = 'landscape',
 }: ConversationFrameProps) {
   const prefersReducedMotion = usePrefersReducedMotion()
   const label = speakerLabel(speaker)
@@ -559,17 +596,16 @@ export function ConversationFrame({
   // 左右2枠の立ち絵(#108/#110): 空の枠は同寸法の不可視プレースホルダーで埋め、位置がずれない
   // ようにする。NPC発話中(npcSpeaking)はどちらの枠も現在の占有者のまま・speaking=falseに
   // なる(layoutTwoSlotFrame参照)ため、Portrait側の描画は変更不要(通常の待機中表示と同じ)。
-  // ウィンドウの上端に-mb-4で少し重ね(はみ出す位置)、呼び出し元(stacked/overlay)ごとに
-  // 外側の余白(gap/px)だけ変える(portraitRowExtraClassName)。
-  function renderPortraitRow(extraClassName: string) {
+  // sizeClassはlayoutごとに呼び出し元が選ぶ(stacked=固定px/overlay=箱高さ比率cqh、上記
+  // PORTRAIT_SIZE_CLASS/PORTRAIT_BOX_RELATIVE_SIZE_CLASS参照)。
+  function renderPortraitRow(extraClassName: string, sizeClass: string) {
     return (
       <div
         className={cn(
           // relative+z-20: 位置指定(relative)を持つ会話ウィンドウ(z-10)より確実に手前に
           // 描画するため。position指定の無い要素はz-indexの数値に関わらず位置指定要素の
-          // 背後に回ってしまう(CSSの積み重ね規則)ため、-mb-4で重なる領域で立ち絵が
-          // ウィンドウの下に隠れないようにする。
-          'relative z-20 -mb-4 flex shrink-0 items-end justify-between gap-2 sm:gap-4',
+          // 背後に回ってしまう(CSSの積み重ね規則)。
+          'relative z-20 flex shrink-0 items-end justify-between gap-2 sm:gap-4',
           extraClassName,
         )}
       >
@@ -578,53 +614,55 @@ export function ConversationFrame({
             display={twoSlot.left}
             slot="left"
             expression={twoSlot.left.speaking ? expression : undefined}
+            sizeClass={sizeClass}
           />
         ) : (
-          <EmptyPortraitSlot />
+          <EmptyPortraitSlot sizeClass={sizeClass} />
         )}
         {twoSlot.right ? (
           <Portrait
             display={twoSlot.right}
             slot="right"
             expression={twoSlot.right.speaking ? expression : undefined}
+            sizeClass={sizeClass}
           />
         ) : (
-          <EmptyPortraitSlot />
+          <EmptyPortraitSlot sizeClass={sizeClass} />
         )}
       </div>
     )
   }
 
   if (layout === 'overlay') {
-    // 探索の会話オーバーレイ(#52・T047)、および導入(#108/#110)。呼び出し側
-    // (scene-explorer.tsx / intro-screen.tsx)が背景の箱(aspect-video・overflow-hidden)の
-    // **直後の兄弟要素**としてこのコンポーネントを配置する想定(#108/#110で`absolute inset-0`
-    // による箱への完全重畳から変更)。立ち絵の拡大(デスクトップ240×320px・モバイル
-    // 120×160px)で「操作要素には重ねない」(DESIGN.md「立ち絵の拡大」節)を保つには、
-    // 箱の高さに収めて絶対配置するのではなく、通常のドキュメントフローに置いて必要なだけ
-    // 高さを取る方が安全(背景シーン右上の「ヒント確認」「調査ポイント一覧」ボタン等、
-    // 箱の中の操作要素と重なる余地が無くなる)。`-mt-6 sm:-mt-10`で箱の下端へわずかに
-    // 重ねる(はみ出す位置)ことで、背景シーンと視覚的につながって見えるようにする。
+    // 探索の会話オーバーレイ(#52・T047)、および導入(#108/#110)。#119/#124: 呼び出し側
+    // (scene-explorer.tsx/intro-screen.tsx/resolve-screen.tsx)がBackgroundBoxの子として
+    // このコンポーネントを配置する前提で、箱に対して`absolute inset-0`で重畳する
+    // (旧#108/#110の「箱の直後の兄弟要素として通常のドキュメントフローに置く」形は、
+    // 縦スクロールを出さない要件(#119)を満たせなかったため撤回した)。
+    // `flex flex-col justify-end`で「立ち絵→会話ウィンドウ」の順に箱の下端へ積み、箱の
+    // 上側(背景の見える部分)はそのまま残す。立ち絵は箱の高さに対する比率(cqh、
+    // BackgroundBoxの`[container-type:size]`基準)でサイズを決め、ウィンドウはmax-h(cqh)+
+    // overflow-y-autoで箱の高さに収める(ページ自体はスクロールしない、DESIGN.md「探索
+    // シーン」節「背景の箱」「重ねる要素は背景の箱に対する相対位置」)。
+    const portraitSizeClass = PORTRAIT_BOX_RELATIVE_SIZE_CLASS[boxOrientation]
     return (
       <div
         data-testid="conversation-frame-overlay"
-        className="relative z-10 -mt-6 flex flex-col sm:-mt-10"
+        className="absolute inset-0 z-10 flex flex-col justify-end"
         onClick={dismissAnywhere ? handleContainerActivate : undefined}
         onKeyDown={onOutsideDismiss ? handleOutsideKeyDown : undefined}
       >
         <div
-          className="relative flex flex-col px-2 sm:px-4"
+          className="relative flex flex-col justify-end gap-0 p-2 sm:p-4"
           onClick={onOutsideDismiss ? handleOutsideActivate : undefined}
           {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
         >
-          {renderPortraitRow('sm:gap-3')}
-          {/* 会話ウィンドウ: 通常のドキュメントフローのため必要なだけ高さを取れる。
-              極端に長い台詞・カードドロワー展開時の保険としてビューポート基準の
-              max-h+overflow-y-autoは残す。 */}
+          {renderPortraitRow('-mb-2 sm:-mb-4', portraitSizeClass)}
           <div
             ref={windowRef}
             className={cn(
-              'border-primary bg-card relative z-10 flex max-h-[70vh] min-w-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
+              'border-primary bg-card relative z-10 flex min-w-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
+              OVERLAY_WINDOW_MAX_HEIGHT_CLASS[boxOrientation],
               onDismiss &&
                 'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
             )}
@@ -644,8 +682,9 @@ export function ConversationFrame({
       onKeyDown={onOutsideDismiss ? handleOutsideKeyDown : undefined}
       {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
     >
-      {/* 立ち絵(左右2枠、#108/#110): 主人公の立ち絵は出さない。 */}
-      {renderPortraitRow('px-2 sm:gap-12')}
+      {/* 立ち絵(左右2枠、#108/#110): 主人公の立ち絵は出さない。stackedは背景の箱を持たない
+          画面向けのため固定pxのまま(PORTRAIT_SIZE_CLASS)。 */}
+      {renderPortraitRow('px-2 sm:gap-12 -mb-4', PORTRAIT_SIZE_CLASS)}
       {/* 会話ウィンドウ: surface + 上辺に primary(ゴールド)のアクセント。 */}
       <div
         ref={windowRef}

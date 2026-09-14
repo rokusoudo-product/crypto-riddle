@@ -1,15 +1,40 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { BackgroundBox } from '@/ui/components/background-box'
 import { ConversationFrame } from '@/ui/components/conversation-frame'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
+import type { BackgroundSrcMap } from '@/ui/lib/background-box'
+import {
+  hasPortraitAsset,
+  resolveBackgroundSrc,
+  resolveBoxOrientation,
+} from '@/ui/lib/background-box'
+import { useIsPortraitScreen } from '@/ui/lib/orientation'
 import { routeForProgress } from '@/ui/screens/navigation'
 import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
 
-import introBackground from '../../../assets/backgrounds/bg-sl-office.png'
+import introBackgroundFallback from '../../../assets/backgrounds/bg-sl-office.png'
+
+// 導入の背景アセット対応表(#119/#124): 本来は対策室の新規背景`bg-hq-taskforce`
+// (横)/`bg-hq-taskforce-portrait`(縦)を使う予定だが、これらはまだ生成されていない
+// (#122で承認ゲートを経て生成予定)。画像は本Issue(#124)の範囲では生成しない方針のため、
+// 生成されるまでの暫定として旧・流用背景bg-sl-office(法務SLシナリオの自社執務室背景)を
+// 'bg-hq-taskforce'の横用として使う(#123で実アセットに差し替え予定。DESIGN.md「アセット」節)。
+// 縦(-portrait)は未登録のため、縦長の画面でも箱は16:9のまま(resolveBoxOrientation参照)。
+const INTRO_BACKGROUND_SRC: BackgroundSrcMap = {
+  'bg-hq-taskforce': introBackgroundFallback,
+}
+const INTRO_BACKGROUND_ASSET_ID = 'bg-hq-taskforce'
+
+// 箱の上下にある固定要素の合計高さ見積もり(#119/#124、BackgroundBoxのchromePx):
+// ScreenContainerのpy-8(上下32px×2=64px)+見出しh1(約40px)+gap-6(24px)+被害企業名/説明
+// ブロック(h2約28px+p約40px+gap-1=8px)+gap-6(24px、箱の上)+gap-6(24px、箱の下)+
+// SKIPボタン行(48px)。8ptグリッドに丸めた概算値(S1試作で画面を見ながら調整する前提)。
+const INTRO_CHROME_PX = 320
 
 // ③導入（ダーク文脈）。目的=事件の前提提示／主要アクション=画面クリックで進行・SKIP。
 // T013: core のシナリオ進行ステートマシン(scenarioReducer)と接続し、s0-sample の導入テキストを表示する。
@@ -55,6 +80,18 @@ export function IntroScreen() {
   const dispatch = useGameStore((s) => s.dispatch)
   // character_intros の何行目を表示中か(#100/#102の多ターン送り)。
   const [turnIndex, setTurnIndex] = useState(0)
+  // 背景の箱の向き(#119/#124): 縦の背景(bg-hq-taskforce-portrait)はまだ無いため、
+  // 縦長の画面でも常にlandscape(16:9のまま)になる(resolveBoxOrientation参照)。
+  const screenIsPortrait = useIsPortraitScreen()
+  const boxOrientation = resolveBoxOrientation({
+    screenIsPortrait,
+    hasPortraitAsset: hasPortraitAsset(INTRO_BACKGROUND_ASSET_ID, INTRO_BACKGROUND_SRC),
+  })
+  const introBackgroundSrc = resolveBackgroundSrc(
+    INTRO_BACKGROUND_ASSET_ID,
+    boxOrientation,
+    INTRO_BACKGROUND_SRC,
+  )
 
   function handleAdvance() {
     if (progress.part !== 'intro') {
@@ -100,25 +137,23 @@ export function IntroScreen() {
         {scenario.intro.background && <p className="max-w-[60ch]">{scenario.intro.background}</p>}
 
         {currentLine && (
-          <div className="flex flex-col gap-0">
-            {/* 背景の箱はoverflow-hiddenのまま(#108/#110): 会話フレーム(立ち絵+ウィンドウ)は
-                #108/#110でこの箱に`absolute inset-0`で重畳する形をやめ、箱の直後の兄弟要素
-                として通常のドキュメントフローに置く形に変更した(必要なだけ高さを取れるため、
-                拡大された立ち絵〔デスクトップ240×320px・モバイル120×160px〕が他の要素に
-                重ならない。conversation-frame.tsxのlayout="overlay"コメント参照)。 */}
-            <div className="border-border bg-muted relative aspect-video w-full overflow-hidden rounded-lg border">
-              <img
-                src={introBackground}
-                alt="対策室の背景"
-                className="absolute inset-0 h-full w-full object-cover"
-              />
-            </div>
+          // 背景の箱(#119/#124): 画面に収まる最大の16:9(縦の背景が無いため常にlandscape)の
+          // 矩形。会話フレーム(立ち絵+ウィンドウ)は箱の子として`absolute inset-0`で重畳する
+          // (縦スクロールを出さないため、#108/#110の「箱の直後の兄弟要素」案は撤回した。
+          // conversation-frame.tsxのlayout="overlay"コメント参照)。
+          <BackgroundBox
+            orientation={boxOrientation}
+            src={introBackgroundSrc}
+            alt="対策室の背景"
+            chromePx={INTRO_CHROME_PX}
+          >
             {/* 台詞送り(#108/#110): 「タップで進行」ボタンは廃止し、探索と同じく画面のどこを
                 クリック/タップしても次の行へ進む(dismissAnywhere)。Enter/Spaceでも送れる
                 (onDismissが元々持つキーボード対応)。Escapeは「閉じる」概念が無いため
                 無効化する(onEscape={() => {}})。 */}
             <ConversationFrame
               layout="overlay"
+              boxOrientation={boxOrientation}
               speaker={currentLine.character}
               speakerHistory={speakerHistory}
               line={currentLine.line}
@@ -127,7 +162,7 @@ export function IntroScreen() {
               onEscape={() => {}}
               dismissAnywhere
             />
-          </div>
+          </BackgroundBox>
         )}
 
         {/* SKIPは会話ウィンドウの外(常時表示)。タイプライターの進行状況に関わらずいつでも

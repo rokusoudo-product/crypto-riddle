@@ -8,6 +8,9 @@ import { SceneExplorer } from '@/ui/components/explore/scene-explorer'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
+import { hasPortraitAsset, resolveBoxOrientation } from '@/ui/lib/background-box'
+import { EXPLORE_BACKGROUND_SRC } from '@/ui/lib/explore-background-assets'
+import { useIsPortraitScreen } from '@/ui/lib/orientation'
 import { routeForProgress } from '@/ui/screens/navigation'
 import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
@@ -84,6 +87,18 @@ export function ExploreScreen() {
   // 代表FB。上記コンポーネント冒頭コメント参照)。一度trueにしたら自動的にはfalseへ戻さない
   // (ナグ防止=再表示しない)。
   const [isWrapUpPromptDismissed, setIsWrapUpPromptDismissed] = useState(false)
+  // 現在表示中のシーンid(#119/#124)。SceneExplorerの`onActiveSceneChange`から都度反映する
+  // (SceneExplorer自身が内部stateとして持つactiveSceneIdの写し)。誘導会話(wrapUpPrompt)を
+  // 同じ背景の箱の向きで重ねるための計算、および`lastExploredSceneId`(解決⑤の背景の
+  // 引き継ぎ、game-store.ts参照)の更新に使う。scenesが無い場合はnullのまま。
+  const [activeSceneId, setActiveSceneId] = useState<string | null>(null)
+  const setLastExploredSceneId = useGameStore((s) => s.setLastExploredSceneId)
+  const screenIsPortrait = useIsPortraitScreen()
+
+  function handleActiveSceneChange(sceneId: string) {
+    setActiveSceneId(sceneId)
+    setLastExploredSceneId(sceneId)
+  }
 
   if (progress.part !== 'exploration') {
     return (
@@ -189,10 +204,24 @@ export function ExploreScreen() {
   // (PR#92追補・代表FB。上記コンポーネント冒頭コメント参照)。onOutsideDismissは
   // ウィンドウ**外側**のクリック/タップ・Escapeでのみ発火し、ウィンドウ自体や「わかった」
   // ボタンのクリックとは競合しない(conversation-frame.tsxのJSDoc参照)。
+  // wrapUpPrompt自身のboxOrientation(#119/#124): SceneExplorer側の会話オーバーレイ
+  // (collect/danger)と全く同じ計算(resolveBoxOrientation+活動中シーンの背景アセット有無)を
+  // ここでも行う。SceneExplorerの内部stateを直接は参照できないため、`onActiveSceneChange`で
+  // 受け取ったactiveSceneIdの写しから独立に計算する(同じ入力からは同じ結果になるため、
+  // 両者は自然に一致する)。
+  const activeScene = scenes?.find((scene) => scene.id === activeSceneId) ?? scenes?.[0]
+  const wrapUpBoxOrientation = activeScene
+    ? resolveBoxOrientation({
+        screenIsPortrait,
+        hasPortraitAsset: hasPortraitAsset(activeScene.background, EXPLORE_BACKGROUND_SRC),
+      })
+    : 'landscape'
+
   const wrapUpPrompt =
     canProceed && !isExplorerConversationOpen && !isWrapUpPromptDismissed ? (
       <ConversationFrame
         layout={hasScenes ? 'overlay' : 'stacked'}
+        boxOrientation={wrapUpBoxOrientation}
         speaker="橘"
         line="材料は揃ったわ。そろそろ問題を整理しましょう。"
         onOutsideDismiss={handleDismissWrapUpPrompt}
@@ -230,6 +259,7 @@ export function ExploreScreen() {
             ownedCardIds={progress.ownedCardIds}
             onCollect={handleInvestigate}
             onConversationOpenChange={setIsExplorerConversationOpen}
+            onActiveSceneChange={handleActiveSceneChange}
             investigationList={investigationListNode}
             conversationSlot={wrapUpPrompt}
           />

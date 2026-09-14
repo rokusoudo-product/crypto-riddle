@@ -112,41 +112,37 @@ import type {
   Character,
   Expression,
   HotspotAction,
-  HotspotCoordinate,
+  HotspotPosition,
   InvestigationPoint,
   Scenario,
   Scene,
   SceneHotspot,
 } from '@/core/model'
+import { BackgroundBox } from '@/ui/components/background-box'
 import { CardDrawer } from '@/ui/components/card-drawer'
 import { ConversationFrame, type ConversationSpeaker } from '@/ui/components/conversation-frame'
 import { Button } from '@/ui/components/ui/button'
+import {
+  hasPortraitAsset,
+  resolveBackgroundSrc,
+  resolveBoxOrientation,
+  resolveHotspotPosition,
+} from '@/ui/lib/background-box'
+import { EXPLORE_BACKGROUND_SRC } from '@/ui/lib/explore-background-assets'
+import { useIsPortraitScreen } from '@/ui/lib/orientation'
 import { cn } from '@/ui/lib/utils'
 
-import bgS1Office from '../../../../assets/backgrounds/bg-s1-office.png'
-import bgS1Server from '../../../../assets/backgrounds/bg-s1-server.png'
-import bgS2Office from '../../../../assets/backgrounds/bg-s2-office.png'
-import bgS2Server from '../../../../assets/backgrounds/bg-s2-server.png'
-import bgS3Office from '../../../../assets/backgrounds/bg-s3-office.png'
-import bgS3OpsRoom from '../../../../assets/backgrounds/bg-s3-ops-room.png'
-import bgSlOffice from '../../../../assets/backgrounds/bg-sl-office.png'
-import bgSlVendor from '../../../../assets/backgrounds/bg-sl-vendor.png'
-
-/** 生成済み背景アセットのID→importの対応。無いIDはプレースホルダ表示にフォールバックする。
- * 【量産時の注意・#88】新しいマップの背景PNGを assets/backgrounds/ に追加したら、
- * 必ずこのタイミングで import 文＋このマップにもエントリを追加すること。
- * PNG追加だけでは自動配線されず、bg-s2系・bg-s3系のように「PNGは存在するのに
- * ここへの登録漏れでプレースホルダ表示のまま」という既発生の不具合(#88)を繰り返す。 */
-const BACKGROUND_SRC: Record<string, string> = {
-  'bg-s1-office': bgS1Office,
-  'bg-s1-server': bgS1Server,
-  'bg-s2-office': bgS2Office,
-  'bg-s2-server': bgS2Server,
-  'bg-s3-office': bgS3Office,
-  'bg-s3-ops-room': bgS3OpsRoom,
-  'bg-sl-office': bgSlOffice,
-  'bg-sl-vendor': bgSlVendor,
-}
+// 生成済み背景アセットのID→importの対応(EXPLORE_BACKGROUND_SRC)は
+// src/ui/lib/explore-background-assets.ts に切り出した(#119/#124: resolve-screen.tsxも
+// 「解決へ進む」を押した時点の探索シーンの背景をそのまま使うため、同じ対応表を参照する
+// 必要があるため)。量産時の注意(#88)・縦の背景(-portrait)の追加方法も同ファイルのコメント参照。
+const BACKGROUND_SRC = EXPLORE_BACKGROUND_SRC
+// 箱の上下にある固定要素の合計高さ見積もり(#119/#124、BackgroundBoxのchromePx):
+// ScreenContainerのpy-8(64px)+見出しh1(約40px)+gap-6(24px)+シーンタブ行(48px、scenes.length>1
+// のときのみ実際には出るが、無いときは箱が少し余裕を持つだけなので一律この値を使う)+
+// gap-6(24px、箱の上)+gap-6(24px、箱の下)+「解決へ進む」ボタン行(48px)。
+// 8ptグリッドに丸めた概算値(S1試作で画面を見ながら調整する前提、DESIGN.md「余白・レイアウト」)。
+const EXPLORE_CHROME_PX = 296
 
 // 色だけに頼らず種別をaria-label(常時保持)でも示す(DESIGN.md「探索シーン」節・WCAG 1.4.1)。
 // 通常表示ではアイコン・可視ラベルを一切出さないため、UI上の用途は aria-label の組み立てのみ。
@@ -255,9 +251,9 @@ interface ConversationContent {
   kind: 'collect' | 'danger'
   hotspotLabel: string
   /** NPC発話ターンでトリガー元のホットスポットを□で強調するための位置(#100/#102、下記JSX参照)。
-   * 0.8.0（#119/#120）: position が横・縦の組になったため、表示は現状どおり横(landscape)を使う
-   * (縦の背景への切り替えは #124)。 */
-  hotspotPosition: HotspotCoordinate
+   * 0.8.0（#119/#120）: position が横・縦の組になったため、横・縦の組のまま保持し、描画時に
+   * 箱の向き(boxOrientation)に応じて`resolveHotspotPosition()`で解決する(#124)。 */
+  hotspotPosition: HotspotPosition
   turns: readonly ConversationTurn[]
 }
 
@@ -292,6 +288,14 @@ export interface SceneExplorerProps {
    * 間は渡されていても表示しない(二重表示防止)。
    */
   conversationSlot?: ReactNode
+  /**
+   * 現在表示中のシーンidが変わるたびに通知する(#119/#124)。呼び出し側(explore-screen.tsx)は
+   * これを使って: (1) 誘導会話(conversationSlot)を自前で描画する際に同じ背景の箱の向きを
+   * 計算する、(2) 「解決へ進む」時点の背景をresolve-screen.tsxが引き継げるよう
+   * `useGameStore`の`lastExploredSceneId`を更新する。onConversationOpenChangeと同じ
+   * 「UI専用の配線・coreの状態には関与しない」パターン。
+   */
+  onActiveSceneChange?: (sceneId: string) => void
 }
 
 /** 探索④「背景シーン＋ホットスポット」表示(#52/#56)。一覧フォールバックは呼び出し側が併設する。 */
@@ -304,6 +308,7 @@ export function SceneExplorer({
   onConversationOpenChange,
   investigationList,
   conversationSlot,
+  onActiveSceneChange,
 }: SceneExplorerProps) {
   const tabsId = useId()
   const [activeSceneId, setActiveSceneId] = useState(scenes[0].id)
@@ -312,6 +317,23 @@ export function SceneExplorer({
     scenes.findIndex((s) => s.id === activeSceneId),
   )
   const activeScene = scenes[activeSceneIndex] ?? scenes[0]
+
+  // 背景の箱の向き(#119/#124、DESIGN.md「探索シーン」節「背景の箱」): 画面の向き
+  // (screenIsPortrait)と、現在のシーンに縦の背景アセットが登録されているか
+  // (BACKGROUND_SRCの`${id}-portrait`)から決める。縦の背景がまだ無いシーンでは、
+  // 縦長の画面でも箱は16:9のまま(resolveBoxOrientation参照)。
+  const screenIsPortrait = useIsPortraitScreen()
+  const boxOrientation = resolveBoxOrientation({
+    screenIsPortrait,
+    hasPortraitAsset: hasPortraitAsset(activeScene.background, BACKGROUND_SRC),
+  })
+  const backgroundSrc = resolveBackgroundSrc(activeScene.background, boxOrientation, BACKGROUND_SRC)
+
+  // 現在のシーンidを呼び出し側へ通知する(#119/#124、上記SceneExplorerPropsのJSDoc参照)。
+  // マウント時(初期シーン)・シーン切替のたびに発火すればよいため依存配列はactiveSceneIdのみ。
+  useEffect(() => {
+    onActiveSceneChange?.(activeSceneId)
+  }, [activeSceneId, onActiveSceneChange])
 
   // 開いているアクションシート(複数actionを持つホットスポット用)。`${hotspotIndex}` で識別する
   // (シーン切替時にクリアするため、シーンIDを跨いだ一意化は不要)。
@@ -489,7 +511,7 @@ export function SceneExplorer({
       setConversation({
         kind: 'collect',
         hotspotLabel: hotspot.label,
-        hotspotPosition: hotspot.position.landscape,
+        hotspotPosition: hotspot.position,
         turns,
       })
       return
@@ -504,7 +526,7 @@ export function SceneExplorer({
       setConversation({
         kind: 'danger',
         hotspotLabel: hotspot.label,
-        hotspotPosition: hotspot.position.landscape,
+        hotspotPosition: hotspot.position,
         turns,
       })
       return
@@ -593,32 +615,18 @@ export function SceneExplorer({
         aria-labelledby={scenes.length > 1 ? `${tabsId}-tab-${activeScene.id}` : undefined}
         className="flex flex-col gap-3"
       >
-        {/* 背景シーン: 16:9既定・モバイル縦は幅にフィット(レターボックス)。横回転は強制しない。
-            BACKGROUND_SRC に実データがあれば<img>で読み込み、無ければ(背景未生成のシーン)
-            トークン色のプレースホルダ+シーン名で成立させる。
-            role="img"はプレースホルダ層(内側のdiv)にだけ付ける: WAI-ARIAのimgロールは
-            Children Presentational(子孫を装飾扱いにする)ため、外側のdivに付けると
-            支援技術から実<button>のホットスポットが子孫として隠れてしまう
-            (<img>の場合は要素自体がimgロールを持つため同様に子孫を隠す点は変わらない)。 */}
-        <div className="border-border bg-muted relative aspect-video w-full overflow-hidden rounded-lg border">
-          {BACKGROUND_SRC[activeScene.background] ? (
-            <img
-              src={BACKGROUND_SRC[activeScene.background]}
-              alt={`${activeScene.title}の背景`}
-              className="absolute inset-0 h-full w-full rounded-lg object-cover"
-            />
-          ) : (
-            <div
-              role="img"
-              aria-label={`${activeScene.title}の背景（画像は準備中のためプレースホルダ表示）`}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <span className="font-heading text-muted-foreground text-base sm:text-lg">
-                {activeScene.title}（背景 準備中）
-              </span>
-            </div>
-          )}
-
+        {/* 背景の箱(#119/#124、DESIGN.md「探索シーン」節「背景の箱」): 画面に収まる最大の
+            16:9(横長の画面)/9:16(縦長の画面)の矩形。判定は画面幅ではなく画面の向き
+            (boxOrientation=useIsPortraitScreen+縦の背景アセットの有無)。縦の背景がまだ無い
+            シーンは、縦長の画面でも箱は16:9のまま(画面幅にフィット)。ホットスポット・立ち絵・
+            会話ウィンドウ・右上のボタン群は、すべてこの箱に対する相対位置(子要素)で重ねる。 */}
+        <BackgroundBox
+          orientation={boxOrientation}
+          src={backgroundSrc}
+          alt={`${activeScene.title}の背景`}
+          placeholderLabel={`${activeScene.title}（背景 準備中）`}
+          chromePx={EXPLORE_CHROME_PX}
+        >
           {/* 右上のボタン群(#52 Phase4.7 追補・T048): 「ヒント確認」(左・手持ちカード閲覧=
               card-drawer)＋「調査ポイント一覧」(右・トグル)。探索状態・会話状態のどちらでも
               常時表示する(発見性の担保、DESIGN.md「探索シーン」節「一覧フォールバック」
@@ -651,9 +659,9 @@ export function SceneExplorer({
               DOMに置かない=誤操作防止・キーボード到達順の単純化、DESIGN.md「探索シーン」節)。 */}
           {!isConversationActive &&
             activeScene.hotspots.map((hotspot, hotspotIndex) => {
-              // 0.8.0（#119/#120）: position が横・縦の組になったため、表示は現状どおり横(landscape)を
-              // 使う(縦の背景への切り替えは #124)。
-              const [x, y] = hotspot.position.landscape
+              // 0.8.0（#119/#120）: position が横・縦の組になったため、箱の向き(boxOrientation)
+              // に応じて横/縦のどちらを使うか解決する(#124、縦座標が無ければ横にフォールバック)。
+              const [x, y] = resolveHotspotPosition(hotspot.position, boxOrientation)
               const investigated = isHotspotInvestigated(hotspot, investigatedPointIds)
               const needsSheet = hotspot.actions.length > 1
               return (
@@ -688,17 +696,23 @@ export function SceneExplorer({
               aria-hidden・pointer-events-none。実ホットスポットの□マーカーと同じ見た目に
               するため同じクラスを使う)。マーカーの位置は背景の箱の座標系(%指定)に依存するため
               箱の中に残す(会話フレーム自体は#108/#110で箱の外=下記へ移動した)。 */}
-          {conversation && currentTurn && isNpcTurn && (
-            <div
-              aria-hidden="true"
-              data-testid="npc-hotspot-marker"
-              style={{
-                left: `${conversation.hotspotPosition[0] * 100}%`,
-                top: `${conversation.hotspotPosition[1] * 100}%`,
-              }}
-              className="border-hotspot-highlight ring-hotspot-highlight/50 pointer-events-none absolute z-10 min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 ring-3"
-            />
-          )}
+          {conversation &&
+            currentTurn &&
+            isNpcTurn &&
+            (() => {
+              const [npcX, npcY] = resolveHotspotPosition(
+                conversation.hotspotPosition,
+                boxOrientation,
+              )
+              return (
+                <div
+                  aria-hidden="true"
+                  data-testid="npc-hotspot-marker"
+                  style={{ left: `${npcX * 100}%`, top: `${npcY * 100}%` }}
+                  className="border-hotspot-highlight ring-hotspot-highlight/50 pointer-events-none absolute z-10 min-h-12 min-w-12 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 ring-3"
+                />
+              )
+            })()}
 
           {/* アクションシート: 複数actionを持つホットスポット用(固定順・並べ替えない)。中央への
               オーバーレイ化・選択肢ボタン半透明80%・「戻る」選択肢の必須化は#52 追補・代表FB
@@ -781,55 +795,57 @@ export function SceneExplorer({
               </div>
             </div>
           )}
-        </div>
 
-        {/* 会話状態(T047): 調査結果/dangerの教育的フィードバック(自身のconversation)、
-            または呼び出し側の会話(conversationSlot、探索完了→解決への誘導)を排他的に
-            表示する。背景シーンは暗転させずそのまま保持する(DESIGN.md「探索シーン」節)。
-            #108/#110: 立ち絵の拡大(デスクトップ240×320px・モバイル120×160px)に伴い、
-            背景の箱に`absolute inset-0`で重畳する形から、箱の**直後の兄弟要素**として
-            通常のドキュメントフローに置く形に変更した(会話フレーム側のコメント参照)。
-            箱の中の右上ボタン群・ホットスポットと重ならなくなる。
-            多ターン化(#100/#102): conversation.turns[conversationTurnIndex]が現在のターン。
-            最終ターンでない間はonDismiss/onEscapeで「次の行へ」進め(advanceConversationTurn)、
-            最終ターンでのみ会話を閉じる(closeConversation)。onEscapeは常にcloseConversationに
-            固定する(onDismissを「次の行へ」に流用してもEscapeだけは常に閉じられるように、
-            conversation-frame.tsxのonEscape JSDoc参照)。 */}
-        {conversation && currentTurn ? (
-          // 「閉じる」ボタンは置かず、会話ウィンドウ全体をクリック/タップで閉じる(または
-          // 次の行へ進める)(#52 Phase4.7 追補・T048、DESIGN.md「探索シーン」節
-          // 「会話ウィンドウ」)。onDismissを指定すると、タイプライターの全文表示前の
-          // クリック/タップ/Enter/Spaceはスキップ、全文表示後の同操作でonDismissを呼ぶ
-          // (2段階、ConversationFrame側の実装参照)。カード閲覧(旧・会話ウィンドウ内の
-          // ?ボタン)は右上の「ヒント確認」に統合したため、children はもう調査結果の
-          // 文脈行のみで、操作要素を持たない(閉じる操作とホットスポット操作が競合しないよう、
-          // 会話状態ではホットスポット自体をそもそもDOMに置かない=上記の分岐と併せて安全)。
-          <ConversationFrame
-            layout="overlay"
-            speaker={currentTurn.speaker}
-            // 左右2枠の並び(#108/#110): 会話1つ(=このconversationオブジェクト)ぶんの
-            // 発話者履歴。conversationは呼び出し側(runAction)が新しい調査結果/danger
-            // ごとに新規生成するため、ここで並びのリセット(「探索の会話1つの開始」)が
-            // 自然に表現される(src/ui/lib/two-slot-frame.ts参照)。
-            speakerHistory={conversation.turns
-              .slice(0, conversationTurnIndex + 1)
-              .map((t) => t.speaker)}
-            line={currentTurn.line}
-            expression={currentTurn.expression}
-            onDismiss={isLastTurn ? closeConversation : advanceConversationTurn}
-            onEscape={closeConversation}
-          >
-            <p className="text-muted-foreground text-xs">
-              {conversation.kind === 'collect'
-                ? `${conversation.hotspotLabel}を調べた結果`
-                : `${conversation.hotspotLabel}を操作した結果`}
-            </p>
-          </ConversationFrame>
-        ) : conversationSlot ? (
-          // idはisWrapUpVisibleのuseEffectが最初の操作可能要素を探すためのフック
-          // (上記コメント参照)。
-          <div id={conversationSlotId}>{conversationSlot}</div>
-        ) : null}
+          {/* 会話状態(T047): 調査結果/dangerの教育的フィードバック(自身のconversation)、
+              または呼び出し側の会話(conversationSlot、探索完了→解決への誘導)を排他的に
+              表示する。背景シーンは暗転させずそのまま保持する(DESIGN.md「探索シーン」節)。
+              #119/#124: 立ち絵の拡大を箱の高さに対する比率に改めたことに伴い、箱に対して
+              `absolute inset-0`で重畳する形へ戻した(縦スクロールを出さないため、#108/#110の
+              「箱の直後の兄弟要素」案は撤回。conversation-frame.tsxのlayout="overlay"
+              コメント参照)。箱の中の右上ボタン群・ホットスポットとは重ならない(z-index・
+              立ち絵/ウィンドウのサイズ上限で担保)。
+              多ターン化(#100/#102): conversation.turns[conversationTurnIndex]が現在のターン。
+              最終ターンでない間はonDismiss/onEscapeで「次の行へ」進め(advanceConversationTurn)、
+              最終ターンでのみ会話を閉じる(closeConversation)。onEscapeは常にcloseConversationに
+              固定する(onDismissを「次の行へ」に流用してもEscapeだけは常に閉じられるように、
+              conversation-frame.tsxのonEscape JSDoc参照)。 */}
+          {conversation && currentTurn ? (
+            // 「閉じる」ボタンは置かず、会話ウィンドウ全体をクリック/タップで閉じる(または
+            // 次の行へ進める)(#52 Phase4.7 追補・T048、DESIGN.md「探索シーン」節
+            // 「会話ウィンドウ」)。onDismissを指定すると、タイプライターの全文表示前の
+            // クリック/タップ/Enter/Spaceはスキップ、全文表示後の同操作でonDismissを呼ぶ
+            // (2段階、ConversationFrame側の実装参照)。カード閲覧(旧・会話ウィンドウ内の
+            // ?ボタン)は右上の「ヒント確認」に統合したため、children はもう調査結果の
+            // 文脈行のみで、操作要素を持たない(閉じる操作とホットスポット操作が競合しないよう、
+            // 会話状態ではホットスポット自体をそもそもDOMに置かない=上記の分岐と併せて安全)。
+            <ConversationFrame
+              layout="overlay"
+              boxOrientation={boxOrientation}
+              speaker={currentTurn.speaker}
+              // 左右2枠の並び(#108/#110): 会話1つ(=このconversationオブジェクト)ぶんの
+              // 発話者履歴。conversationは呼び出し側(runAction)が新しい調査結果/danger
+              // ごとに新規生成するため、ここで並びのリセット(「探索の会話1つの開始」)が
+              // 自然に表現される(src/ui/lib/two-slot-frame.ts参照)。
+              speakerHistory={conversation.turns
+                .slice(0, conversationTurnIndex + 1)
+                .map((t) => t.speaker)}
+              line={currentTurn.line}
+              expression={currentTurn.expression}
+              onDismiss={isLastTurn ? closeConversation : advanceConversationTurn}
+              onEscape={closeConversation}
+            >
+              <p className="text-muted-foreground text-xs">
+                {conversation.kind === 'collect'
+                  ? `${conversation.hotspotLabel}を調べた結果`
+                  : `${conversation.hotspotLabel}を操作した結果`}
+              </p>
+            </ConversationFrame>
+          ) : conversationSlot ? (
+            // idはisWrapUpVisibleのuseEffectが最初の操作可能要素を探すためのフック
+            // (上記コメント参照)。
+            <div id={conversationSlotId}>{conversationSlot}</div>
+          ) : null}
+        </BackgroundBox>
       </div>
 
       {/* 「調査ポイント一覧」トグルパネル(#66→T047でトグル化)。中身は呼び出し側

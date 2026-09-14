@@ -2,15 +2,29 @@ import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { MAX_CONSULTS } from '@/core/scenario'
+import { BackgroundBox } from '@/ui/components/background-box'
 import { CardDrawer } from '@/ui/components/card-drawer'
 import { ConversationFrame } from '@/ui/components/conversation-frame'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
+import {
+  hasPortraitAsset,
+  resolveBackgroundSrc,
+  resolveBoxOrientation,
+} from '@/ui/lib/background-box'
 import { resolveExplanation } from '@/ui/lib/explanation'
+import { EXPLORE_BACKGROUND_SRC } from '@/ui/lib/explore-background-assets'
+import { useIsPortraitScreen } from '@/ui/lib/orientation'
 import { routeForProgress } from '@/ui/screens/navigation'
 import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
+
+// 箱の上下にある固定要素の合計高さ見積もり(#119/#124、BackgroundBoxのchromePx):
+// ScreenContainerのpy-8(64px)+見出しh1(約40px)+gap-6(24px、箱の上)。解決⑤は下に
+// 独立したボタン行を持たない(選択肢・相談・カードドロワーはすべて会話ウィンドウの中)ため、
+// 探索④より少ない見積もりにしている(8ptグリッドに丸めた概算値)。
+const RESOLVE_CHROME_PX = 200
 
 // ⑤解決（ダーク文脈）。目的=会話モードで問いに答え攻撃手段を特定・防衛策を選ぶ（spec §8, #42）。
 // 単一解・厳密一致（spec §8.2）。
@@ -35,6 +49,28 @@ export function ResolveScreen() {
   const [cipherAnswer, setCipherAnswer] = useState('')
   // 相談で開いたヒントは「今の問いで相談を押した後」だけ表示する(問いが変わったら自動的に隠れる)。
   const [hintRevealedForQuestionId, setHintRevealedForQuestionId] = useState<string | null>(null)
+  // 解決⑤の背景(代表決定2026-09-13・#119/#124): 独自の背景画像は持たず、「解決へ進む」を
+  // 押した時点で表示していた探索シーンの背景をそのまま使う(新しい画像は作らない)。
+  // `lastExploredSceneId`(探索④が更新するUI専用の値、game-store.ts参照)で探すシーンが
+  // 見つからなければ先頭シーンへフォールバックする。scenario.scenesが無いマップ(一覧
+  // フォールバックのみのマップ)では背景の箱自体を出さず、従来どおりのstacked layoutにする。
+  const lastExploredSceneId = useGameStore((s) => s.lastExploredSceneId)
+  const screenIsPortrait = useIsPortraitScreen()
+  const resolveScene =
+    scenario.scenes?.find((scene) => scene.id === lastExploredSceneId) ?? scenario.scenes?.[0]
+  const resolveBoxOrientationValue = resolveScene
+    ? resolveBoxOrientation({
+        screenIsPortrait,
+        hasPortraitAsset: hasPortraitAsset(resolveScene.background, EXPLORE_BACKGROUND_SRC),
+      })
+    : 'landscape'
+  const resolveBackgroundSrcValue = resolveScene
+    ? resolveBackgroundSrc(
+        resolveScene.background,
+        resolveBoxOrientationValue,
+        EXPLORE_BACKGROUND_SRC,
+      )
+    : undefined
 
   if (progress.part !== 'resolution' || progress.resolutionStage === null) {
     return (
@@ -92,6 +128,80 @@ export function ResolveScreen() {
       ? resolveExplanation(question, priorWrongAttempts)
       : null
 
+  // 解決の会話モードで会話フレーム上に載せる要素(選択肢・誤答フィードバック・相談・
+  // カードドロワー)。背景の箱の有無(resolveScene)でConversationFrameのlayout/親要素が
+  // 変わるだけで中身は共通のため、変数として切り出して両分岐で使い回す(#119/#124)。
+  const questionChildren = question ? (
+    <>
+      {progress.lastAnswerFeedback?.correct === true && progress.lastAnswerFeedback.reply && (
+        <p className="border-border bg-background rounded-lg border p-3 text-sm">
+          {progress.lastAnswerFeedback.reply}
+        </p>
+      )}
+
+      {/* 選択肢を先にレンダーし、相談・カードドロワーより前の Tab 順にする。 */}
+      <ul className="flex flex-col gap-2">
+        {question.choices.map((choice, index) => (
+          <li key={index}>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto min-h-12 w-full justify-start px-4 py-3 text-left text-base whitespace-normal"
+              onClick={() => handleQuestionAnswer(index)}
+            >
+              {choice.text}
+            </Button>
+          </li>
+        ))}
+      </ul>
+
+      {progress.lastAnswerFeedback?.correct === false && (
+        <div
+          aria-live="polite"
+          className="border-border bg-background rounded-lg border p-3 text-sm"
+        >
+          {progress.lastAnswerFeedback.reply && <p>{progress.lastAnswerFeedback.reply}</p>}
+          {/* 段階解説の話者表示(#100/#102): explanationsのunion要素(string |
+              DialogueLine)を{character, line}へ正規化してから、結果画面(result-screen.tsx)の
+              clear_explanationと同じ表示形式(話者名+「台詞」)を流用する。 */}
+          {resolvedExplanation && (
+            <p className="text-muted-foreground">
+              <span className="font-semibold">{resolvedExplanation.character}</span>「
+              {resolvedExplanation.line}」
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-4">
+          <Button
+            type="button"
+            variant="secondary"
+            className="h-12 min-w-12 px-6"
+            disabled={consultDisabled}
+            aria-describedby={consultDisabled ? 'consult-disabled-reason' : undefined}
+            onClick={handleConsult}
+          >
+            相談する（残り{Math.max(consultRemaining, 0)}回・XP減）
+          </Button>
+          {consultDisabled && (
+            <p id="consult-disabled-reason" className="text-muted-foreground text-sm">
+              相談はこのマップで使い切りました（マップ単位3回まで）。
+            </p>
+          )}
+        </div>
+        {hintRevealedForQuestionId === question.id && (
+          <p role="status" className="border-border bg-background rounded-lg border p-3 text-sm">
+            {question.consult_hint}
+          </p>
+        )}
+      </div>
+
+      <CardDrawer cards={ownedCards} />
+    </>
+  ) : null
+
   return (
     <ScreenContainer title="解決">
       <StateFrame state={state}>
@@ -128,90 +238,47 @@ export function ResolveScreen() {
           </form>
         )}
 
-        {progress.resolutionStage === 'question' && question && (
-          <ConversationFrame
-            speaker={question.speaker}
-            // 左右2枠の並び(#108/#110): 解決は問1→問2に進んでも並びを保つ(DESIGN.md「左右2枠の
-            // 入れ替わり方式」節「並びのリセット」)。questions全体の話者列のうち、現在の問いまでを
-            // 履歴として渡すことで、問いをまたいでも並びが連続する(src/ui/lib/two-slot-frame.ts
-            // が履歴から並びを導出する純粋関数のため、リセット用のstateは不要)。「解決の開始」
-            // (questionIndex=0から)は履歴が[questions[0].speaker]から始まることで自然に表現される。
-            speakerHistory={scenario.resolution.questions
-              .slice(0, progress.questionIndex + 1)
-              .map((q) => q.speaker)}
-            line={question.prompt}
-          >
-            {progress.lastAnswerFeedback?.correct === true && progress.lastAnswerFeedback.reply && (
-              <p className="border-border bg-background rounded-lg border p-3 text-sm">
-                {progress.lastAnswerFeedback.reply}
-              </p>
-            )}
-
-            {/* 選択肢を先にレンダーし、相談・カードドロワーより前の Tab 順にする。 */}
-            <ul className="flex flex-col gap-2">
-              {question.choices.map((choice, index) => (
-                <li key={index}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-auto min-h-12 w-full justify-start px-4 py-3 text-left text-base whitespace-normal"
-                    onClick={() => handleQuestionAnswer(index)}
-                  >
-                    {choice.text}
-                  </Button>
-                </li>
-              ))}
-            </ul>
-
-            {progress.lastAnswerFeedback?.correct === false && (
-              <div
-                aria-live="polite"
-                className="border-border bg-background rounded-lg border p-3 text-sm"
+        {progress.resolutionStage === 'question' &&
+          question &&
+          (resolveScene ? (
+            // 解決⑤の背景(代表決定2026-09-13・#119/#124): 「解決へ進む」を押した時点で
+            // 表示していた探索シーンの背景をそのまま使い(新しい画像は作らない)、導入③・
+            // 探索④と同じ「背景の箱」＋立ち絵・会話ウィンドウの重ね配置を適用する。
+            <BackgroundBox
+              orientation={resolveBoxOrientationValue}
+              src={resolveBackgroundSrcValue}
+              alt={`${resolveScene.title}の背景`}
+              placeholderLabel={`${resolveScene.title}（背景 準備中）`}
+              chromePx={RESOLVE_CHROME_PX}
+            >
+              <ConversationFrame
+                layout="overlay"
+                boxOrientation={resolveBoxOrientationValue}
+                speaker={question.speaker}
+                // 左右2枠の並び(#108/#110): 解決は問1→問2に進んでも並びを保つ(DESIGN.md
+                // 「左右2枠の入れ替わり方式」節「並びのリセット」)。questions全体の話者列の
+                // うち現在の問いまでを履歴として渡すことで、問いをまたいでも並びが連続する。
+                speakerHistory={scenario.resolution.questions
+                  .slice(0, progress.questionIndex + 1)
+                  .map((q) => q.speaker)}
+                line={question.prompt}
               >
-                {progress.lastAnswerFeedback.reply && <p>{progress.lastAnswerFeedback.reply}</p>}
-                {/* 段階解説の話者表示(#100/#102): explanationsのunion要素(string |
-                    DialogueLine)を{character, line}へ正規化してから、結果画面(result-screen.tsx)の
-                    clear_explanationと同じ表示形式(話者名+「台詞」)を流用する。 */}
-                {resolvedExplanation && (
-                  <p className="text-muted-foreground">
-                    <span className="font-semibold">{resolvedExplanation.character}</span>「
-                    {resolvedExplanation.line}」
-                  </p>
-                )}
-              </div>
-            )}
-
-            <div className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-center gap-4">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="h-12 min-w-12 px-6"
-                  disabled={consultDisabled}
-                  aria-describedby={consultDisabled ? 'consult-disabled-reason' : undefined}
-                  onClick={handleConsult}
-                >
-                  相談する（残り{Math.max(consultRemaining, 0)}回・XP減）
-                </Button>
-                {consultDisabled && (
-                  <p id="consult-disabled-reason" className="text-muted-foreground text-sm">
-                    相談はこのマップで使い切りました（マップ単位3回まで）。
-                  </p>
-                )}
-              </div>
-              {hintRevealedForQuestionId === question.id && (
-                <p
-                  role="status"
-                  className="border-border bg-background rounded-lg border p-3 text-sm"
-                >
-                  {question.consult_hint}
-                </p>
-              )}
-            </div>
-
-            <CardDrawer cards={ownedCards} />
-          </ConversationFrame>
-        )}
+                {questionChildren}
+              </ConversationFrame>
+            </BackgroundBox>
+          ) : (
+            // scenario.scenesが無いマップ(一覧フォールバックのみ)は背景の箱を持たないため、
+            // 従来どおりstacked layout(背景の箱を持たない画面向け)のまま描画する。
+            <ConversationFrame
+              speaker={question.speaker}
+              speakerHistory={scenario.resolution.questions
+                .slice(0, progress.questionIndex + 1)
+                .map((q) => q.speaker)}
+              line={question.prompt}
+            >
+              {questionChildren}
+            </ConversationFrame>
+          ))}
       </StateFrame>
     </ScreenContainer>
   )
