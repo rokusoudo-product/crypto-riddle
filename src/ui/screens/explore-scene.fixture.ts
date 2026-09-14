@@ -23,7 +23,7 @@ import { scenarioSchema } from '@/core/model'
 import type { Scenario } from '@/core/model'
 
 const rawScenario: Scenario = {
-  schema_version: '0.7.0',
+  schema_version: '0.8.0',
   id: 's-test-scene-explore',
   title: '探索シーンUIテスト用マップ',
   status: 'draft',
@@ -78,7 +78,7 @@ const rawScenario: Scenario = {
       hotspots: [
         {
           object_type: 'pc',
-          position: [0.3, 0.4],
+          position: { landscape: [0.3, 0.4] },
           label: '経理担当のPC',
           actions: [
             {
@@ -98,7 +98,7 @@ const rawScenario: Scenario = {
         },
         {
           object_type: 'person',
-          position: [0.7, 0.5],
+          position: { landscape: [0.7, 0.5] },
           label: '田中さん',
           actions: [{ kind: 'collect', investigation_point_id: 'ip-witness', label: '話を聞く' }],
         },
@@ -111,7 +111,7 @@ const rawScenario: Scenario = {
       hotspots: [
         {
           object_type: 'device',
-          position: [0.5, 0.5],
+          position: { landscape: [0.5, 0.5] },
           label: 'サーバ機器',
           actions: [{ kind: 'noop', label: '今は触らない' }],
         },

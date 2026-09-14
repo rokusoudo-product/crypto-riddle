@@ -39,7 +39,7 @@
 # 注記: S1/S2/S3 と同じ理由(scripts/build-data.test.ts のフィクスチャ一致テストが折り返しの
 # 空白挿入を検出する)で、本文フィールド(body/description/line 等)は1行で記述している。
 
-schema_version: "0.7.0"
+schema_version: "0.8.0"
 id: sl-consignment-breach
 title: 委託先クラウドストレージからの個人データ漏えい
 status: draft
@@ -120,7 +120,8 @@ scenes:
     background: bg-sl-office
     hotspots:
       - object_type: book
-        position: [0.17, 0.32]
+        position:
+          landscape: [0.17, 0.32]
         label: 委託契約書棚
         actions:
           - kind: collect
@@ -134,7 +135,8 @@ scenes:
             line: ガイドラインを確認しました。個人データの取扱いを委託する場合、委託元は委託先に対して必要かつ適切な監督を行う義務を負い、委託先の監督が不十分であったことに起因する漏えい等は、委託元の義務違反として問題になり得るとされています。
             speaker: 橘
       - object_type: pc
-        position: [0.56, 0.45]
+        position:
+          landscape: [0.56, 0.45]
         label: 委託先の一次報告を受けた端末
         actions:
           - kind: collect
@@ -152,7 +154,8 @@ scenes:
     background: bg-sl-vendor
     hotspots:
       - object_type: device
-        position: [0.19, 0.68]
+        position:
+          landscape: [0.19, 0.68]
         label: 委託先のクラウドストレージ管理端末
         actions:
           - kind: collect
@@ -161,7 +164,8 @@ scenes:
             line: 委託先のクラウドストレージのアクセスログを確認した。共有設定が変更された直後から、複数の見知らぬ外部IPアドレスから会員データの保管領域へ直接アクセスされた記録が残っている。
             speaker: 霧島
       - object_type: person
-        position: [0.44, 0.55]
+        position:
+          landscape: [0.44, 0.55]
         label: 委託先担当者
         prompt: "委託先担当者「何かご質問はありますか？」"
         actions:
@@ -173,7 +177,8 @@ scenes:
           - kind: noop
             label: 何でもない
       - object_type: book
-        position: [0.84, 0.62]
+        position:
+          landscape: [0.84, 0.62]
         label: 委託先の安全管理措置報告書
         actions:
           - kind: collect
@@ -182,7 +187,8 @@ scenes:
             line: 委託先が提出した安全管理措置の報告書を確認した。アクセス権限の設定手順は定められているが、変更後の設定内容を第三者が確認するダブルチェック体制までは整備されていなかった。
             speaker: 橘
       - object_type: door
-        position: [0.6, 0.5]
+        position:
+          landscape: [0.6, 0.5]
         label: 執務室への扉
         actions:
           - kind: goto

@@ -71,7 +71,7 @@ describe('resolveExplanationのインデックス式とcore(pickExplanation)の�
   // 間接的にAnswerFeedback.explanation(string|null)を得て、resolveExplanationが選ぶ.lineと
   // 一致することを確認する(#100/#102、resolveExplanationのJSDoc参照)。
   const rawScenario: Scenario = {
-    schema_version: '0.7.0',
+    schema_version: '0.8.0',
     id: 's-test-explanation-parity',
     title: 'explanations整合性テスト用マップ',
     status: 'draft',

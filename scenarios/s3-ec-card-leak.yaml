@@ -32,7 +32,7 @@
 # 注記: S1/S2 と同じ理由(scripts/build-data.test.ts の S3 フィクスチャ一致テストが折り返しの
 # 空白挿入を検出する)で、本文フィールド(body/description/line 等)は1行で記述している。
 
-schema_version: "0.7.0"
+schema_version: "0.8.0"
 id: s3-ec-card-leak
 title: ECサイトのカード情報漏洩
 status: draft
@@ -130,7 +130,8 @@ scenes:
     background: bg-s3-office
     hotspots:
       - object_type: pc
-        position: [0.4, 0.65]
+        position:
+          landscape: [0.4, 0.65]
         label: EC運営担当者の端末
         actions:
           - kind: collect
@@ -149,7 +150,8 @@ scenes:
           - kind: noop
             label: 今は触らない
       - object_type: person
-        position: [0.2, 0.4]
+        position:
+          landscape: [0.2, 0.4]
         label: EC運営担当者
         actions:
           - kind: collect
@@ -158,7 +160,8 @@ scenes:
             line: EC運営担当者に聞きました。最近サイトの見た目や決済画面に自分たちで手を加えた覚えはなく、CMSやプラグインのバージョン管理は開発委託先に任せきりだったそうです。
             speaker: 橘
       - object_type: person
-        position: [0.78, 0.55]
+        position:
+          landscape: [0.78, 0.55]
         label: 管理部門長
         actions:
           - kind: collect
@@ -167,7 +170,8 @@ scenes:
             line: 管理部門長に伺いました。すでに複数の顧客から不正利用の申告が入っており、風評への影響を心配して、原因がはっきりするまで公表を控えたいという声も出ているそうです。
             speaker: 橘
       - object_type: book
-        position: [0.6, 0.16]
+        position:
+          landscape: [0.6, 0.16]
         label: 資料棚
         actions:
           - kind: collect
@@ -181,7 +185,8 @@ scenes:
             line: 注意喚起を確認した。決済ページのスクリプトを改ざんし、入力中のカード情報を確定前にブラウザから外部のサーバへ直接送信させる、フォームジャッキング(Webスキミング)と呼ばれる手口が全国的に報告されている。今回の型に近い。
             speaker: 霧島
       - object_type: door
-        position: [0.95, 0.5]
+        position:
+          landscape: [0.95, 0.5]
         label: システム運用ルームへの扉
         actions:
           - kind: goto
@@ -192,7 +197,8 @@ scenes:
     background: bg-s3-ops-room
     hotspots:
       - object_type: device
-        position: [0.18, 0.45]
+        position:
+          landscape: [0.18, 0.45]
         label: 運用監視端末
         actions:
           - kind: collect
@@ -206,7 +212,8 @@ scenes:
             line: 決済ページのファイルを、正規のバックアップと比較した。スクリプトの末尾に見慣れないコードが追加されており、入力されたカード番号・有効期限・セキュリティコードを、フォーム送信前に外部の見知らぬドメインへ直接送っていた。
             speaker: 霧島
       - object_type: person
-        position: [0.51, 0.43]
+        position:
+          landscape: [0.51, 0.43]
         label: 開発委託先の担当者
         prompt: "開発委託先「何かお困りですか？」"
         actions:
@@ -218,7 +225,8 @@ scenes:
           - kind: noop
             label: 何でもない
       - object_type: door
-        position: [0.5, 0.9]
+        position:
+          landscape: [0.5, 0.9]
         label: 執務室への扉
         actions:
           - kind: goto
