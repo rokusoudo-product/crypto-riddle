@@ -37,8 +37,10 @@ const INTRO_BACKGROUND_ASSET_ID = 'bg-hq-taskforce'
 // T013: core のシナリオ進行ステートマシン(scenarioReducer)と接続し、s0-sample の導入テキストを表示する。
 //
 // 2026-09-13(#100/#102・#50吸収): 導入を会話フレーム(ConversationFrame)へ刷新した。
-// - 背景: 新規生成せず既存 bg-sl-office(自社執務室・人物なし)を流用する(2026-09-12代表承認)。
-//   アセットIDはシナリオスキーマに持たせない(introはscenes[]を使わないため)方針どおり、
+// - 背景: 新規生成せず既存 bg-sl-office(自社執務室・人物なし)を流用する(2026-09-12代表承認。
+//   この流用方針自体は#119で撤回し、#123で対策室の新規背景bg-hq-taskforceへ差し替え済み。
+//   下記の対応表・実装は現状のもの)。アセットIDはシナリオスキーマに持たせない(introはscenes[]を
+//   使わないため)方針どおり、
 //   このファイル側のUI定数(INTRO_BACKGROUND_SRC)として持つ(scene-explorer.tsxの
 //   BACKGROUND_SRCと同じ、Viteのimportでアセットurlを解決する方式)。
 // - `intro.background`(ナレーション本文、省略可・0.7.0)が省略されていればナレーションブロックを

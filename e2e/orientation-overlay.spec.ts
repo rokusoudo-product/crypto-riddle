@@ -206,9 +206,12 @@ for (const [label, viewport] of Object.entries({
 }
 
 // 秘書の2回目のレビューで見つかった重なりの不具合2点(#124)の回帰確認:
-// 不具合1: 縦長・縦の背景が無いシーンで、シーンタブ・右上ボタン群が背景の絵とホットスポットに
+// 不具合1: 縦長のシーンで、シーンタブ・右上ボタン群が背景の絵とホットスポットに
 //   重なる(scene-explorer.tsxのPORTRAIT_CONTROLS_*_TOP_OFFSET・resolveBackgroundImageRect/
-//   resolveHotspotBoxPosition の topOffset 引数で修正)。
+//   resolveHotspotBoxPosition の topOffset 引数で修正)。修正当時(#124)はS1にまだ縦の背景・
+//   portrait座標が無く、横画像を箱の上部に表示するフォールバック経路のみを確認していたが、
+//   #123でS1(scene-office)に縦の背景・全ホットスポットのportrait座標が入ったことで、
+//   このテストは実際の縦の背景+実測座標の経路も併せて確認するようになった(下記参照)。
 // 不具合2: 「解決へ進む」が会話ウィンドウ(調査結果・danger・誘導会話のいずれも)に重なる
 //   (探索状態=箱右下/会話状態=右上ボタン群の列、に表示位置を切り替えて修正)。
 function rectsOverlap(
@@ -218,7 +221,7 @@ function rectsOverlap(
   return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
 }
 
-test.describe('縦長・縦の背景が無いシーンで、シーンタブ・右上ボタン群が背景の絵とホットスポットに重ならない(秘書レビュー2回目・#124)', () => {
+test.describe('縦長のシーンで、シーンタブ・右上ボタン群が背景の絵とホットスポットに重ならない(秘書レビュー2回目・#124。#123でS1が縦の背景+実測portrait座標を持つようになった後も成立することを確認)', () => {
   test.use({ viewport: { width: 390, height: 844 } })
 
   test('探索状態(アイドル)で、ホットスポットの矩形がシーンタブ・右上ボタン群の矩形と重ならない', async ({
