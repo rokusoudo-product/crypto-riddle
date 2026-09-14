@@ -8,8 +8,7 @@ import { SceneExplorer } from '@/ui/components/explore/scene-explorer'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
-import { hasPortraitAsset, resolveBoxOrientation } from '@/ui/lib/background-box'
-import { EXPLORE_BACKGROUND_SRC } from '@/ui/lib/explore-background-assets'
+import { resolveBoxOrientation } from '@/ui/lib/background-box'
 import { useIsPortraitScreen } from '@/ui/lib/orientation'
 import { routeForProgress } from '@/ui/screens/navigation'
 import { useGameStore } from '@/ui/store/game-store'
@@ -87,16 +86,15 @@ export function ExploreScreen() {
   // 代表FB。上記コンポーネント冒頭コメント参照)。一度trueにしたら自動的にはfalseへ戻さない
   // (ナグ防止=再表示しない)。
   const [isWrapUpPromptDismissed, setIsWrapUpPromptDismissed] = useState(false)
-  // 現在表示中のシーンid(#119/#124)。SceneExplorerの`onActiveSceneChange`から都度反映する
-  // (SceneExplorer自身が内部stateとして持つactiveSceneIdの写し)。誘導会話(wrapUpPrompt)を
-  // 同じ背景の箱の向きで重ねるための計算、および`lastExploredSceneId`(解決⑤の背景の
-  // 引き継ぎ、game-store.ts参照)の更新に使う。scenesが無い場合はnullのまま。
-  const [activeSceneId, setActiveSceneId] = useState<string | null>(null)
   const setLastExploredSceneId = useGameStore((s) => s.setLastExploredSceneId)
   const screenIsPortrait = useIsPortraitScreen()
 
+  // SceneExplorerの`onActiveSceneChange`から都度反映する: `lastExploredSceneId`
+  // (解決⑤の背景の引き継ぎ、game-store.ts参照)を更新する。#124(縦長の画面は常に9:16)で
+  // 箱の向きが画面の向きのみで決まるようになったため、シーンidそのものをこの画面のstateとして
+  // 持つ必要は無くなった(wrapUpPromptのboxOrientationはresolveBoxOrientation(screenIsPortrait)
+  // だけで求まる)。
   function handleActiveSceneChange(sceneId: string) {
-    setActiveSceneId(sceneId)
     setLastExploredSceneId(sceneId)
   }
 
@@ -204,18 +202,11 @@ export function ExploreScreen() {
   // (PR#92追補・代表FB。上記コンポーネント冒頭コメント参照)。onOutsideDismissは
   // ウィンドウ**外側**のクリック/タップ・Escapeでのみ発火し、ウィンドウ自体や「わかった」
   // ボタンのクリックとは競合しない(conversation-frame.tsxのJSDoc参照)。
-  // wrapUpPrompt自身のboxOrientation(#119/#124): SceneExplorer側の会話オーバーレイ
-  // (collect/danger)と全く同じ計算(resolveBoxOrientation+活動中シーンの背景アセット有無)を
-  // ここでも行う。SceneExplorerの内部stateを直接は参照できないため、`onActiveSceneChange`で
-  // 受け取ったactiveSceneIdの写しから独立に計算する(同じ入力からは同じ結果になるため、
-  // 両者は自然に一致する)。
-  const activeScene = scenes?.find((scene) => scene.id === activeSceneId) ?? scenes?.[0]
-  const wrapUpBoxOrientation = activeScene
-    ? resolveBoxOrientation({
-        screenIsPortrait,
-        hasPortraitAsset: hasPortraitAsset(activeScene.background, EXPLORE_BACKGROUND_SRC),
-      })
-    : 'landscape'
+  // wrapUpPrompt自身のboxOrientation(#124・代表決定2026-09-14「縦長の画面は常に9:16」):
+  // 箱の向きは画面の向きのみで決まるため、SceneExplorer側の会話オーバーレイと常に同じ値になる
+  // (シーンごとの背景アセット有無には依存しない。#119時点の「活動中シーンの背景アセット有無」
+  // 計算は不要になった)。
+  const wrapUpBoxOrientation = resolveBoxOrientation(screenIsPortrait)
 
   const wrapUpPrompt =
     canProceed && !isExplorerConversationOpen && !isWrapUpPromptDismissed ? (
@@ -229,7 +220,7 @@ export function ExploreScreen() {
         <div className="flex items-center justify-between gap-2">
           <p className="text-muted-foreground text-xs">
             必要な手がかりは出揃った。まとめるなら「わかった」、もう少し調べたいなら画面をタップ
-            （Escapeでも可）して探索を続けよう。あとからでも下の「解決へ進む」から進める。
+            （Escapeでも可）して探索を続けよう。あとからでも右下の「解決へ進む」から進める。
           </p>
           <Button
             type="button"
@@ -243,8 +234,24 @@ export function ExploreScreen() {
       </ConversationFrame>
     ) : null
 
+  // 「解決へ進む」(#124・代表決定2026-09-14): scenesがある場合は箱の右下に重ねる
+  // (SceneExplorerのenterResolutionSlotへ渡す)。誘導会話(wrapUpPrompt)の表示状態に関わらず
+  // 常時表示する(PR#92追補・代表FB「誘導が導線を隠さない」を維持。scene-explorer.tsxの
+  // enterResolutionSlot JSDoc参照)。scenesが無い場合(一覧フォールバックのみ)は背景の箱自体が
+  // 無いため、従来どおりページ下部に直接描画する。
+  const enterResolutionButton = (
+    <Button
+      type="button"
+      className="h-12 min-w-12 self-start px-6 text-base"
+      disabled={!canProceed}
+      onClick={handleEnterResolution}
+    >
+      解決へ進む
+    </Button>
+  )
+
   return (
-    <ScreenContainer title="探索">
+    <ScreenContainer title="探索" variant={hasScenes ? 'immersive' : 'default'}>
       <StateFrame
         state={state}
         loading={<p className="text-muted-foreground">判定しています…</p>}
@@ -262,22 +269,15 @@ export function ExploreScreen() {
             onActiveSceneChange={handleActiveSceneChange}
             investigationList={investigationListNode}
             conversationSlot={wrapUpPrompt}
+            enterResolutionSlot={enterResolutionButton}
           />
         ) : (
           <>
             {investigationListNode}
             {wrapUpPrompt}
+            {enterResolutionButton}
           </>
         )}
-
-        <Button
-          type="button"
-          className="h-12 min-w-12 self-start px-6 text-base"
-          disabled={!canProceed}
-          onClick={handleEnterResolution}
-        >
-          解決へ進む
-        </Button>
       </StateFrame>
     </ScreenContainer>
   )

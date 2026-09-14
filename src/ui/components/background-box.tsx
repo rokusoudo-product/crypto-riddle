@@ -1,17 +1,17 @@
 // src/ui/components/background-box.tsx — 「背景の箱」共通コンポーネント(#119/#124)。
 //
 // DESIGN.md「余白・レイアウト」「探索シーン」節「背景の箱」が正本:
-// - 背景を持つ画面(導入③・探索④・解決⑤)では、画面に収まる最大の16:9(横長の画面)/9:16
-//   (縦長の画面)の矩形を中央に置く。判定は画面幅ではなく画面の向き(orientation、
-//   src/ui/lib/orientation.tsのuseIsPortraitScreen)。
-// - 重ねる要素(ホットスポット・立ち絵・会話ウィンドウ・右上のボタン群)は、すべてこの箱に
-//   対する相対位置(position: relative な本コンポーネントのルート要素の子として絶対配置)で置く。
-// - 縦スクロールを出さない: 箱の幅は「画面の高さから、その画面の他の固定要素(見出し・
-//   タブ・ボタン列等=chromePx)を引いた残りの高さ」を基準にアスペクト比から逆算する
-//   (advisor提案の`width: min(100%, calc((100dvh - chrome) * ratio))`方式)。chromePxは
-//   呼び出し側(intro-screen.tsx/scene-explorer.tsx/resolve-screen.tsx)が画面ごとの実際の
-//   見出し・タブ・ボタン列の高さから見積もって渡す(8ptグリッドの合計値、各呼び出し側の
-//   コメントに内訳を記す)。
+// - 背景を持つ画面(導入③・探索④・解決⑤)は、画面いっぱい(100dvw×100dvh)に収まる最大の
+//   16:9(横長の画面)/9:16(縦長の画面)の矩形を画面中央に置く(代表決定2026-09-14・#124:
+//   画面幅720〜960pxのコンテナ制約は適用しない)。判定は画面幅ではなく画面の向き
+//   (orientation、src/ui/lib/orientation.tsのuseIsPortraitScreen)。
+// - 重ねる要素(見出し・タブ・ヒント確認・調査ポイント一覧・SKIP・「解決へ進む」・立ち絵・
+//   会話ウィンドウ等)は、すべてこの箱に対する相対位置(position: relative な本コンポーネントの
+//   ルート要素の子として絶対配置)で置く(呼び出し側=intro-screen.tsx/scene-explorer.tsx/
+//   resolve-screen.tsxの責務)。
+// - 縦スクロールを出さない: 箱の幅は画面の高さ(100dvh)からアスペクト比で逆算する
+//   (`width: min(100%, calc(100dvh * ratio))`)。呼び出し側のScreenContainerが
+//   `variant="immersive"`でページ自体の縦スクロールを止める(screen-container.tsx参照)。
 // - 箱には`[container-type:size]`を設定し、子要素(立ち絵等)がコンテナクエリ単位(cqh/cqw)で
 //   箱の実高さ・実幅に対する比率サイズを指定できるようにする(conversation-frame.tsxの
 //   立ち絵サイズがこれを利用する)。
@@ -19,7 +19,9 @@ import type { ReactNode } from 'react'
 
 import { cn } from '@/ui/lib/utils'
 
-import type { BoxOrientation } from '../lib/background-box'
+import type { BackgroundImageRect, BoxOrientation } from '../lib/background-box'
+
+const FULL_IMAGE_RECT: BackgroundImageRect = { left: 0, top: 0, width: 1, height: 1 }
 
 export interface BackgroundBoxProps {
   orientation: BoxOrientation
@@ -29,10 +31,11 @@ export interface BackgroundBoxProps {
   /** 背景未生成時のプレースホルダ文言(例: 「執務室（背景 準備中）」)。 */
   placeholderLabel?: string
   /**
-   * この画面で箱の上下にある固定要素(見出し・タブ・ボタン列など)の合計高さ(px)。
-   * 呼び出し側が画面ごとに見積もって渡す(本コンポーネント冒頭コメント参照)。
+   * 背景画像の描画矩形(箱に対する相対値、#124・src/ui/lib/background-box.tsの
+   * resolveBackgroundImageRect参照)。省略時は箱全体(cover)。縦長の箱で縦の背景アセットが
+   * 無いシーンでは、呼び出し側が箱の上部だけを覆う矩形を渡す(横画像をcontain・上寄せ表示)。
    */
-  chromePx: number
+  imageRect?: BackgroundImageRect
   /** 箱に対する相対位置で重ねる要素(ホットスポット・立ち絵・会話ウィンドウ・右上ボタン群等)。 */
   children?: ReactNode
   className?: string
@@ -44,30 +47,53 @@ export function BackgroundBox({
   src,
   alt,
   placeholderLabel,
-  chromePx,
+  imageRect = FULL_IMAGE_RECT,
   children,
   className,
 }: BackgroundBoxProps) {
   const isLandscape = orientation === 'landscape'
   // width: 画面に収まる最大の16:9(または9:16)の矩形。aspect-ratioで縦横比を固定し、
-  // widthだけを「画面の高さ(100dvh)からchromePxを引いた残り」×比率で計算する
-  // (advisor提案。ブラウザは`aspect-ratio`+`max-height`だけでは幅を縮めてくれないため、
-  // widthの式に直接収める)。100%(親要素の幅いっぱい)を超えないようmin()で上限を掛ける。
+  // widthだけを画面の高さ(100dvh)×比率で計算する(advisor提案。ブラウザは`aspect-ratio`+
+  // `max-height`だけでは幅を縮めてくれないため、widthの式に直接収める)。100%(親要素の幅
+  // いっぱい)を超えないようmin()で上限を掛ける。
   const ratioMultiplier = isLandscape ? 16 / 9 : 9 / 16
+  const isFullImage = imageRect.width === 1 && imageRect.height === 1
   return (
     <div
+      data-testid="background-box"
       className={cn(
-        'border-border bg-background relative mx-auto overflow-hidden rounded-lg border',
+        'bg-background relative mx-auto overflow-hidden',
         '[container-type:size]',
         className,
       )}
       style={{
         aspectRatio: isLandscape ? '16 / 9' : '9 / 16',
-        width: `min(100%, calc((100dvh - ${chromePx}px) * ${ratioMultiplier}))`,
+        width: `min(100%, calc(100dvh * ${ratioMultiplier}))`,
       }}
     >
       {src ? (
-        <img src={src} alt={alt} className="absolute inset-0 h-full w-full object-cover" />
+        <img
+          src={src}
+          alt={alt}
+          // 縦長の箱で縦の背景アセットが無い場合、imageRectが箱の上部だけを指す(#124)。
+          // 実画像の縦横比がちょうど矩形と一致する想定だが、生成物のブレに備えcontain・
+          // 上寄せにする(はみ出しでクロップされないため)。矩形が箱全体のときは従来どおり
+          // cover(=inset-0 h-full w-full)にする。
+          className={cn(
+            'absolute',
+            isFullImage ? 'inset-0 h-full w-full object-cover' : 'object-contain object-top',
+          )}
+          style={
+            isFullImage
+              ? undefined
+              : {
+                  left: `${imageRect.left * 100}%`,
+                  top: `${imageRect.top * 100}%`,
+                  width: `${imageRect.width * 100}%`,
+                  height: `${imageRect.height * 100}%`,
+                }
+          }
+        />
       ) : (
         // role="img"はプレースホルダ層にだけ付ける(scene-explorer.tsxの従来実装と同じ理由:
         // WAI-ARIAのimgロールはChildren Presentationalのため、外側divに付けると子孫の実

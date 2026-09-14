@@ -173,17 +173,15 @@ function speakerLabel(speaker: ConversationSpeaker): string {
 //   レンダリング高さに追従させる(DESIGN.md「会話フレーム」節「立ち絵の拡大」の目安:
 //   横長の箱=箱の高さの45〜50%程度、縦長の箱=30〜35%程度。3:4比率から幅は自動算出)。
 const PORTRAIT_SIZE_CLASS = 'h-40 w-30 sm:h-80 sm:w-60'
+// overlay限定(#119/#124、2026-09-14改訂): 固定cqh高さではなく「箱の高さに対する上限
+// (max-h、目安値はDESIGN.md「立ち絵の拡大」節の横長45〜50%/縦長30〜35%)」まで、実際に
+// 使える縦方向の空き(=立ち絵の行=h-full、下記renderPortraitRow呼び出し側のflex-1/min-h-0)
+// に収まるだけ自動で縮める。会話ウィンドウ(常に内容優先・縮めない)が大きいほど立ち絵は
+// 小さくなり、頭が箱の上端で切れることはない(flexboxのshrinkで立ち絵の行だけが縮む設計、
+// conversation-frame.tsx冒頭コメント「overlay限定」参照)。
 const PORTRAIT_BOX_RELATIVE_SIZE_CLASS: Record<BoxOrientation, string> = {
-  landscape: 'h-[48cqh] w-auto aspect-[3/4]',
-  portrait: 'h-[32cqh] w-auto aspect-[3/4]',
-}
-// 会話ウィンドウの高さ上限(overlay限定・#119/#124): 箱の高さに対するcqh単位。立ち絵と合わせて
-// 箱の高さを超えないよう、立ち絵の比率に応じて縦長の箱ではやや余裕を持たせる。内容がこれを
-// 超える場合はoverflow-y-auto(ウィンドウ内部のスクロール)で吸収し、ページ自体はスクロール
-// させない(#119「縦スクロールを出さない」)。
-const OVERLAY_WINDOW_MAX_HEIGHT_CLASS: Record<BoxOrientation, string> = {
-  landscape: 'max-h-[58cqh]',
-  portrait: 'max-h-[64cqh]',
+  landscape: 'h-full max-h-[48cqh] w-auto aspect-[3/4]',
+  portrait: 'h-full max-h-[32cqh] w-auto aspect-[3/4]',
 }
 
 // 話者の枠(#119/#124): いま話している人の立ち絵カードを、フルカラー表示に加えて黒または白の
@@ -364,8 +362,10 @@ export interface ConversationFrameProps {
    */
   dismissAnywhere?: boolean
   /**
-   * 背景の箱の向き(#119/#124)。`layout="overlay"`のときのみ意味を持ち、立ち絵の拡大率
-   * (PORTRAIT_BOX_RELATIVE_SIZE_CLASS)・会話ウィンドウの高さ上限を横長/縦長で切り替える。
+   * 背景の箱の向き(#119/#124)。`layout="overlay"`のときのみ意味を持ち、立ち絵の拡大率の上限
+   * (PORTRAIT_BOX_RELATIVE_SIZE_CLASS、横長/縦長で切り替え)を決める。会話ウィンドウ自体は
+   * 高さ上限を持たず内容優先で伸び、立ち絵の行が箱の残り空間に合わせて自動的に縮む
+   * (2026-09-14改訂・#124、上記layout==='overlay'のコメント参照)。
    * 呼び出し側(scene-explorer.tsx/intro-screen.tsx/resolve-screen.tsx)は自身が描画する
    * BackgroundBoxと同じ`resolveBoxOrientation()`の結果を渡すこと。`layout="stacked"`では
    * 無視される(固定pxのPORTRAIT_SIZE_CLASSを使う)。省略時は'landscape'。
@@ -598,6 +598,9 @@ export function ConversationFrame({
   // なる(layoutTwoSlotFrame参照)ため、Portrait側の描画は変更不要(通常の待機中表示と同じ)。
   // sizeClassはlayoutごとに呼び出し元が選ぶ(stacked=固定px/overlay=箱高さ比率cqh、上記
   // PORTRAIT_SIZE_CLASS/PORTRAIT_BOX_RELATIVE_SIZE_CLASS参照)。
+  // shrink/grow挙動(overlay限定・stacked=shrink-0固定/overlay=flex-1 min-h-0で縮む)は
+  // 呼び出し側がextraClassNameで指定する(#124: 同じユーティリティを2箇所で異なる方向に
+  // 上書きするとTailwindのクラス優先順位が不定になるため、基底クラスにはshrink系を含めない)。
   function renderPortraitRow(extraClassName: string, sizeClass: string) {
     return (
       <div
@@ -605,7 +608,7 @@ export function ConversationFrame({
           // relative+z-20: 位置指定(relative)を持つ会話ウィンドウ(z-10)より確実に手前に
           // 描画するため。position指定の無い要素はz-indexの数値に関わらず位置指定要素の
           // 背後に回ってしまう(CSSの積み重ね規則)。
-          'relative z-20 flex shrink-0 items-end justify-between gap-2 sm:gap-4',
+          'relative z-20 flex items-end justify-between gap-2 sm:gap-4',
           extraClassName,
         )}
       >
@@ -639,30 +642,36 @@ export function ConversationFrame({
     // このコンポーネントを配置する前提で、箱に対して`absolute inset-0`で重畳する
     // (旧#108/#110の「箱の直後の兄弟要素として通常のドキュメントフローに置く」形は、
     // 縦スクロールを出さない要件(#119)を満たせなかったため撤回した)。
-    // `flex flex-col justify-end`で「立ち絵→会話ウィンドウ」の順に箱の下端へ積み、箱の
-    // 上側(背景の見える部分)はそのまま残す。立ち絵は箱の高さに対する比率(cqh、
-    // BackgroundBoxの`[container-type:size]`基準)でサイズを決め、ウィンドウはmax-h(cqh)+
-    // overflow-y-autoで箱の高さに収める(ページ自体はスクロールしない、DESIGN.md「探索
-    // シーン」節「背景の箱」「重ねる要素は背景の箱に対する相対位置」)。
+    // 2026-09-14改訂(#124・代表FB「解決の会話ウィンドウが窮屈」): 内側のラッパーに`h-full`
+    // (箱の実高さに確定させる)を与え、立ち絵の行を`flex-1 min-h-0`(縮小可・content優先で
+    // 縮める)、会話ウィンドウを`shrink-0`(縮めない=内容を絶対に切り詰めない)にすることで、
+    // 「立ち絵→ウィンドウ」の合計が箱の高さを超える場合は立ち絵の行**だけ**が自動的に縮む
+    // (window有りだけがshrink-0なのでflexboxの縮小配分は立ち絵の行に全て乗る、標準的な
+    // flexbox shrink計算)。立ち絵カード自身(PORTRAIT_BOX_RELATIVE_SIZE_CLASS)も`h-full`
+    // (=縮んだ行の実高さ)を基準にし、`max-h-[Xcqh]`で上限を掛ける(cqh単独だと行の実際の
+    // 空きに追従しないため、上限としてのみ使う)。会話ウィンドウは`overflow-y-auto`+
+    // `max-h-full`を最後の安全弁として残すが、通常の表示状態では発火しない設計
+    // (E2E/E2E-shot.mjsのno-scroll確認対象)。
     const portraitSizeClass = PORTRAIT_BOX_RELATIVE_SIZE_CLASS[boxOrientation]
     return (
       <div
         data-testid="conversation-frame-overlay"
-        className="absolute inset-0 z-10 flex flex-col justify-end"
+        className="absolute inset-0 z-10 flex flex-col"
         onClick={dismissAnywhere ? handleContainerActivate : undefined}
         onKeyDown={onOutsideDismiss ? handleOutsideKeyDown : undefined}
       >
         <div
-          className="relative flex flex-col justify-end gap-0 p-2 sm:p-4"
+          className="relative flex h-full min-h-0 flex-col justify-end gap-0 p-2 sm:p-4"
           onClick={onOutsideDismiss ? handleOutsideActivate : undefined}
           {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
         >
-          {renderPortraitRow('-mb-2 sm:-mb-4', portraitSizeClass)}
+          {renderPortraitRow('min-h-0 flex-1 -mb-2 sm:-mb-4', portraitSizeClass)}
           <div
             ref={windowRef}
+            data-testid="conversation-window"
             className={cn(
-              'border-primary bg-card relative z-10 flex min-w-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
-              OVERLAY_WINDOW_MAX_HEIGHT_CLASS[boxOrientation],
+              'border-primary bg-card relative z-10 flex min-w-0 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
+              'max-h-full',
               onDismiss &&
                 'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
             )}
@@ -683,8 +692,8 @@ export function ConversationFrame({
       {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
     >
       {/* 立ち絵(左右2枠、#108/#110): 主人公の立ち絵は出さない。stackedは背景の箱を持たない
-          画面向けのため固定pxのまま(PORTRAIT_SIZE_CLASS)。 */}
-      {renderPortraitRow('px-2 sm:gap-12 -mb-4', PORTRAIT_SIZE_CLASS)}
+          画面向けのため固定pxのまま(PORTRAIT_SIZE_CLASS)、縮小しない(shrink-0)。 */}
+      {renderPortraitRow('shrink-0 px-2 sm:gap-12 -mb-4', PORTRAIT_SIZE_CLASS)}
       {/* 会話ウィンドウ: surface + 上辺に primary(ゴールド)のアクセント。 */}
       <div
         ref={windowRef}

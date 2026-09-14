@@ -6,33 +6,22 @@ import { describe, expect, it } from 'vitest'
 import {
   findOrientationMismatches,
   hasPortraitAsset,
+  resolveBackgroundImageRect,
   resolveBackgroundSrc,
   resolveBoxOrientation,
+  resolveHotspotBoxPosition,
   resolveHotspotPosition,
   type BackgroundSrcMap,
   type OrientationCheckScene,
 } from './background-box'
 
-describe('resolveBoxOrientation(#119)', () => {
-  it('画面が縦長かつ縦の背景アセットがあればportraitを返す', () => {
-    expect(resolveBoxOrientation({ screenIsPortrait: true, hasPortraitAsset: true })).toBe(
-      'portrait',
-    )
+describe('resolveBoxOrientation(#119、#124で「縦長の画面は常に9:16」に改訂・代表決定2026-09-14)', () => {
+  it('画面が縦長なら、縦の背景アセットの有無に関わらず常にportrait(9:16)を返す', () => {
+    expect(resolveBoxOrientation(true)).toBe('portrait')
   })
 
-  it('画面が縦長でも縦の背景アセットが無ければlandscapeのまま(箱は16:9のまま画面幅にフィット)', () => {
-    expect(resolveBoxOrientation({ screenIsPortrait: true, hasPortraitAsset: false })).toBe(
-      'landscape',
-    )
-  })
-
-  it('画面が横長ならportraitアセットの有無に関わらずlandscape', () => {
-    expect(resolveBoxOrientation({ screenIsPortrait: false, hasPortraitAsset: true })).toBe(
-      'landscape',
-    )
-    expect(resolveBoxOrientation({ screenIsPortrait: false, hasPortraitAsset: false })).toBe(
-      'landscape',
-    )
+  it('画面が横長なら常にlandscape(16:9)を返す', () => {
+    expect(resolveBoxOrientation(false)).toBe('landscape')
   })
 })
 
@@ -85,6 +74,62 @@ describe('resolveHotspotPosition(schema 0.8.0・#119/#124)', () => {
 
   it('orientation="landscape"のときは常にlandscapeを使う', () => {
     expect(resolveHotspotPosition(withPortrait, 'landscape')).toEqual([0.3, 0.4])
+  })
+})
+
+describe('resolveBackgroundImageRect(#124・代表決定2026-09-14「縦長の画面は常に9:16」)', () => {
+  it('横長の箱は常に箱全体(cover)', () => {
+    expect(resolveBackgroundImageRect('landscape', true)).toEqual({
+      left: 0,
+      top: 0,
+      width: 1,
+      height: 1,
+    })
+    expect(resolveBackgroundImageRect('landscape', false)).toEqual({
+      left: 0,
+      top: 0,
+      width: 1,
+      height: 1,
+    })
+  })
+
+  it('縦長の箱で縦の背景アセットがあれば箱全体(cover)', () => {
+    expect(resolveBackgroundImageRect('portrait', true)).toEqual({
+      left: 0,
+      top: 0,
+      width: 1,
+      height: 1,
+    })
+  })
+
+  it('縦長の箱で縦の背景アセットが無ければ、箱の上部に幅いっぱい・高さ=幅×9/16(=箱の高さの81/256)', () => {
+    const rect = resolveBackgroundImageRect('portrait', false)
+    expect(rect.left).toBe(0)
+    expect(rect.top).toBe(0)
+    expect(rect.width).toBe(1)
+    expect(rect.height).toBeCloseTo(81 / 256, 10)
+  })
+})
+
+describe('resolveHotspotBoxPosition(#124・代表決定2026-09-14)', () => {
+  const withPortrait = {
+    landscape: [0.3, 0.4] as [number, number],
+    portrait: [0.5, 0.6] as [number, number],
+  }
+  const withoutPortrait = { landscape: [0.3, 0.4] as [number, number] }
+
+  it('横長の箱は無変換(画像=箱全体)', () => {
+    expect(resolveHotspotBoxPosition(withPortrait, 'landscape', true)).toEqual([0.3, 0.4])
+  })
+
+  it('縦長の箱で縦の背景アセットがあれば無変換(portrait座標=箱基準)', () => {
+    expect(resolveHotspotBoxPosition(withPortrait, 'portrait', true)).toEqual([0.5, 0.6])
+  })
+
+  it('縦長の箱で縦の背景アセットが無ければ、landscape座標を画像の描画矩形(箱上部)基準に変換する', () => {
+    const [x, y] = resolveHotspotBoxPosition(withoutPortrait, 'portrait', false)
+    expect(x).toBeCloseTo(0.3, 10)
+    expect(y).toBeCloseTo(0.4 * (81 / 256), 10)
   })
 })
 

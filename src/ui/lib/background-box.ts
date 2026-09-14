@@ -1,9 +1,12 @@
 // src/ui/lib/background-box.ts — 「背景の箱」の向き・座標・背景アセット解決(#119/#124)の純粋関数。
 //
-// DESIGN.md「探索シーン」節「背景の箱」が正本:
-// - 縦の背景があるシーンでは、画面の向き(orientation)で横長16:9/縦長9:16の箱を切り替える。
-// - 縦の背景がないシーンは、縦長の画面でも箱を16:9のまま(画面幅にフィット)にし、
-//   立ち絵の比率も横用の値を使う。
+// DESIGN.md「探索シーン」節「背景の箱」が正本(縦長の画面は常に9:16・代表決定2026-09-14・#124):
+// - 箱の向きは画面の向き(orientation)のみで決まる。縦長の画面は常に9:16の箱、横長の画面は
+//   常に16:9の箱(縦の背景アセットの有無は箱の向きに影響しない。旧仕様=縦の背景が無ければ
+//   縦長の画面でも16:9のままは#124で撤回)。
+// - 縦の背景アセットが無いシーンでは、縦長(9:16)の箱の**上部**に横長画像を幅いっぱいで表示し
+//   (contain・上寄せ)、残りは背景色トークンで塗る(resolveBackgroundImageRect)。ホットスポットは
+//   その画像の描画矩形基準の座標に変換する(resolveHotspotBoxPosition)。
 // - 縦の背景アセットの解決はスキーマの範囲外: `background` のIDに `-portrait` を付けた
 //   アセットIDを、UI側の背景の対応表(BACKGROUND_SRCマップ)で引く(docs/scenario_schema.md §2.7)。
 //
@@ -22,15 +25,12 @@ export function hasPortraitAsset(baseId: string, srcMap: BackgroundSrcMap): bool
 }
 
 /**
- * 背景の箱の向きを決める(#119)。判定は画面幅ではなく画面の向き(screenIsPortrait)で行うが、
- * 縦の背景アセットが無いシーンでは縦長の画面でも箱を16:9のまま(landscape)にする
- * (DESIGN.md「探索シーン」節「背景の箱」)。
+ * 背景の箱の向きを決める(#119、#124で「縦長の画面は常に9:16」に改訂・代表決定2026-09-14)。
+ * 判定は画面幅ではなく画面の向き(screenIsPortrait)のみで行う。縦の背景アセットの有無は
+ * 箱の向きには影響しない(無ければ箱の上部に横画像を表示する。resolveBackgroundImageRect参照)。
  */
-export function resolveBoxOrientation(params: {
-  screenIsPortrait: boolean
-  hasPortraitAsset: boolean
-}): BoxOrientation {
-  return params.screenIsPortrait && params.hasPortraitAsset ? 'portrait' : 'landscape'
+export function resolveBoxOrientation(screenIsPortrait: boolean): BoxOrientation {
+  return screenIsPortrait ? 'portrait' : 'landscape'
 }
 
 /**
@@ -57,6 +57,54 @@ export function resolveHotspotPosition(
   orientation: BoxOrientation,
 ): HotspotCoordinate {
   return orientation === 'portrait' && position.portrait ? position.portrait : position.landscape
+}
+
+/** 背景画像の描画矩形(箱に対する相対値、0〜1)。 */
+export interface BackgroundImageRect {
+  readonly left: number
+  readonly top: number
+  readonly width: number
+  readonly height: number
+}
+
+const FULL_IMAGE_RECT: BackgroundImageRect = { left: 0, top: 0, width: 1, height: 1 }
+
+// 縦長(9:16)の箱で縦の背景が無いとき、横長(16:9)画像を箱の上部に幅いっぱいで表示した場合の
+// 高さ(箱の高さに対する比率)。箱の幅を1とすると箱の高さは16/9、画像は横幅1・高さ9/16(自身の
+// 16:9比率を保持)なので、箱の高さに対する比率は (9/16) / (16/9) = (9/16)^2 = 81/256 ≈ 0.3164。
+const PORTRAIT_NO_ASSET_IMAGE_HEIGHT = (9 / 16) * (9 / 16)
+
+/**
+ * 背景画像の描画矩形を解決する(#124・代表決定2026-09-14): 縦長の箱(orientation='portrait')で
+ * 縦の背景アセットが無いシーンは、横長画像を箱の**上部**に幅いっぱいで表示する(contain・上寄せ、
+ * 残りは背景色トークンで塗る)。それ以外(横長の箱、または縦の背景アセットがあるシーン)は
+ * 箱全体を画像で覆う(cover)。返り値は箱に対する相対値(0〜1)。
+ */
+export function resolveBackgroundImageRect(
+  orientation: BoxOrientation,
+  hasPortraitAsset: boolean,
+): BackgroundImageRect {
+  if (orientation === 'portrait' && !hasPortraitAsset) {
+    return { left: 0, top: 0, width: 1, height: PORTRAIT_NO_ASSET_IMAGE_HEIGHT }
+  }
+  return FULL_IMAGE_RECT
+}
+
+/**
+ * ホットスポットの座標を「箱に対する相対位置」に解決する(#124・代表決定2026-09-14)。
+ * `resolveHotspotPosition`が返す座標は「画像自身に対する相対位置」(縦の背景アセットがあれば
+ * portrait座標=箱基準、無ければlandscape座標=横画像基準)のため、`resolveBackgroundImageRect`の
+ * 描画矩形で箱基準の位置へ変換する。画像が箱全体を覆う場合(横長の箱、または縦の背景アセットが
+ * あるシーン)は矩形が箱全体(0,0,1,1)のため実質的に無変換(従来どおり)。
+ */
+export function resolveHotspotBoxPosition(
+  position: HotspotPosition,
+  orientation: BoxOrientation,
+  hasPortraitAsset: boolean,
+): HotspotCoordinate {
+  const [x, y] = resolveHotspotPosition(position, orientation)
+  const rect = resolveBackgroundImageRect(orientation, hasPortraitAsset)
+  return [rect.left + x * rect.width, rect.top + y * rect.height]
 }
 
 /** 食い違い検出(#124)対象の最小限のシーン形(Scene/SceneHotspotの必要フィールドのみ)。 */

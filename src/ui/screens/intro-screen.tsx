@@ -9,6 +9,7 @@ import { Button } from '@/ui/components/ui/button'
 import type { BackgroundSrcMap } from '@/ui/lib/background-box'
 import {
   hasPortraitAsset,
+  resolveBackgroundImageRect,
   resolveBackgroundSrc,
   resolveBoxOrientation,
 } from '@/ui/lib/background-box'
@@ -29,12 +30,6 @@ const INTRO_BACKGROUND_SRC: BackgroundSrcMap = {
   'bg-hq-taskforce': introBackgroundFallback,
 }
 const INTRO_BACKGROUND_ASSET_ID = 'bg-hq-taskforce'
-
-// 箱の上下にある固定要素の合計高さ見積もり(#119/#124、BackgroundBoxのchromePx):
-// ScreenContainerのpy-8(上下32px×2=64px)+見出しh1(約40px)+gap-6(24px)+被害企業名/説明
-// ブロック(h2約28px+p約40px+gap-1=8px)+gap-6(24px、箱の上)+gap-6(24px、箱の下)+
-// SKIPボタン行(48px)。8ptグリッドに丸めた概算値(S1試作で画面を見ながら調整する前提)。
-const INTRO_CHROME_PX = 320
 
 // ③導入（ダーク文脈）。目的=事件の前提提示／主要アクション=画面クリックで進行・SKIP。
 // T013: core のシナリオ進行ステートマシン(scenarioReducer)と接続し、s0-sample の導入テキストを表示する。
@@ -69,9 +64,22 @@ const INTRO_CHROME_PX = 320
 //   Escapeは「閉じる」概念が無いため無効化する(`onEscape={() => {}}`。onDismissだけを
 //   流用してEscapeまで次の行として扱うと、Escapeキーが不用意に導入を進めてしまうため)。
 // - 「SKIP」は会話フレームの外(常時表示・独立したボタン)に置き、タイプライターの進行状況に
-//   関わらずいつでも押せる(途中の行でも即座に導入全体を飛ばして探索へ進める、既存の導線を
+//   関わらずいつでも押せる(途中の行でも即座に導入全体を飛ばして探索へ進む、既存の導線を
 //   壊さない)。会話フレーム内側のクリック領域とは別要素のため、SKIPクリックが
 //   `dismissAnywhere`側の進行処理と二重発火することはない。
+//
+// 2026-09-14(秘書レビュー・代表決定・#124): 背景の箱を画面いっぱいに表示する改訂。
+// - `ScreenContainer`の`variant="immersive"`でコンテナ最大幅(720〜960px)を外し、見出し
+//   「導入」は`sr-only`にする(見た目からは外すがDOMには残す)。
+// - 会社名・説明(`victim_company`)と`intro.background`(ナレーション、省略可)、SKIPは
+//   箱の外(ページ上部)ではなく**箱の中に重ねる**: 会社名・説明パネルは箱の左上(半透明の
+//   surfaceパネル)、SKIPは箱の右上(不透明ボタン、右上ボタン群と同じ考え方)。どちらも
+//   `ConversationFrame`(`dismissAnywhere`で箱全体クリックの進行を持つ)の**外側の兄弟**として
+//   置くことで、SKIPやパネルのクリックが台詞送りへ二重発火しない(DOM上で子孫関係にないため
+//   イベントバブリングの影響を受けない)。
+// - 縦の背景(bg-hq-taskforce-portrait)はまだ無いため、縦長の画面では箱自体は9:16になる
+//   (#124で「縦長の画面は常に9:16」に改訂・代表決定2026-09-14)が、画像は箱の上部に横画像を
+//   幅いっぱいで表示する(resolveBackgroundImageRect、DESIGN.md「探索シーン」節「背景の箱」)。
 export function IntroScreen() {
   const state = useScreenState()
   const navigate = useNavigate()
@@ -80,18 +88,18 @@ export function IntroScreen() {
   const dispatch = useGameStore((s) => s.dispatch)
   // character_intros の何行目を表示中か(#100/#102の多ターン送り)。
   const [turnIndex, setTurnIndex] = useState(0)
-  // 背景の箱の向き(#119/#124): 縦の背景(bg-hq-taskforce-portrait)はまだ無いため、
-  // 縦長の画面でも常にlandscape(16:9のまま)になる(resolveBoxOrientation参照)。
+  // 背景の箱の向き(#124・代表決定2026-09-14「縦長の画面は常に9:16」): 縦の背景
+  // (bg-hq-taskforce-portrait)はまだ無いため、縦長の画面では箱は9:16のまま画像は箱の上部に
+  // 横画像を表示する(resolveBackgroundImageRect参照)。
   const screenIsPortrait = useIsPortraitScreen()
-  const boxOrientation = resolveBoxOrientation({
-    screenIsPortrait,
-    hasPortraitAsset: hasPortraitAsset(INTRO_BACKGROUND_ASSET_ID, INTRO_BACKGROUND_SRC),
-  })
+  const boxOrientation = resolveBoxOrientation(screenIsPortrait)
+  const introHasPortraitAsset = hasPortraitAsset(INTRO_BACKGROUND_ASSET_ID, INTRO_BACKGROUND_SRC)
   const introBackgroundSrc = resolveBackgroundSrc(
     INTRO_BACKGROUND_ASSET_ID,
     boxOrientation,
     INTRO_BACKGROUND_SRC,
   )
+  const introImageRect = resolveBackgroundImageRect(boxOrientation, introHasPortraitAsset)
 
   function handleAdvance() {
     if (progress.part !== 'intro') {
@@ -121,32 +129,55 @@ export function IntroScreen() {
   }
 
   return (
-    <ScreenContainer title="導入">
+    <ScreenContainer title="導入" variant={currentLine ? 'immersive' : 'default'}>
       <StateFrame
         state={state}
         error={<p className="text-destructive">シナリオの読込に失敗しました。</p>}
       >
-        <div className="flex flex-col gap-2">
-          <h2 className="font-heading text-lg">{scenario.intro.victim_company.name}</h2>
-          <p className="text-muted-foreground text-sm">
-            {scenario.intro.victim_company.description}
-          </p>
-        </div>
-        {/* intro.background(ナレーション本文)は0.7.0で省略可になった(台本v2.2・完全会話劇化)。
-            省略時はこのブロックを描画せず会話フレームへ直行する(S2/S3/SLは持つため後方互換)。 */}
-        {scenario.intro.background && <p className="max-w-[60ch]">{scenario.intro.background}</p>}
-
-        {currentLine && (
-          // 背景の箱(#119/#124): 画面に収まる最大の16:9(縦の背景が無いため常にlandscape)の
-          // 矩形。会話フレーム(立ち絵+ウィンドウ)は箱の子として`absolute inset-0`で重畳する
-          // (縦スクロールを出さないため、#108/#110の「箱の直後の兄弟要素」案は撤回した。
+        {currentLine ? (
+          // 背景の箱(#124・代表決定2026-09-14): 画面いっぱいに収まる最大の矩形。会話フレーム
+          // (立ち絵+ウィンドウ)は箱の子として`absolute inset-0`で重畳する(縦スクロールを
+          // 出さないため、#108/#110の「箱の直後の兄弟要素」案は撤回した。
           // conversation-frame.tsxのlayout="overlay"コメント参照)。
           <BackgroundBox
             orientation={boxOrientation}
             src={introBackgroundSrc}
             alt="対策室の背景"
-            chromePx={INTRO_CHROME_PX}
+            imageRect={introImageRect}
           >
+            {/* 会社名・説明パネル(#124): 箱の左上に半透明のsurfaceパネルで重ねる。台詞の
+                会話ウィンドウ・立ち絵(箱の下端側)とは重ならない位置。ConversationFrameの
+                外側の兄弟要素のため、dismissAnywhereのクリック進行とは二重発火しない。 */}
+            <div className="border-border bg-card/80 absolute top-2 left-2 z-20 flex max-w-[min(70%,32rem)] flex-col gap-1 rounded-lg border p-3">
+              <h2 className="font-heading text-base sm:text-lg">
+                {scenario.intro.victim_company.name}
+              </h2>
+              <p className="text-muted-foreground text-xs sm:text-sm">
+                {scenario.intro.victim_company.description}
+              </p>
+              {/* intro.background(ナレーション本文)は0.7.0で省略可になった(台本v2.2・完全
+                  会話劇化)。省略時はこのブロックを描画せず会話フレームへ直行する(S2/S3/SLは
+                  持つため後方互換)。 */}
+              {scenario.intro.background && (
+                <p className="text-xs sm:text-sm">{scenario.intro.background}</p>
+              )}
+            </div>
+
+            {/* SKIPは箱の右上(常時表示・不透明ボタン)。タイプライターの進行状況に関わらず
+                いつでも押せ、即座に導入全体を飛ばして探索へ進む(既存の導線を壊さない)。
+                ConversationFrameの外側の兄弟要素のため、SKIPクリックがdismissAnywhere側の
+                進行処理と二重発火することはない。 */}
+            <div className="absolute top-2 right-2 z-30">
+              <Button
+                type="button"
+                variant="outline"
+                className="bg-card hover:bg-muted dark:bg-card dark:hover:bg-muted h-12 min-w-12 px-6 shadow-sm"
+                onClick={handleAdvance}
+              >
+                SKIP
+              </Button>
+            </div>
+
             {/* 台詞送り(#108/#110): 「タップで進行」ボタンは廃止し、探索と同じく画面のどこを
                 クリック/タップしても次の行へ進む(dismissAnywhere)。Enter/Spaceでも送れる
                 (onDismissが元々持つキーボード対応)。Escapeは「閉じる」概念が無いため
@@ -163,20 +194,14 @@ export function IntroScreen() {
               dismissAnywhere
             />
           </BackgroundBox>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <h2 className="font-heading text-lg">{scenario.intro.victim_company.name}</h2>
+            <p className="text-muted-foreground text-sm">
+              {scenario.intro.victim_company.description}
+            </p>
+          </div>
         )}
-
-        {/* SKIPは会話ウィンドウの外(常時表示)。タイプライターの進行状況に関わらずいつでも
-            押せ、即座に導入全体を飛ばして探索へ進む(既存の導線を壊さない)。 */}
-        <div className="flex flex-wrap gap-4">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-12 min-w-12 px-6"
-            onClick={handleAdvance}
-          >
-            SKIP
-          </Button>
-        </div>
       </StateFrame>
     </ScreenContainer>
   )

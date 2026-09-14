@@ -10,6 +10,7 @@ import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
 import {
   hasPortraitAsset,
+  resolveBackgroundImageRect,
   resolveBackgroundSrc,
   resolveBoxOrientation,
 } from '@/ui/lib/background-box'
@@ -19,12 +20,6 @@ import { useIsPortraitScreen } from '@/ui/lib/orientation'
 import { routeForProgress } from '@/ui/screens/navigation'
 import { useGameStore } from '@/ui/store/game-store'
 import { useScreenState } from '@/ui/state/use-screen-state'
-
-// 箱の上下にある固定要素の合計高さ見積もり(#119/#124、BackgroundBoxのchromePx):
-// ScreenContainerのpy-8(64px)+見出しh1(約40px)+gap-6(24px、箱の上)。解決⑤は下に
-// 独立したボタン行を持たない(選択肢・相談・カードドロワーはすべて会話ウィンドウの中)ため、
-// 探索④より少ない見積もりにしている(8ptグリッドに丸めた概算値)。
-const RESOLVE_CHROME_PX = 200
 
 // ⑤解決（ダーク文脈）。目的=会話モードで問いに答え攻撃手段を特定・防衛策を選ぶ（spec §8, #42）。
 // 単一解・厳密一致（spec §8.2）。
@@ -58,12 +53,11 @@ export function ResolveScreen() {
   const screenIsPortrait = useIsPortraitScreen()
   const resolveScene =
     scenario.scenes?.find((scene) => scene.id === lastExploredSceneId) ?? scenario.scenes?.[0]
-  const resolveBoxOrientationValue = resolveScene
-    ? resolveBoxOrientation({
-        screenIsPortrait,
-        hasPortraitAsset: hasPortraitAsset(resolveScene.background, EXPLORE_BACKGROUND_SRC),
-      })
-    : 'landscape'
+  // #124・代表決定2026-09-14「縦長の画面は常に9:16」: 箱の向きは画面の向きのみで決まる。
+  const resolveBoxOrientationValue = resolveBoxOrientation(screenIsPortrait)
+  const resolveSceneHasPortraitAsset = resolveScene
+    ? hasPortraitAsset(resolveScene.background, EXPLORE_BACKGROUND_SRC)
+    : false
   const resolveBackgroundSrcValue = resolveScene
     ? resolveBackgroundSrc(
         resolveScene.background,
@@ -71,6 +65,10 @@ export function ResolveScreen() {
         EXPLORE_BACKGROUND_SRC,
       )
     : undefined
+  const resolveImageRect = resolveBackgroundImageRect(
+    resolveBoxOrientationValue,
+    resolveSceneHasPortraitAsset,
+  )
 
   if (progress.part !== 'resolution' || progress.resolutionStage === null) {
     return (
@@ -202,8 +200,13 @@ export function ResolveScreen() {
     </>
   ) : null
 
+  // #124・代表決定2026-09-14「背景は画面いっぱいに表示」: 背景の箱を持つのは
+  // resolutionStage==='question'かつresolveSceneがある場合のみ(cipherステージ・一覧
+  // フォールバックのみのマップは従来どおりコンテナ最大幅960pxのstacked layout)。
+  const isImmersive = progress.resolutionStage === 'question' && Boolean(resolveScene)
+
   return (
-    <ScreenContainer title="解決">
+    <ScreenContainer title="解決" variant={isImmersive ? 'immersive' : 'default'}>
       <StateFrame state={state}>
         {progress.resolutionStage === 'cipher' && (
           <form className="flex flex-col gap-4" onSubmit={handleCipherSubmit}>
@@ -249,7 +252,7 @@ export function ResolveScreen() {
               src={resolveBackgroundSrcValue}
               alt={`${resolveScene.title}の背景`}
               placeholderLabel={`${resolveScene.title}（背景 準備中）`}
-              chromePx={RESOLVE_CHROME_PX}
+              imageRect={resolveImageRect}
             >
               <ConversationFrame
                 layout="overlay"
