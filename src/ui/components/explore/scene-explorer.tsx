@@ -139,6 +139,20 @@ import { cn } from '@/ui/lib/utils'
 // 必要があるため)。量産時の注意(#88)・縦の背景(-portrait)の追加方法も同ファイルのコメント参照。
 const BACKGROUND_SRC = EXPLORE_BACKGROUND_SRC
 
+// 縦長(9:16)の箱で縦の背景アセットが無いシーンにおける、箱の上部に重ねる固定要素(右上ボタン群
+// 「ヒント確認」「調査ポイント一覧」・シーンタブ)の高さぶん、横画像とホットスポットの開始位置
+// (top)を下げるオフセット(#124秘書レビュー2回目・2026-09-14「シーンタブ・右上ボタン群が背景の
+// 絵とホットスポットを隠す」不具合の修正)。箱に対する相対値(0〜1)。
+// シーンタブは`scenes.length > 1`のときだけ描画され(下記JSX参照)、縦長では右上ボタン群の
+// 直下(top-16)へ2行目として並ぶ。行数ぶんの高さの目安(実機確認・撮影スクリプト
+// tmp/shot.mjsの基準ビューポート幅390pxでの箱の高さ390×16/9≈693pxを基準に算出、
+// resolveBoxOrientation/BackgroundBoxのコメント参照。固定pxの行に対し箱の実高さは画面幅で
+// 変わるため厳密比例はしないが、既存のtop-16等と同じ近似で扱う):
+// - ボタン群のみ(シーンタブ無し・シーンが1つのみのマップ): top-2(8px)+h-12(48px)+余白8px=64px
+// - ボタン群+シーンタブ(2行、通常のマップ): シーンタブのtop-16(64px)+h-12(48px)+余白8px=120px
+const PORTRAIT_CONTROLS_SINGLE_ROW_TOP_OFFSET = 64 / 693
+const PORTRAIT_CONTROLS_TWO_ROW_TOP_OFFSET = 120 / 693
+
 // 色だけに頼らず種別をaria-label(常時保持)でも示す(DESIGN.md「探索シーン」節・WCAG 1.4.1)。
 // 通常表示ではアイコン・可視ラベルを一切出さないため、UI上の用途は aria-label の組み立てのみ。
 // door(T046・0.6.0でスキーマに追加)も他object_typeと同じ組み立てにする(例:
@@ -293,12 +307,20 @@ export interface SceneExplorerProps {
    */
   onActiveSceneChange?: (sceneId: string) => void
   /**
-   * 「解決へ進む」ボタン(#124・代表決定2026-09-14「背景は画面いっぱいに表示」)。箱の右下に
-   * 重ねて表示する。呼び出し側(explore-screen.tsx)が`canProceed`の活性状態を持ったまま
-   * ボタン要素をそのまま渡す(このコンポーネントはcanEnterResolutionの判定に関与しない)。
-   * 誘導会話(conversationSlot)の表示状態に関わらず常時表示する(PR#92追補・代表FB
-   * 「誘導が導線を隠さない」を維持。旧実装ではページ下部に常時表示していたものを箱の中へ
-   * 移しただけで、表示条件は変えていない)。
+   * 「解決へ進む」ボタン(#124・代表決定2026-09-14「背景は画面いっぱいに表示」)。呼び出し側
+   * (explore-screen.tsx)が`canProceed`の活性状態を持ったままボタン要素をそのまま渡す
+   * (このコンポーネントはcanEnterResolutionの判定に関与しない)。
+   *
+   * 表示位置は探索状態/会話状態で切り替える(#124秘書レビュー2回目・2026-09-14「会話ウィンドウ
+   * に重なる」不具合の修正): 探索状態(会話ウィンドウが無い間)は箱の**右下**に重ねる(旧実装と
+   * 同じ位置)。会話状態(自身のconversation=collect/dangerの結果、誘導会話conversationSlotの
+   * どちらも)は、箱の下部いっぱいに広がる会話ウィンドウと箱右下で重なってしまうため、右上の
+   * 「ヒント確認」「調査ポイント一覧」ボタン群の列へ移す(isConversationActive、下記JSX参照)。
+   * 第一案(会話状態は常に非表示)は、誘導会話の表示・非表示に関わらず`canProceed`成立中は
+   * 常に活性のまま使える(PR#92追補・代表FB「誘導が導線を隠さない」)ことを要求する既存
+   * テスト・挙動を壊すため撤回し、この「位置を移す」案に切り替えた(誘導会話には「わかった」
+   * という別の解決への手段もあるため、自身の会話中に一時的に位置が変わること自体は誘導を
+   * 妨げない)。
    */
   enterResolutionSlot?: ReactNode
 }
@@ -332,9 +354,17 @@ export function SceneExplorer({
   const boxOrientation = resolveBoxOrientation(screenIsPortrait)
   const activeSceneHasPortraitAsset = hasPortraitAsset(activeScene.background, BACKGROUND_SRC)
   const backgroundSrc = resolveBackgroundSrc(activeScene.background, boxOrientation, BACKGROUND_SRC)
+  // 箱の上部に重なる固定要素(右上ボタン群・シーンタブ)ぶんのオフセット(#124秘書レビュー2回目・
+  // 上記PORTRAIT_CONTROLS_*_TOP_OFFSETのコメント参照)。横長の箱・縦の背景アセットがあるシーンは
+  // resolveBackgroundImageRect/resolveHotspotBoxPosition側で無視されるため、常に渡してよい。
+  const portraitControlsTopOffset =
+    scenes.length > 1
+      ? PORTRAIT_CONTROLS_TWO_ROW_TOP_OFFSET
+      : PORTRAIT_CONTROLS_SINGLE_ROW_TOP_OFFSET
   const backgroundImageRect = resolveBackgroundImageRect(
     boxOrientation,
     activeSceneHasPortraitAsset,
+    portraitControlsTopOffset,
   )
 
   // 現在のシーンidを呼び出し側へ通知する(#119/#124、上記SceneExplorerPropsのJSDoc参照)。
@@ -658,9 +688,26 @@ export function SceneExplorer({
             なので実質4.5%alpha=ほぼ透明)がtailwind-mergeでは`bg-card`と衝突と見なされず
             (variant違い)残ってしまい、それが背景に溶ける主因だった。`dark:bg-card`
             `dark:hover:bg-muted`を明示して打ち消し、確実に不透明にする(T048)。
-            z-30はConversationFrame overlay(z-10)より確実に手前に出すため。旧: 会話ウィンドウ内の
-            ?カードボタンはここへ統合し廃止した(下記conversation内のコメント参照)。 */}
-        <div className="absolute top-2 right-2 z-30 flex items-start gap-2">
+            z-50はConversationFrame overlay(自身のconversation・z-10)だけでなく誘導会話
+            (conversationSlot・z-40)よりも確実に手前に出すため(#124秘書レビュー2回目・
+            2026-09-14: conversationSlotの`absolute inset-0`修正=下記conversationSlotIdの
+            divのコメント参照=で誘導会話が箱いっぱいの透明なクリック捕捉層として正しく
+            機能するようになった結果、旧z-30のままだと誘導会話の下に隠れてこの列のボタンが
+            一切クリックできなくなることが発覚したため、z-40を上回るz-50へ引き上げた。
+            「調査ポイント一覧」パネル自体(listPanelId、z-30のまま)は本来どおり誘導会話の
+            下に隠れる=変更していない)。旧: 会話ウィンドウ内の?カードボタンはここへ統合し
+            廃止した(下記conversation内のコメント参照)。
+            会話状態では「解決へ進む」もこの列の末尾に加える(#124秘書レビュー2回目・
+            2026-09-14。下記enterResolutionSlotのJSXコメント参照。第一案=常に非表示は
+            誘導会話(conversationSlot)表示中に「解決へ進む」が常時活性のまま使えることを
+            要求する既存テスト・PR#92追補FB「誘導が導線を隠さない」を壊すため撤回し、
+            この案(会話状態の間だけ右上へ移す)に切り替えた)。`flex-wrap`は3ボタン目が
+            増えても縦長の狭い画面ではみ出さず折り返すため(2ボタンのみの場合は従来どおり
+            1行に収まる)。 */}
+        <div
+          data-testid="top-controls-row"
+          className="absolute top-2 right-2 z-50 flex flex-wrap items-start justify-end gap-2"
+        >
           <CardDrawer cards={ownedCards} triggerVariant="label" />
           <Button
             type="button"
@@ -672,6 +719,7 @@ export function SceneExplorer({
           >
             調査ポイント一覧
           </Button>
+          {isConversationActive && enterResolutionSlot}
         </div>
 
         {/* 「調査ポイント一覧」トグルパネル(#66→T047でトグル化、#124で箱の中の絶対配置
@@ -718,6 +766,7 @@ export function SceneExplorer({
               hotspot.position,
               boxOrientation,
               activeSceneHasPortraitAsset,
+              portraitControlsTopOffset,
             )
             const investigated = isHotspotInvestigated(hotspot, investigatedPointIds)
             const needsSheet = hotspot.actions.length > 1
@@ -761,6 +810,7 @@ export function SceneExplorer({
               conversation.hotspotPosition,
               boxOrientation,
               activeSceneHasPortraitAsset,
+              portraitControlsTopOffset,
             )
             return (
               <div
@@ -898,22 +948,40 @@ export function SceneExplorer({
           </ConversationFrame>
         ) : conversationSlot ? (
           // idはisWrapUpVisibleのuseEffectが最初の操作可能要素を探すためのフック
-          // (上記コメント参照)。relative z-40: 「調査ポイント一覧」を開いたまま一覧内から
+          // (上記コメント参照)。z-40: 「調査ポイント一覧」を開いたまま一覧内から
           // 最後の1件を調べ終えると、この誘導会話(わかった)が一覧(z-30)と同じ箱の中で
           // 入れ替わりで重なる。一覧より上に出す必要があるため、自身のconversation
           // (collect/danger、z-30の一覧より下のまま=一覧を常時操作可能にする設計を維持)とは
-          // 個別にconversationSlotだけをさらに持ち上げる(上記一覧パネルのz-indexコメント参照)。 */}
-          <div id={conversationSlotId} className="relative z-40">
+          // 個別にconversationSlotだけをさらに持ち上げる(上記一覧パネルのz-indexコメント参照)。
+          // `absolute inset-0`(#124秘書レビュー2回目・2026-09-14で発見・修正): 旧`relative`
+          // だけだとこのdivがBackgroundBox内で唯一の通常フロー要素になり、中身(conversationSlot=
+          // `layout="overlay"`のConversationFrame、自身が`absolute inset-0`)が幅は箱いっぱい・
+          // 高さ0で計算されてしまい、この0高さのdivがConversationFrameの`absolute inset-0`の
+          // 基準(containing block)になって誘導会話全体が画面上端付近に極小サイズで潰れて
+          // 実質不可視になっていた(E2Eで会話ウィンドウの矩形を検証して発覚。自身の会話
+          // (collect/danger)はBackgroundBoxへ直接`absolute inset-0`で重畳するため元々この問題は
+          // 無かった)。`absolute inset-0`で箱いっぱいに確定させることで解消する。 */}
+          <div id={conversationSlotId} className="absolute inset-0 z-40">
             {conversationSlot}
           </div>
         ) : null}
 
-        {/* 「解決へ進む」(#124・代表決定2026-09-14): 箱の右下に重ねる。呼び出し側
-              (explore-screen.tsx)がcanProceedの活性状態を持ったままボタン要素を渡す。
-              誘導会話(conversationSlot)の表示状態に関わらず常時表示する(PR#92追補・代表FB
-              「誘導が導線を隠さない」を維持、上記SceneExplorerPropsのJSDoc参照)。 */}
-        {enterResolutionSlot && (
-          <div className="absolute right-2 bottom-2 z-30">{enterResolutionSlot}</div>
+        {/* 「解決へ進む」(#124・代表決定2026-09-14): 探索状態(会話ウィンドウが無い間)は箱の
+              右下に重ねる。呼び出し側(explore-screen.tsx)がcanProceedの活性状態を持ったまま
+              ボタン要素を渡す。会話状態(自身のconversation・誘導会話conversationSlotの
+              どちらも)は、箱の下部いっぱいに広がる会話ウィンドウと箱右下で重なるため
+              (#124秘書レビュー2回目・2026-09-14)、ここでは描画せず上記の右上ボタン群の列へ
+              移す(isConversationActive、上記コメント参照)。「誘導会話の表示・非表示に
+              関わらずcanProceed成立中は常に活性のまま使える」(PR#92追補・代表FB「誘導が
+              導線を隠さない」、DESIGN.md「探索完了→解決への誘導」節)自体は維持したまま、
+              表示位置だけを会話状態の間切り替える。 */}
+        {enterResolutionSlot && !isConversationActive && (
+          <div
+            data-testid="enter-resolution-bottom-slot"
+            className="absolute right-2 bottom-2 z-30"
+          >
+            {enterResolutionSlot}
+          </div>
         )}
       </BackgroundBox>
     </div>

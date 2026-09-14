@@ -109,6 +109,39 @@ describe('resolveBackgroundImageRect(#124・代表決定2026-09-14「縦長の�
     expect(rect.width).toBe(1)
     expect(rect.height).toBeCloseTo(81 / 256, 10)
   })
+
+  describe('topOffset引数(#124秘書レビュー2回目・2026-09-14「シーンタブ・右上ボタン群が背景の絵とホットスポットを隠す」不具合の修正)', () => {
+    it('縦長の箱で縦の背景アセットが無ければ、topOffsetぶんtopを下げる(width/heightは変えない)', () => {
+      const rect = resolveBackgroundImageRect('portrait', false, 0.2)
+      expect(rect.left).toBe(0)
+      expect(rect.top).toBe(0.2)
+      expect(rect.width).toBe(1)
+      expect(rect.height).toBeCloseTo(81 / 256, 10)
+    })
+
+    it('省略時は0(従来どおり箱の最上部から表示)', () => {
+      const rect = resolveBackgroundImageRect('portrait', false)
+      expect(rect.top).toBe(0)
+    })
+
+    it('横長の箱ではtopOffsetを渡しても無視される(箱全体のcoverのまま)', () => {
+      expect(resolveBackgroundImageRect('landscape', false, 0.2)).toEqual({
+        left: 0,
+        top: 0,
+        width: 1,
+        height: 1,
+      })
+    })
+
+    it('縦長の箱で縦の背景アセットがあればtopOffsetを渡しても無視される(箱全体のcoverのまま)', () => {
+      expect(resolveBackgroundImageRect('portrait', true, 0.2)).toEqual({
+        left: 0,
+        top: 0,
+        width: 1,
+        height: 1,
+      })
+    })
+  })
 })
 
 describe('resolveHotspotBoxPosition(#124・代表決定2026-09-14)', () => {
@@ -130,6 +163,22 @@ describe('resolveHotspotBoxPosition(#124・代表決定2026-09-14)', () => {
     const [x, y] = resolveHotspotBoxPosition(withoutPortrait, 'portrait', false)
     expect(x).toBeCloseTo(0.3, 10)
     expect(y).toBeCloseTo(0.4 * (81 / 256), 10)
+  })
+
+  describe('topOffset引数(#124秘書レビュー2回目・2026-09-14)', () => {
+    it('縦長の箱で縦の背景アセットが無ければ、resolveBackgroundImageRectと同じtopOffsetぶん下げた位置に変換する', () => {
+      const [x, y] = resolveHotspotBoxPosition(withoutPortrait, 'portrait', false, 0.2)
+      expect(x).toBeCloseTo(0.3, 10)
+      expect(y).toBeCloseTo(0.2 + 0.4 * (81 / 256), 10)
+    })
+
+    it('横長の箱ではtopOffsetを渡しても無視される(無変換のまま)', () => {
+      expect(resolveHotspotBoxPosition(withPortrait, 'landscape', true, 0.2)).toEqual([0.3, 0.4])
+    })
+
+    it('縦長の箱で縦の背景アセットがあればtopOffsetを渡しても無視される(無変換のまま)', () => {
+      expect(resolveHotspotBoxPosition(withPortrait, 'portrait', true, 0.2)).toEqual([0.5, 0.6])
+    })
   })
 })
 

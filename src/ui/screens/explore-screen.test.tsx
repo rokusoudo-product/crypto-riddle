@@ -355,6 +355,67 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(officeTab).toHaveAttribute('aria-selected', 'true')
       expect(document.activeElement).toBe(officeTab)
     })
+
+    /** 「解決へ進む」ボタンが現在どちらのスロット(箱右下/右上ボタン群列)にあるかを判定する
+     * (#124秘書レビュー2回目: 会話状態では右上ボタン群の列へ、探索状態では箱右下へ、
+     * 表示位置を切り替えて会話ウィンドウとの重なりを避ける。scene-explorer.tsxの
+     * enter-resolution-bottom-slot/top-controls-row参照)。 */
+    function enterResolutionSlotLocation(): 'bottom' | 'top' | 'absent' {
+      const button = screen.queryByRole('button', { name: '解決へ進む' })
+      if (!button) return 'absent'
+      const bottomSlot = screen.queryByTestId('enter-resolution-bottom-slot')
+      if (bottomSlot?.contains(button)) return 'bottom'
+      if (screen.getByTestId('top-controls-row').contains(button)) return 'top'
+      throw new Error('「解決へ進む」がどちらの既知スロットにも属していない')
+    }
+
+    it('自身の会話ウィンドウ(調査結果)が開いている間は「解決へ進む」を箱右下から右上ボタン群の列へ移し、閉じると箱右下に戻す(#124秘書レビュー2回目・会話ウィンドウとの重なり解消)', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+      const tanakaLine =
+        '田中さんに話を聞いた。「昼過ぎに画面の様子がおかしくなった」と田中さんは証言した。'
+
+      // 探索状態: 「解決へ進む」は箱右下に表示されている(非活性でも表示自体はする)。
+      expect(enterResolutionSlotLocation()).toBe('bottom')
+
+      // 田中さん(単一action)を調べて会話状態(自身のconversation)にする。
+      await user.click(screen.getByRole('button', { name: /田中さん（人物）/ }))
+      await screen.findByRole('button', { name: tanakaLine })
+
+      // 自身の会話ウィンドウが開いている間は箱右下から右上ボタン群の列へ移る(箱右下で会話
+      // ウィンドウと重なる不具合の修正。ボタン自体は消えない=活性状態はcanProceedのまま)。
+      expect(enterResolutionSlotLocation()).toBe('top')
+      expect(screen.getByRole('button', { name: '解決へ進む' })).toBeInTheDocument()
+
+      // 会話ウィンドウを閉じる(1回目=スキップ、2回目=閉じる、T048)。
+      await user.click(screen.getByRole('button', { name: tanakaLine }))
+      if (screen.queryByRole('button', { name: tanakaLine })) {
+        await user.click(screen.getByRole('button', { name: tanakaLine }))
+      }
+
+      // 探索状態に戻ると箱右下に戻る。
+      expect(enterResolutionSlotLocation()).toBe('bottom')
+    })
+
+    it('danger(教育的フィードバック)の会話ウィンドウが開いている間も「解決へ進む」を右上ボタン群の列へ移す', async () => {
+      const user = userEvent.setup()
+      renderExplore(exploreSceneFixture)
+
+      const pcHotspot = screen.getByRole('button', { name: /経理担当のPC（PC）/ })
+      pcHotspot.focus()
+      await user.keyboard('{Enter}')
+      await user.keyboard('{Tab}')
+      expect(document.activeElement).toHaveTextContent('電源を落とす')
+      await user.keyboard('{Enter}')
+      const dangerLine = 'ここで電源を落とすと揮発性メモリの証拠が消えます。'
+      await screen.findByText(dangerLine)
+
+      expect(enterResolutionSlotLocation()).toBe('top')
+
+      await user.click(screen.getByRole('button', { name: dangerLine }))
+      await user.click(screen.getByRole('button', { name: dangerLine }))
+      expect(enterResolutionSlotLocation()).toBe('bottom')
+    })
   })
 
   describe('探索完了→解決への誘導(#52 Phase4.7/#71・T045、T047で会話オーバーレイに統合)', () => {
@@ -386,6 +447,13 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(screen.getAllByText('橘').length).toBeGreaterThan(0)
       // 促し後も「解決へ進む」自体は活性のまま(誘導が導線を隠さない)。
       expect(screen.getByRole('button', { name: '解決へ進む' })).toBeEnabled()
+      // 誘導会話(conversationSlot)が表示されている間も、箱右下の会話ウィンドウと重ならない
+      // よう右上ボタン群の列へ移る(#124秘書レビュー2回目・自身の会話と同じ扱い)。
+      expect(
+        screen
+          .getByTestId('top-controls-row')
+          .contains(screen.getByRole('button', { name: '解決へ進む' })),
+      ).toBe(true)
     })
 
     it('促しは全文表示(またはスキップ)後、「わかった」を押すと探索状態には戻らず解決パートへ直接進む(#52 追補)', async () => {

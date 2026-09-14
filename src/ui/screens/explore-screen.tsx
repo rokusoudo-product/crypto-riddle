@@ -236,8 +236,11 @@ export function ExploreScreen() {
 
   // 「解決へ進む」(#124・代表決定2026-09-14): scenesがある場合は箱の右下に重ねる
   // (SceneExplorerのenterResolutionSlotへ渡す)。誘導会話(wrapUpPrompt)の表示状態に関わらず
-  // 常時表示する(PR#92追補・代表FB「誘導が導線を隠さない」を維持。scene-explorer.tsxの
-  // enterResolutionSlot JSDoc参照)。scenesが無い場合(一覧フォールバックのみ)は背景の箱自体が
+  // 表示する(PR#92追補・代表FB「誘導が導線を隠さない」を維持)。ただし
+  // SceneExplorer自身の会話(調査結果・danger)が開いている間はSceneExplorer側の判定で
+  // 非表示になる(#124秘書レビュー2回目・2026-09-14: 会話ウィンドウとの重なり解消。
+  // scene-explorer.tsxのenterResolutionSlot JSDoc参照。本ファイルはボタン要素を渡すだけで
+  // その表示条件には関与しない)。scenesが無い場合(一覧フォールバックのみ)は背景の箱自体が
   // 無いため、従来どおりページ下部に直接描画する。
   const enterResolutionButton = (
     <Button

@@ -204,3 +204,152 @@ for (const [label, viewport] of Object.entries({
     })
   })
 }
+
+// 秘書の2回目のレビューで見つかった重なりの不具合2点(#124)の回帰確認:
+// 不具合1: 縦長・縦の背景が無いシーンで、シーンタブ・右上ボタン群が背景の絵とホットスポットに
+//   重なる(scene-explorer.tsxのPORTRAIT_CONTROLS_*_TOP_OFFSET・resolveBackgroundImageRect/
+//   resolveHotspotBoxPosition の topOffset 引数で修正)。
+// 不具合2: 「解決へ進む」が会話ウィンドウ(調査結果・danger・誘導会話のいずれも)に重なる
+//   (探索状態=箱右下/会話状態=右上ボタン群の列、に表示位置を切り替えて修正)。
+function rectsOverlap(
+  a: { x: number; y: number; width: number; height: number },
+  b: { x: number; y: number; width: number; height: number },
+): boolean {
+  return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y
+}
+
+test.describe('縦長・縦の背景が無いシーンで、シーンタブ・右上ボタン群が背景の絵とホットスポットに重ならない(秘書レビュー2回目・#124)', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('探索状態(アイドル)で、ホットスポットの矩形がシーンタブ・右上ボタン群の矩形と重ならない', async ({
+    page,
+  }) => {
+    await page.goto('/')
+    await page.getByRole('link', { name: 'つづきから' }).click()
+    await selectS1Map(page)
+    await expect(page.getByRole('heading', { name: '導入' })).toBeVisible()
+    await page.getByRole('button', { name: 'SKIP' }).click()
+    await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
+
+    const tablistRect = await page.getByRole('tablist', { name: '探索シーンの切替' }).boundingBox()
+    const buttonRowRect = await page.getByRole('button', { name: '調査ポイント一覧' }).boundingBox()
+    if (!tablistRect || !buttonRowRect) throw new Error('シーンタブ・右上ボタン群が見つからない')
+
+    // scene-office(既定表示シーン)の全ホットスポット。
+    const hotspotLabels = [
+      '経理部 中野の端末（PC）',
+      '中野（人物）',
+      '経理部長（人物）',
+      '資料棚（書籍）',
+      'サーバ室への扉（扉）',
+    ]
+    for (const label of hotspotLabels) {
+      const hotspotRect = await page.getByRole('button', { name: label, exact: true }).boundingBox()
+      if (!hotspotRect) throw new Error(`ホットスポットが見つからない: ${label}`)
+      expect(rectsOverlap(hotspotRect, tablistRect), `${label} とシーンタブが重なっている`).toBe(
+        false,
+      )
+      expect(
+        rectsOverlap(hotspotRect, buttonRowRect),
+        `${label} と右上ボタン群が重なっている`,
+      ).toBe(false)
+    }
+  })
+})
+
+test.describe('「解決へ進む」が会話ウィンドウに重ならない(秘書レビュー2回目・#124)', () => {
+  for (const [label, viewport] of Object.entries({
+    横長: { width: 1280, height: 800 },
+    縦長: { width: 390, height: 844 },
+  })) {
+    test.describe(`${label} ${viewport.width}x${viewport.height}`, () => {
+      test.use({ viewport })
+
+      test(`調査結果の会話ウィンドウ(自身の会話)が開いている間、「解決へ進む」は会話ウィンドウと重ならない(${label})`, async ({
+        page,
+      }) => {
+        await page.goto('/')
+        await page.getByRole('link', { name: 'つづきから' }).click()
+        await selectS1Map(page)
+        await expect(page.getByRole('heading', { name: '導入' })).toBeVisible()
+        const introLine1 =
+          'あらあら〜、新人さん、ちょうど良いところに。今、浜通(はまどおり)商事さんから緊急のお電話が入りまして……。はい、お茶どうぞ〜。'
+        await expect(page.getByText(introLine1, { exact: false })).toBeVisible()
+        await skipTypewriter(page, introLine1)
+        await page.getByRole('button', { name: 'SKIP' }).click()
+        await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
+
+        // 中野(単一action)を調べて自身の会話ウィンドウを開く(tmp/shot.mjsと同じ経路。
+        // 秘書指摘の撮影画像=turn1-npc/turn2-supportと同じシナリオ)。
+        await page.getByRole('button', { name: '中野（人物）', exact: true }).click()
+        const nakanoLine1 =
+          'すみません……月末で請求処理が立て込んでて。取引先からの「請求書送付のご連絡」ってメールで、疑いもせず添付を開いてしまって……。「マクロを有効にしますか」って出たのも、いつも通りだと思って押しちゃったんです。'
+        await expect(page.getByText(nakanoLine1, { exact: false })).toBeVisible()
+
+        const enterResolution = page.getByRole('button', { name: '解決へ進む' })
+        const conversationWindow = page.getByTestId('conversation-window')
+        const [enterResolutionRect, windowRect] = await Promise.all([
+          enterResolution.boundingBox(),
+          conversationWindow.boundingBox(),
+        ])
+        if (!enterResolutionRect || !windowRect) {
+          throw new Error('「解決へ進む」または会話ウィンドウが見つからない')
+        }
+        expect(rectsOverlap(enterResolutionRect, windowRect)).toBe(false)
+
+        // 次のターン(支援役=橘、turn2-support)へ進めても重ならないまま。
+        await skipTypewriter(page, nakanoLine1)
+        await page.getByRole('button', { name: nakanoLine1, exact: true }).click()
+        const nakanoLine2 =
+          '……ご本人も認めているわ。件名の巧妙さと、月末の油断が重なった。よくある入口ね。'
+        await expect(page.getByText(nakanoLine2, { exact: false })).toBeVisible()
+        const [enterResolutionRect2, windowRect2] = await Promise.all([
+          enterResolution.boundingBox(),
+          conversationWindow.boundingBox(),
+        ])
+        if (!enterResolutionRect2 || !windowRect2) {
+          throw new Error('「解決へ進む」または会話ウィンドウが見つからない(turn2)')
+        }
+        expect(rectsOverlap(enterResolutionRect2, windowRect2)).toBe(false)
+      })
+
+      test(`探索完了への誘導会話(conversationSlot)が開いている間も、「解決へ進む」は会話ウィンドウと重ならない(${label})`, async ({
+        page,
+      }) => {
+        await page.goto('/')
+        await page.getByRole('link', { name: 'つづきから' }).click()
+        await selectS1Map(page)
+        await expect(page.getByRole('heading', { name: '導入' })).toBeVisible()
+        await page.getByRole('button', { name: 'SKIP' }).click()
+        await expect(page.getByRole('heading', { name: '探索' })).toBeVisible()
+
+        // 一覧から全ポイントを調査して「解決へ」の活性条件を満たし、誘導会話を開かせる。
+        await page.getByRole('button', { name: '調査ポイント一覧' }).click()
+        let investigateButton = page.getByRole('button', { name: '調査する' }).first()
+        while (await investigateButton.count()) {
+          await investigateButton.click()
+          investigateButton = page.getByRole('button', { name: '調査する' }).first()
+        }
+        const wrapUpLine = '材料は揃ったわ。そろそろ問題を整理しましょう。'
+        await expect(page.getByText(wrapUpLine, { exact: false })).toBeVisible()
+
+        const enterResolution = page.getByRole('button', { name: '解決へ進む' })
+        await expect(enterResolution).toBeEnabled()
+        const conversationWindow = page.getByTestId('conversation-window')
+        const [enterResolutionRect, windowRect] = await Promise.all([
+          enterResolution.boundingBox(),
+          conversationWindow.boundingBox(),
+        ])
+        if (!enterResolutionRect || !windowRect) {
+          throw new Error('「解決へ進む」または誘導会話の会話ウィンドウが見つからない')
+        }
+        expect(rectsOverlap(enterResolutionRect, windowRect)).toBe(false)
+
+        // 「わかった」からそのまま解決へ進めること(PR#92追補の挙動を壊していないことの確認)。
+        await skipTypewriter(page, wrapUpLine)
+        await page.getByRole('button', { name: 'わかった' }).click()
+        await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
+      })
+    })
+  }
+})

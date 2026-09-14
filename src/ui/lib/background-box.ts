@@ -79,13 +79,23 @@ const PORTRAIT_NO_ASSET_IMAGE_HEIGHT = (9 / 16) * (9 / 16)
  * 縦の背景アセットが無いシーンは、横長画像を箱の**上部**に幅いっぱいで表示する(contain・上寄せ、
  * 残りは背景色トークンで塗る)。それ以外(横長の箱、または縦の背景アセットがあるシーン)は
  * 箱全体を画像で覆う(cover)。返り値は箱に対する相対値(0〜1)。
+ *
+ * `topOffset`(#124秘書レビュー2回目・2026-09-14「シーンタブ・右上ボタン群が背景の絵と
+ * ホットスポットを隠す」不具合の修正): 呼び出し側(scene-explorer.tsx)がシーンタブ・右上
+ * ボタン群など箱の上部に重ねる固定要素を持つ場合、その高さぶん画像の開始位置(top)を
+ * 下げるためのオフセット(箱に対する相対値、省略時0=従来どおり箱の最上部から表示)。
+ * 画像の高さ(`PORTRAIT_NO_ASSET_IMAGE_HEIGHT`)自体は変えず、位置だけをずらす。
+ * 横長の箱・縦の背景アセットがあるシーン(=画像が箱全体を覆う)では無視される(呼び出し側の
+ * intro-screen.tsx/resolve-screen.tsxのように箱の上部に固定要素を重ねない画面では、この
+ * 引数自体を渡す必要が無い=省略時の既定0のままでよい)。
  */
 export function resolveBackgroundImageRect(
   orientation: BoxOrientation,
   hasPortraitAsset: boolean,
+  topOffset = 0,
 ): BackgroundImageRect {
   if (orientation === 'portrait' && !hasPortraitAsset) {
-    return { left: 0, top: 0, width: 1, height: PORTRAIT_NO_ASSET_IMAGE_HEIGHT }
+    return { left: 0, top: topOffset, width: 1, height: PORTRAIT_NO_ASSET_IMAGE_HEIGHT }
   }
   return FULL_IMAGE_RECT
 }
@@ -96,14 +106,20 @@ export function resolveBackgroundImageRect(
  * portrait座標=箱基準、無ければlandscape座標=横画像基準)のため、`resolveBackgroundImageRect`の
  * 描画矩形で箱基準の位置へ変換する。画像が箱全体を覆う場合(横長の箱、または縦の背景アセットが
  * あるシーン)は矩形が箱全体(0,0,1,1)のため実質的に無変換(従来どおり)。
+ *
+ * `topOffset`(#124秘書レビュー2回目・2026-09-14): `resolveBackgroundImageRect`と同じ
+ * オフセットを渡すと、画像の描画矩形が箱の上部からずれた場合でもホットスポットが画像の
+ * 実際の描画位置に追従する(呼び出し側=scene-explorer.tsxが画像とホットスポット双方に
+ * 同じ値を渡すことで整合を保つ)。
  */
 export function resolveHotspotBoxPosition(
   position: HotspotPosition,
   orientation: BoxOrientation,
   hasPortraitAsset: boolean,
+  topOffset = 0,
 ): HotspotCoordinate {
   const [x, y] = resolveHotspotPosition(position, orientation)
-  const rect = resolveBackgroundImageRect(orientation, hasPortraitAsset)
+  const rect = resolveBackgroundImageRect(orientation, hasPortraitAsset, topOffset)
   return [rect.left + x * rect.width, rect.top + y * rect.height]
 }
 
