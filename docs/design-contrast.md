@@ -6,7 +6,8 @@ created: 2026-09-14
 related:
   - DESIGN.md（カラートークン・半透明パネル節）
   - scripts/check-contrast.mjs
-issue: https://github.com/rokusoudo-product/crypto-riddle/issues/132
+issue:
+  - https://github.com/rokusoudo-product/crypto-riddle/issues/132
   - https://github.com/rokusoudo-product/crypto-riddle/issues/13
 gate: "#132・#13（カラートークン AA 検証。#13 を #132 に含めて完了させる）で作成。正式反映は代表レビュー（PRマージ）で承認。"
 ---
