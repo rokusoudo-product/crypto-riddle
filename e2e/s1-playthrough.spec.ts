@@ -502,6 +502,13 @@ test.describe('S1「標的型メールからの侵入」背景シーン経由の
     // ここでは代替経路(解決へ進む)を確認する。
     await enterResolution.click()
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
+
+    // #119/#124: 解決画面は「解決へ進む」を押した時点で表示していた探索シーンの背景を
+    // そのまま引き継ぐ(lastExploredSceneId、新しい画像は作らない)。ここではサーバ室タブを
+    // 表示したまま解決へ進んだため、解決画面でもサーバ室の背景が表示されることを確認する
+    // (この行が無いと、resolve-screen.tsxがscenario.scenes[0]=執務室へ既定フォールバック
+    // しても偶然テストが通ってしまい、lastExploredSceneIdの配線が壊れても検知できない)。
+    await expect(page.getByRole('img', { name: 'サーバ室の背景' })).toBeVisible()
   })
 
   test('ドア(object_type: door)でも執務室↔サーバ室を移動でき、シーンタブと併用できる(#78・T046-ui-data)', async ({

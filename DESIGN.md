@@ -33,6 +33,8 @@
 | error | #B23F35 | #D25A4E | 誤答・破壊的操作 |
 | info | #3E6E99 | #5A8FBF | 補足情報 |
 | hotspot-highlight | oklch(0.637 0.237 25.331) | oklch(0.749 0.202 22.86) | 探索ホットスポット□マーカーの枠線（危険操作系の warning/error/destructive とは別扱い。#71・T045） |
+| speaker-frame-black | oklch(0 0 0) | oklch(0 0 0) | 会話中の立ち絵カードを囲む話者の枠（黒案。ライト/ダーク共通の絶対色。#118/#124・`SPEAKER_FRAME_COLOR`定数で white 案と切替） |
+| speaker-frame-white | oklch(1 0 0) | oklch(1 0 0) | 会話中の立ち絵カードを囲む話者の枠（白案。ライト/ダーク共通の絶対色。#118/#124・`SPEAKER_FRAME_COLOR`定数で black 案と切替） |
 
 - すべて CSS 変数（テーマトークン）経由で参照する。上記 hex は**仮値**で、実装前に全ペアの AA コントラスト（本文4.5:1／大テキスト3:1）を検証し微調整する。
 
