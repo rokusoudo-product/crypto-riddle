@@ -38,7 +38,7 @@ export function TitleScreen() {
         }
       >
         <p className="text-muted-foreground max-w-[60ch]">
-          静かで硬派な推理アドベンチャー。事件現場の緊張感の中で、暗号と情報セキュリティの知識を手がかりに真相へ迫る。
+          張り詰めたセキュリティ対応の最前線に立つ推理アドベンチャー。暗号と情報セキュリティの知識を手がかりに真相へ迫る。
         </p>
         <div className="flex flex-wrap gap-4">
           <PrimaryAction to="/maps">つづきから</PrimaryAction>

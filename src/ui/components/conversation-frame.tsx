@@ -184,17 +184,20 @@ const PORTRAIT_BOX_RELATIVE_SIZE_CLASS: Record<BoxOrientation, string> = {
   portrait: 'h-full max-h-[32cqh] w-auto aspect-[3/4]',
 }
 
-// 話者の枠(#119/#124): いま話している人の立ち絵カードを、フルカラー表示に加えて黒または白の
-// 枠線で囲む(DESIGN.md「会話フレーム」節「話者の枠」)。index.cssの
-// --speaker-frame-black/--speaker-frame-whiteトークン経由で両方用意してあり、切り替えは
-// この定数1箇所で行う。代表決定(2026-09-14)により白に確定した。
-const SPEAKER_FRAME_COLOR: 'black' | 'white' = 'white'
+// 話者の枠(#119/#124/#132/#133): いま話している人の立ち絵カードを、フルカラー表示に加えて
+// 白またはネオンブルーの枠線で囲む(DESIGN.md「会話フレーム」節「話者の枠」)。index.cssの
+// --speaker-frame-white/--speaker-frame-neon-blueトークン経由で両方用意してあり、切り替えは
+// この定数1箇所で行う。既定は white のまま(代表決定2026-09-14を継続)。
+// 旧 black 案(--speaker-frame-black)は、ダーク統一の背景では成立しないため(#132・
+// docs/design-contrast.md で NG 確認)使用禁止となり、型・トークン・このルックアップテーブルの
+// いずれからも外した(#133)。
+const SPEAKER_FRAME_COLOR: 'white' | 'neon-blue' = 'white'
 // `SPEAKER_FRAME_COLOR`をリテラル比較(===)で分岐すると、tscがconst初期化値からの
 // 制御フロー narrowing により反対側の分岐を「到達不能(no overlap)」と誤判定して
 // TS2367 を出す(値をどちらに変えても同様)。ルックアップテーブル参照にすることで回避する。
-const SPEAKER_FRAME_RING_CLASS_BY_COLOR: Record<'black' | 'white', string> = {
-  black: 'ring-4 ring-speaker-frame-black',
+const SPEAKER_FRAME_RING_CLASS_BY_COLOR: Record<'white' | 'neon-blue', string> = {
   white: 'ring-4 ring-speaker-frame-white',
+  'neon-blue': 'ring-4 ring-speaker-frame-neon-blue',
 }
 const SPEAKER_FRAME_RING_CLASS = SPEAKER_FRAME_RING_CLASS_BY_COLOR[SPEAKER_FRAME_COLOR]
 
@@ -674,7 +677,9 @@ export function ConversationFrame({
             ref={windowRef}
             data-testid="conversation-window"
             className={cn(
-              'border-primary bg-card relative z-10 flex min-w-0 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
+              // 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel、DESIGN.md「半透明（ガラス風）
+              // パネル」節・#133) + 上辺に primary(ネオンブルー)のアクセント(旧ゴールドは#132で撤回)。
+              'border-primary glass-panel relative z-10 flex min-w-0 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
               'max-h-full',
               onDismiss &&
                 'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
@@ -698,11 +703,12 @@ export function ConversationFrame({
       {/* 立ち絵(左右2枠、#108/#110): 主人公の立ち絵は出さない。stackedは背景の箱を持たない
           画面向けのため固定pxのまま(PORTRAIT_SIZE_CLASS)、縮小しない(shrink-0)。 */}
       {renderPortraitRow('shrink-0 px-2 sm:gap-12 -mb-4', PORTRAIT_SIZE_CLASS)}
-      {/* 会話ウィンドウ: surface + 上辺に primary(ゴールド)のアクセント。 */}
+      {/* 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel) + 上辺に primary(ネオンブルー、
+          旧ゴールドは#132で撤回)のアクセント。 */}
       <div
         ref={windowRef}
         className={cn(
-          'border-primary bg-card relative z-10 flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
+          'border-primary glass-panel relative z-10 flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
           onDismiss &&
             'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
         )}

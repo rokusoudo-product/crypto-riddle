@@ -724,7 +724,7 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
   })
 
   describe('アクションシートの中央オーバーレイ化・半透明・「戻る」選択肢の必須化(#52 追補・代表FB)', () => {
-    it('アクションシートは画面中央にオーバーレイ表示され、選択肢ボタンは不透明度80%相当の半透明トークンを持つ', async () => {
+    it('アクションシートは画面中央にオーバーレイ表示され、選択肢ボタンは半透明（ガラス風）パネルトークンを持つ', async () => {
       const user = userEvent.setup()
       renderExplore(exploreSceneFixture)
 
@@ -741,13 +741,14 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       expect(overlayWrapper?.className).toMatch(/items-center/)
       expect(overlayWrapper?.className).toMatch(/justify-center/)
 
-      // 選択肢ボタンは不透明度80%程度の半透明トークン(bg-card/80等、カラーコード直書きではない)。
+      // 選択肢ボタンは共通の半透明（ガラス風）パネルトークン(glass-panel、
+      // --glass-panel-min-alpha=0.81。カラーコード直書きではない)。
       const firstAction = within(sheet).getByRole('button', { name: 'ログを取る' })
-      expect(firstAction.className).toMatch(/bg-card\/80/)
+      expect(firstAction.className).toMatch(/glass-panel/)
 
       // 右上の「ヒント確認」「調査ポイント一覧」は対象外(不透明のまま、別要件)。
       const listToggle = screen.getByRole('button', { name: '調査ポイント一覧' })
-      expect(listToggle.className).not.toMatch(/\/80/)
+      expect(listToggle.className).not.toMatch(/glass-panel/)
     })
 
     it('Escapeキーでアクションシートを閉じ、フォーカスは元のホットスポットへ復帰する', async () => {
@@ -788,8 +789,8 @@ describe('探索④ 背景シーン＋ホットスポット(#52/#56・T038)', ()
       ])
 
       const closeButton = within(sheet).getByRole('button', { name: '閉じる（何もしない）' })
-      // 補った選択肢も他の選択肢と同じく半透明トークンを持つ。
-      expect(closeButton.className).toMatch(/bg-card\/80/)
+      // 補った選択肢も他の選択肢と同じく半透明（ガラス風）パネルトークンを持つ。
+      expect(closeButton.className).toMatch(/glass-panel/)
 
       await user.click(closeButton)
       expect(screen.queryByRole('group', { name: '資料棚の操作' })).not.toBeInTheDocument()
