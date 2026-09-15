@@ -15,7 +15,7 @@ import { scenarioSchema } from '@/core/model'
 import type { Scenario } from '@/core/model'
 
 const rawScenario: Scenario = {
-  schema_version: '0.8.0',
+  schema_version: '0.9.0',
   id: 's-test-scene-npc-dialogue',
   title: 'NPC発話・多ターン送りテスト用マップ',
   status: 'draft',

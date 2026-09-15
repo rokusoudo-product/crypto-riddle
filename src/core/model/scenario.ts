@@ -18,6 +18,7 @@ import { z } from 'zod'
 import {
   characterSchema,
   dialogueLineSchema,
+  gameTimeSchema,
   legalRefIdSchema,
   npcDialogueLineSchema,
   termIdSchema,
@@ -61,7 +62,11 @@ import { uniqueArraySchema } from './util.ts'
 // 旧 [x, y] 配列形式は廃止し、既存4マップ(S1/S2/S3/SL)の座標値は変更せず landscape へ機械移植した
 // (#120)。portrait の実データ投入は #123、縦背景の解決・食い違い検出 UI は #124。詳細は
 // docs/scenario_schema.md §2.7。
-export const scenarioSchemaVersionSchema = z.literal('0.8.0')
+// 0.9.0（#136, 2026-09-15）: ゲーム内時刻の表示(DESIGN.md「ゲーム内時刻」節)のため、省略可能な
+// game_time(`HH:MM`・24時間表記、gameTimeSchema・common.ts)を introSchema・sceneSchema・
+// resolutionSchema にそれぞれ追加した後方互換な拡張。粒度は導入・探索の各シーン・解決に1つずつ
+// (代表回答2026-09-14)。値の記入(実データ投入)は #137。詳細は docs/scenario_schema.md §2.8。
+export const scenarioSchemaVersionSchema = z.literal('0.9.0')
 
 /** マップID。ファイル名(拡張子除く)と一致させる（実在チェックは validate-collection.ts）。 */
 export const scenarioIdSchema = z.string().regex(/^[a-z][a-z0-9_-]*$/)
@@ -132,6 +137,8 @@ export const introSchema = z
     background: z.string().min(1).optional(),
     victim_company: victimCompanySchema,
     character_intros: z.array(dialogueLineSchema).min(1),
+    // ゲーム内時刻(`HH:MM`、省略可)。0.9.0（#136）で新設。DESIGN.md「ゲーム内時刻」節。
+    game_time: gameTimeSchema.optional(),
   })
   .strict()
 export type Intro = z.infer<typeof introSchema>
@@ -278,6 +285,8 @@ export const sceneSchema = z
     // パスを直書きしない(docs/scenario_schema.md §2.5)ため、単なる文字列IDとして扱う。
     background: z.string().min(1),
     hotspots: z.array(sceneHotspotSchema).min(1),
+    // ゲーム内時刻(`HH:MM`、省略可)。0.9.0（#136）で新設。DESIGN.md「ゲーム内時刻」節。
+    game_time: gameTimeSchema.optional(),
   })
   .strict()
 export type Scene = z.infer<typeof sceneSchema>
@@ -374,6 +383,8 @@ export const resolutionSchema = z
       }),
     clear_explanation: z.array(dialogueLineSchema).min(1),
     legal_refs: uniqueArraySchema(legalRefIdSchema).optional(),
+    // ゲーム内時刻(`HH:MM`、省略可)。0.9.0（#136）で新設。DESIGN.md「ゲーム内時刻」節。
+    game_time: gameTimeSchema.optional(),
   })
   .strict()
 export type Resolution = z.infer<typeof resolutionSchema>

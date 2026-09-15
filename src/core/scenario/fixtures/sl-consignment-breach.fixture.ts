@@ -18,7 +18,7 @@
 import type { Scenario } from '../../model/index.ts'
 
 export const slConsignmentBreachFixture: Scenario = {
-  schema_version: '0.8.0',
+  schema_version: '0.9.0',
   id: 'sl-consignment-breach',
   title: '委託先クラウドストレージからの個人データ漏えい',
   status: 'draft',

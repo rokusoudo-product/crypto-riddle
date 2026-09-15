@@ -19,7 +19,7 @@ import { scenarioSchema } from '@/core/model'
 import type { Scenario } from '@/core/model'
 
 const rawScenario: Scenario = {
-  schema_version: '0.8.0',
+  schema_version: '0.9.0',
   id: 's-test-scene-no-noop',
   title: 'アクションシート戻る補完テスト用マップ',
   status: 'draft',
