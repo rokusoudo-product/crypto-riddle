@@ -378,6 +378,18 @@ export interface ConversationFrameProps {
    * 無視される(固定pxのPORTRAIT_SIZE_CLASSを使う)。省略時は'landscape'。
    */
   boxOrientation?: BoxOrientation
+  /**
+   * 会話ウィンドウの右上角に重ねる要素(#136/#137、DESIGN.md「ゲーム内時刻」節「会話フレーム」節)。
+   * 現状はゲーム内時刻バッジ(`GameTimeBadge`)専用の差し込み口だが、汎用に`ReactNode`で受ける。
+   *
+   * 会話ウィンドウ**自体**(windowRef)の中には入れない: `onDismiss`指定時、windowRefは
+   * `role="button"`になり`aria-label`を`line`に固定する。ARIAのbuttonロールは子孫を
+   * Presentational化する(children-presentational)ため、内部に置いた要素は支援技術から
+   * 見えなくなってしまう(`aria-label`だけが読み上げられ、cornerSlotの中身は無視される)。
+   * そのため、windowRefの**兄弟**として絶対配置し、見た目だけウィンドウの角に重ねる
+   * (`pointer-events-none`にするのは呼び出し側=GameTimeBadgeの責務)。
+   */
+  cornerSlot?: ReactNode
 }
 
 /** 導入・探索の会話・解決の会話モードで共通して使う会話フレーム(DESIGN.md「会話フレーム」節)。 */
@@ -394,6 +406,7 @@ export function ConversationFrame({
   onOutsideDismiss,
   dismissAnywhere = false,
   boxOrientation = 'landscape',
+  cornerSlot,
 }: ConversationFrameProps) {
   const prefersReducedMotion = usePrefersReducedMotion()
   const label = speakerLabel(speaker)
@@ -673,20 +686,33 @@ export function ConversationFrame({
           {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
         >
           {renderPortraitRow('min-h-0 flex-1 -mb-2 sm:-mb-4', portraitSizeClass)}
-          <div
-            ref={windowRef}
-            data-testid="conversation-window"
-            className={cn(
-              // 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel、DESIGN.md「半透明（ガラス風）
-              // パネル」節・#133) + 上辺に primary(ネオンブルー)のアクセント(旧ゴールドは#132で撤回)。
-              'border-primary glass-panel relative z-10 flex min-w-0 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
-              'max-h-full',
-              onDismiss &&
-                'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
+          {/* #136/#137: ゲーム内時刻バッジ(cornerSlot)を挟む外側ラッパー。shrink-0/max-h-full/
+              z-10(flexの縮小挙動・重ね順)はこのラッパーへ移し、windowRef自体は内側のまま保つ
+              (windowRefはonOutsideDismissのcontains判定・onDismiss時のマウントフォーカスが
+              参照するDOM要素のため、参照先は変えない)。cornerSlotはwindowRefの兄弟として
+              絶対配置し、windowRefが`role="button"`(onDismiss指定時)になってもARIAの
+              children-presentational化の影響を受けないようにする(上記cornerSlot JSDoc参照)。 */}
+          <div className="relative z-10 flex max-h-full shrink-0 flex-col">
+            {cornerSlot && (
+              <div className="pointer-events-none absolute top-2 right-2 z-20 sm:top-3 sm:right-3">
+                {cornerSlot}
+              </div>
             )}
-            {...dismissWindowProps}
-          >
-            {windowContent}
+            <div
+              ref={windowRef}
+              data-testid="conversation-window"
+              className={cn(
+                // 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel、DESIGN.md「半透明（ガラス風）
+                // パネル」節・#133) + 上辺に primary(ネオンブルー)のアクセント(旧ゴールドは#132で撤回)。
+                'border-primary glass-panel relative flex min-w-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
+                'max-h-full',
+                onDismiss &&
+                  'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
+              )}
+              {...dismissWindowProps}
+            >
+              {windowContent}
+            </div>
           </div>
         </div>
       </div>
@@ -704,17 +730,27 @@ export function ConversationFrame({
           画面向けのため固定pxのまま(PORTRAIT_SIZE_CLASS)、縮小しない(shrink-0)。 */}
       {renderPortraitRow('shrink-0 px-2 sm:gap-12 -mb-4', PORTRAIT_SIZE_CLASS)}
       {/* 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel) + 上辺に primary(ネオンブルー、
-          旧ゴールドは#132で撤回)のアクセント。 */}
-      <div
-        ref={windowRef}
-        className={cn(
-          'border-primary glass-panel relative z-10 flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
-          onDismiss &&
-            'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
+          旧ゴールドは#132で撤回)のアクセント。#136/#137: cornerSlot(ゲーム内時刻バッジ)は
+          windowRef自体ではなくその兄弟として重ねる(overlay分岐と同じ理由、上記cornerSlot
+          JSDoc参照)。 */}
+      <div className="relative z-10 flex flex-col">
+        {cornerSlot && (
+          <div className="pointer-events-none absolute top-2 right-2 z-20 sm:top-3 sm:right-3">
+            {cornerSlot}
+          </div>
         )}
-        {...dismissWindowProps}
-      >
-        {windowContent}
+        <div
+          ref={windowRef}
+          data-testid="conversation-window"
+          className={cn(
+            'border-primary glass-panel relative flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
+            onDismiss &&
+              'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
+          )}
+          {...dismissWindowProps}
+        >
+          {windowContent}
+        </div>
       </div>
     </div>
   )

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import { canEnterResolution } from '@/core/scenario'
 import { ConversationFrame } from '@/ui/components/conversation-frame'
 import { SceneExplorer } from '@/ui/components/explore/scene-explorer'
+import { GameTimeBadge } from '@/ui/components/game-time-badge'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
@@ -88,14 +89,20 @@ export function ExploreScreen() {
   const [isWrapUpPromptDismissed, setIsWrapUpPromptDismissed] = useState(false)
   const setLastExploredSceneId = useGameStore((s) => s.setLastExploredSceneId)
   const screenIsPortrait = useIsPortraitScreen()
+  // ゲーム内時刻(#136/#137): 誘導会話(wrapUpPrompt、下記)のcornerSlotに現在のシーンの
+  // game_timeを渡すため、SceneExplorerの`onActiveSceneChange`からこの画面のstateとしても
+  // 保持する(lastExploredSceneIdはストア側の別用途=解決⑤の背景引き継ぎのため、ここでは
+  // 読み取り専用の別stateとして持つ。両者は同じタイミングで更新されるが責務を分けたままにする)。
+  const [activeSceneId, setActiveSceneId] = useState<string | null>(null)
 
   // SceneExplorerの`onActiveSceneChange`から都度反映する: `lastExploredSceneId`
   // (解決⑤の背景の引き継ぎ、game-store.ts参照)を更新する。#124(縦長の画面は常に9:16)で
   // 箱の向きが画面の向きのみで決まるようになったため、シーンidそのものをこの画面のstateとして
   // 持つ必要は無くなった(wrapUpPromptのboxOrientationはresolveBoxOrientation(screenIsPortrait)
-  // だけで求まる)。
+  // だけで求まる)。#136/#137でactiveSceneIdをwrapUpPromptのゲーム内時刻表示のために復活させた。
   function handleActiveSceneChange(sceneId: string) {
     setLastExploredSceneId(sceneId)
+    setActiveSceneId(sceneId)
   }
 
   if (progress.part !== 'exploration') {
@@ -207,6 +214,11 @@ export function ExploreScreen() {
   // (シーンごとの背景アセット有無には依存しない。#119時点の「活動中シーンの背景アセット有無」
   // 計算は不要になった)。
   const wrapUpBoxOrientation = resolveBoxOrientation(screenIsPortrait)
+  // ゲーム内時刻(#136/#137): 誘導会話もSceneExplorer自身の会話オーバーレイと同じ「現在の
+  // シーンのgame_time・会話ウィンドウ帯の右上端」表示にする(DESIGN.md「探索シーン」節
+  // 「探索完了→解決への誘導」も同じ会話オーバーレイの仕組みに載ることを踏まえる)。
+  const activeGameTime =
+    scenes?.find((scene) => scene.id === activeSceneId)?.game_time ?? scenes?.[0]?.game_time
 
   const wrapUpPrompt =
     canProceed && !isExplorerConversationOpen && !isWrapUpPromptDismissed ? (
@@ -216,6 +228,7 @@ export function ExploreScreen() {
         speaker="橘"
         line="材料は揃ったわ。そろそろ問題を整理しましょう。"
         onOutsideDismiss={handleDismissWrapUpPrompt}
+        cornerSlot={<GameTimeBadge gameTime={activeGameTime} />}
       >
         <div className="flex items-center justify-between gap-2">
           <p className="text-muted-foreground text-xs">

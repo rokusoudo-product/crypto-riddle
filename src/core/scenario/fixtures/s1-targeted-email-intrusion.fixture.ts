@@ -43,6 +43,8 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
   ],
   intro: {
     // background(ナレーション)は台本v2.2で廃止(完全会話劇化)。#103参照。
+    // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: '10:15',
     victim_company: {
       name: '株式会社浜通商事',
       industry: '産業資材卸売業',
@@ -158,6 +160,8 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
       id: 'scene-office',
       title: '執務室',
       background: 'bg-s1-office',
+      // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+      game_time: '11:20',
       hotspots: [
         {
           object_type: 'pc',
@@ -279,6 +283,8 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
       id: 'scene-server',
       title: 'サーバ室',
       background: 'bg-s1-server',
+      // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+      game_time: '11:45',
       hotspots: [
         {
           object_type: 'device',
@@ -502,6 +508,8 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
     },
   ],
   resolution: {
+    // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: '12:30',
     cipher_stages: [],
     // 会話モード(#42/T030)の問い列(spec §8.5「攻撃の起点 → 初動対応」の2問構成)。誤答肢の reply は
     // いずれも探索で集めたカードの内容を具体的に裏付けとして引用し、プレイヤーがカードドロワーで

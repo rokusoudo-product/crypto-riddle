@@ -5,6 +5,7 @@ import { MAX_CONSULTS } from '@/core/scenario'
 import { BackgroundBox } from '@/ui/components/background-box'
 import { CardDrawer } from '@/ui/components/card-drawer'
 import { ConversationFrame } from '@/ui/components/conversation-frame'
+import { GameTimeBadge } from '@/ui/components/game-time-badge'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
@@ -265,6 +266,11 @@ export function ResolveScreen() {
                   .slice(0, progress.questionIndex + 1)
                   .map((q) => q.speaker)}
                 line={question.prompt}
+                // ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節): 解決は独自のgame_timeを
+                // 持つ(探索シーンのgame_timeとは独立、docs/scenario_schema.md §2.8)。#134/#135が
+                // このファイルを大きく書き換える予定のため、時刻表示はcornerSlotを差し込むだけの
+                // 最小差分にとどめる(#137 Issue本文)。
+                cornerSlot={<GameTimeBadge gameTime={scenario.resolution.game_time} />}
               >
                 {questionChildren}
               </ConversationFrame>
@@ -278,6 +284,7 @@ export function ResolveScreen() {
                 .slice(0, progress.questionIndex + 1)
                 .map((q) => q.speaker)}
               line={question.prompt}
+              cornerSlot={<GameTimeBadge gameTime={scenario.resolution.game_time} />}
             >
               {questionChildren}
             </ConversationFrame>

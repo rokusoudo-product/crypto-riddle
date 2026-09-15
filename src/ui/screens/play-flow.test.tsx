@@ -72,6 +72,9 @@ describe('1マップ通しプレイの結線(T013/T033) — s0-sample(暗号ス�
     await user.click(screen.getByRole('button', { name: 'マップを選ぶ' }))
     expect(await screen.findByRole('heading', { name: '導入' })).toBeInTheDocument()
     expect(screen.getByText('株式会社アルファテック')).toBeInTheDocument()
+    // ゲーム内時刻(#136/#137): s0-sampleはgame_timeを書いていないため、何も表示されない
+    // (省略時にUIが時刻を出さないことの確認。docs/scenario_schema.md §2.8)。
+    expect(screen.queryByText(/ゲーム内時刻/)).not.toBeInTheDocument()
 
     // ③導入 → ④探索(SKIPで即座に進む。ステートマシンが intro→exploration へ遷移する。
     // #100/#102で導入が会話フレーム化され「タップで進行」は1行ずつの送りになったため、
@@ -97,6 +100,8 @@ describe('1マップ通しプレイの結線(T013/T033) — s0-sample(暗号ス�
     await user.click(enterResolution)
     expect(await screen.findByRole('heading', { name: '解決' })).toBeInTheDocument()
     expect(screen.getByText(/暗号文:/)).toBeInTheDocument()
+    // ゲーム内時刻(#136/#137): s0-sampleはresolution.game_timeも省略しているため表示されない。
+    expect(screen.queryByText(/ゲーム内時刻/)).not.toBeInTheDocument()
 
     // 暗号ステージ: わざと誤った平文を送信すると、暗号ステージのまま留まる
     // (#42/T032: 会話モードは誤答しても follow_up 画面へ遷移しない)。

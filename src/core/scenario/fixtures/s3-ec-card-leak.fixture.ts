@@ -45,6 +45,8 @@ export const s3EcCardLeakFixture: Scenario = {
     'term-appi-breach-report',
   ],
   intro: {
+    // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: '23:40',
     background:
       '深夜、通信販売会社「つきかげ通販」に、複数の顧客から「身に覚えのないカード利用明細が届いた」という問い合わせが立て続けに入った。調べると、いずれも直近で自社ECサイトで買い物をした顧客だった。カード番号は自社のデータベースには一切保存していないはずなのに、なぜカード情報が漏れたのか——対策室に緊急招集がかかる。',
     victim_company: {
@@ -125,6 +127,8 @@ export const s3EcCardLeakFixture: Scenario = {
       id: 'scene-office',
       title: '執務室',
       background: 'bg-s3-office',
+      // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+      game_time: '00:50',
       hotspots: [
         {
           object_type: 'pc',
@@ -217,6 +221,8 @@ export const s3EcCardLeakFixture: Scenario = {
       id: 'scene-ops-room',
       title: 'システム運用ルーム',
       background: 'bg-s3-ops-room',
+      // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+      game_time: '01:30',
       hotspots: [
         {
           object_type: 'device',
@@ -403,6 +409,8 @@ export const s3EcCardLeakFixture: Scenario = {
     },
   ],
   resolution: {
+    // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: '02:15',
     cipher_stages: [],
     questions: [
       {

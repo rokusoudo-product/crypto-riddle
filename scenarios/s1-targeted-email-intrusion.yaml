@@ -72,6 +72,8 @@ related_terms:
 intro:
   # ナレーション(background)は台本v2.2で廃止(完全会話劇化)。小鳥遊の緊急入電から始まる
   # 9行の会話に置き換えた(#103)。
+  # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+  game_time: "10:15"
   victim_company:
     name: 株式会社浜通商事
     industry: 産業資材卸売業
@@ -234,6 +236,8 @@ scenes:
   - id: scene-office
     title: 執務室
     background: bg-s1-office
+    # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: "11:20"
     hotspots:
       - object_type: pc
         position:
@@ -318,6 +322,8 @@ scenes:
   - id: scene-server
     title: サーバ室
     background: bg-s1-server
+    # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: "11:45"
     hotspots:
       - object_type: device
         position:
@@ -498,6 +504,8 @@ cards:
 resolution:
   # 入門編のため暗号を含めない(#5 代表回答)。0件を許容する src/core/model/scenario.ts の
   # T015 変更により、ENTER_RESOLUTION は cipher ステージを飛ばし questions[0] へ直接進む。
+  # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+  game_time: "12:30"
   cipher_stages: []
 
   # 会話モード(#42/T030)の問い列(spec §8.5「攻撃の起点 → 初動対応」の2問構成)。誤答肢の reply は

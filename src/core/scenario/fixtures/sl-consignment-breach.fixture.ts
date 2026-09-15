@@ -38,6 +38,8 @@ export const slConsignmentBreachFixture: Scenario = {
   ],
   related_terms: ['term-appi-breach-report', 'term-incident-response-process', 'term-log-analysis'],
   intro: {
+    // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: '09:10',
     background:
       'ある朝、宅配会員サービスを営む「株式会社ひばり生活サービス」に、会員データの管理システム運用を委託しているクラウド事業者から一本の連絡が入った。「保管しているデータの一部に、外部からアクセスされた可能性がある」。詳しく確認すると、会員の氏名・住所等を含むデータが保存されたクラウドストレージの共有設定が、委託先の作業ミスによって外部から閲覧できる状態になっていたことが判明した。「委託しているのだから自社は無関係」で済む話なのか——対策室に招集がかかる。',
     victim_company: {
@@ -101,6 +103,8 @@ export const slConsignmentBreachFixture: Scenario = {
       id: 'scene-office',
       title: '自社執務室',
       background: 'bg-sl-office',
+      // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+      game_time: '10:20',
       hotspots: [
         {
           object_type: 'book',
@@ -151,6 +155,8 @@ export const slConsignmentBreachFixture: Scenario = {
       id: 'scene-vendor',
       title: '委託先ブース(会議室)',
       background: 'bg-sl-vendor',
+      // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+      game_time: '13:30',
       hotspots: [
         {
           object_type: 'device',
@@ -312,6 +318,8 @@ export const slConsignmentBreachFixture: Scenario = {
     },
   ],
   resolution: {
+    // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: '15:00',
     cipher_stages: [],
     questions: [
       {

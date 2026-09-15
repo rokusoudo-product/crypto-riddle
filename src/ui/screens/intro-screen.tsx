@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 
 import { BackgroundBox } from '@/ui/components/background-box'
 import { ConversationFrame } from '@/ui/components/conversation-frame'
+import { GameTimeBadge } from '@/ui/components/game-time-badge'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
@@ -199,6 +200,9 @@ export function IntroScreen() {
               onDismiss={handleAdvanceTurn}
               onEscape={() => {}}
               dismissAnywhere
+              // ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節): game_time省略時は
+              // GameTimeBadgeがnullを返し何も表示しない。
+              cornerSlot={<GameTimeBadge gameTime={scenario.intro.game_time} />}
             />
           </BackgroundBox>
         ) : (

@@ -519,6 +519,46 @@ describe('ConversationFrame(#64/T042 タイプライター表示)', () => {
     })
   })
 
+  describe('cornerSlot(ゲーム内時刻バッジ差し込み口・#136/#137)', () => {
+    it('overlay layoutでは会話ウィンドウの外側(兄弟)に描画され、role="button"の子孫にはならない', () => {
+      render(
+        <ConversationFrame
+          speaker="橘"
+          line={LINE}
+          layout="overlay"
+          onDismiss={() => {}}
+          cornerSlot={<span>ゲーム内時刻 10:15</span>}
+        />,
+      )
+      // onDismiss指定時、会話ウィンドウ自体はaria-label=lineのrole="button"になり、ARIAの
+      // children-presentational化で内部の要素は支援技術から見えなくなる。cornerSlotの中身が
+      // そのbutton要素の子孫に置かれていない(=見えなくならない)ことを確認する。
+      const conversationWindow = screen.getByRole('button', { name: LINE })
+      expect(conversationWindow).not.toContainElement(screen.getByText('ゲーム内時刻 10:15'))
+      // 可視テキストとしては引き続き取得できる(sibling配置で見た目は角に重なる)。
+      expect(screen.getByText('ゲーム内時刻 10:15')).toBeInTheDocument()
+    })
+
+    it('stacked layoutでも同様に会話ウィンドウの外側(兄弟)に描画される', () => {
+      render(
+        <ConversationFrame
+          speaker="橘"
+          line={LINE}
+          onDismiss={() => {}}
+          cornerSlot={<span>ゲーム内時刻 12:30</span>}
+        />,
+      )
+      const conversationWindow = screen.getByRole('button', { name: LINE })
+      expect(conversationWindow).not.toContainElement(screen.getByText('ゲーム内時刻 12:30'))
+      expect(screen.getByText('ゲーム内時刻 12:30')).toBeInTheDocument()
+    })
+
+    it('cornerSlot省略時は何も追加描画しない', () => {
+      render(<ConversationFrame speaker="橘" line={LINE} layout="overlay" />)
+      expect(screen.queryByText(/ゲーム内時刻/)).not.toBeInTheDocument()
+    })
+  })
+
   describe('表情フォールバック(resolvePortraitSrc・#100/#102)', () => {
     it('該当表情のPNGが無ければneutralにフォールバックする(現在生成済みは3名ともneutralのみ)', () => {
       const neutral = resolvePortraitSrc('霧島', 'neutral')
