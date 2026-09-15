@@ -82,9 +82,11 @@ export function ResolveChoicePanel({
       <p className="font-heading text-sm leading-relaxed sm:text-base">{prompt}</p>
 
       {priorCorrectReply && (
-        <p className="border-border bg-background/60 rounded-lg border p-2 text-sm">
-          {priorCorrectReply}
-        </p>
+        // 秘書レビュー(2026-09-15・PR#151)指摘の修正: 枠線・背景付きの箱だと選択肢ボタンと
+        // 見分けが付きにくい(押せそうに見える)。会話ウィンドウには表示されない情報のため
+        // パネルからは消さず残すが、誤答の段階解説(下記wrongExplanation)と同じ「枠線・背景の
+        // 無い地の文」にして、ボタンと明確に区別する。
+        <p className="text-muted-foreground text-sm">{priorCorrectReply}</p>
       )}
 
       <ul className="flex flex-col gap-2">
