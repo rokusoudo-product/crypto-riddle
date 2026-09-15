@@ -184,23 +184,6 @@ const PORTRAIT_BOX_RELATIVE_SIZE_CLASS: Record<BoxOrientation, string> = {
   portrait: 'h-full max-h-[32cqh] w-auto aspect-[3/4]',
 }
 
-// ゲーム内時刻バッジ(cornerSlot、#136/#137)のoverlay分岐での右オフセット(秘書レビュー
-// 2026-09-15・PR#149)。会話ウィンドウの外側・上辺のすぐ上(`bottom-full`)に置くため縦方向は
-// 立ち絵の行と同じ帯に入るが、右の立ち絵カードの最大幅(PORTRAIT_BOX_RELATIVE_SIZE_CLASSの
-// max-h-cqhにaspect-[3/4]を掛けた値、= 同じcqh単位で48cqh×3/4=36cqh・32cqh×3/4=24cqh)より
-// 大きく右へ逃がすことで、右の立ち絵と重ならないようにする(cqhはPORTRAIT_BOX_RELATIVE_SIZE_CLASS
-// と同じ単位系なので、box高さが変わっても両者は常に同じ比率のまま連動する)。縦長(portrait)は
-// 立ち絵の最大幅が箱の非常に広い割合(24cqh≒箱幅の43%相当)を占めうるため、左の立ち絵の
-// 最大幅(同じく43%相当)と合わせると理論上は隙間が15%程度しか残らない狭さになる。実際の場面
-// (会話文の長さ等で立ち絵の行がこの上限まで伸びるとは限らない)では余裕があることを撮影で
-// 確認したうえで採用した値。
-const TIME_BADGE_CORNER_RIGHT_OFFSET_CLASS: Record<BoxOrientation, string> = {
-  landscape: 'right-[40cqh]',
-  // 縦長(portrait)は呼び出し側がGameTimeBadgeに`compact`(時刻のみ表示)を指定して幅を
-  // 縮めているため、横長ほど大きくは逃がさない(秘書レビュー2026-09-15・PR#149・advisor提案)。
-  portrait: 'right-[8cqh]',
-}
-
 // 話者の枠(#119/#124/#132/#133): いま話している人の立ち絵カードを、フルカラー表示に加えて
 // 白またはネオンブルーの枠線で囲む(DESIGN.md「会話フレーム」節「話者の枠」)。index.cssの
 // --speaker-frame-white/--speaker-frame-neon-blueトークン経由で両方用意してあり、切り替えは
@@ -396,22 +379,19 @@ export interface ConversationFrameProps {
    */
   boxOrientation?: BoxOrientation
   /**
-   * 会話ウィンドウの**外側**・右上(上辺のすぐ上、タブのように接する)に重ねる要素
-   * (#136/#137、DESIGN.md「ゲーム内時刻」節「会話フレーム」節)。現状はゲーム内時刻バッジ
-   * (`GameTimeBadge`)専用の差し込み口だが、汎用に`ReactNode`で受ける。
-   *
-   * 会話ウィンドウ**自体**(windowRef)の中には入れない。理由は2つ:
-   * (1) `onDismiss`指定時、windowRefは`role="button"`になり`aria-label`を`line`に固定する。
-   *     ARIAのbuttonロールは子孫をPresentational化する(children-presentational)ため、
-   *     内部に置いた要素は支援技術から見えなくなってしまう(`aria-label`だけが読み上げられ、
-   *     cornerSlotの中身は無視される)。
-   * (2) 見た目上も、名前の帯(NamePlate)が#147時点からウィンドウ幅いっぱいに伸びる不具合
-   *     (#138で解消予定・本Issueの範囲外)があり、ウィンドウ**内側**の右上に置くと名前の帯と
-   *     重なって見える(秘書レビュー2026-09-15・PR#149で指摘)。
-   * そのため、windowRefの**兄弟**として絶対配置し、`bottom-full`でウィンドウの外側・
-   * 上辺のすぐ上へ重ねる(`pointer-events-none`にするのは呼び出し側=GameTimeBadgeの責務)。
+   * 背景の箱の中央に重ねる選択パネル(解決⑤専用、DESIGN.md「解決の会話モード」節「配置」・
+   * #134)。指定時は`layout`ごとに置き場所が変わる:
+   * - overlay(横長): 立ち絵の行の中央(左右2枠の間、`self-center`・幅は呼び出し側の
+   *   className指定に委ねる)に3列目として並べる。
+   * - overlay(縦長・boxOrientation='portrait'): 立ち絵の行の**上**に独立した行として積む
+   *   (DESIGN.md「縦長（9:16）の構成」節: 上から 手持ちカードボタン→選択パネル→
+   *   立ち絵2枠+名前箱→会話ウィンドウ)。
+   * - stacked(背景の箱を持たない画面向け): 立ち絵の行の上に同様に積む(resolve-screen.tsx
+   *   のscenario.scenesが無いマップ向けフォールバック)。
+   * 会話ウィンドウ(children)には含めない: 会話ウィンドウは台詞(タイプライター)専用にする
+   * (DESIGN.md「解決の会話モード」節「会話ウィンドウとの役割分担」)。
    */
-  cornerSlot?: ReactNode
+  centerPanel?: ReactNode
 }
 
 /** 導入・探索の会話・解決の会話モードで共通して使う会話フレーム(DESIGN.md「会話フレーム」節)。 */
@@ -428,7 +408,7 @@ export function ConversationFrame({
   onOutsideDismiss,
   dismissAnywhere = false,
   boxOrientation = 'landscape',
-  cornerSlot,
+  centerPanel,
 }: ConversationFrameProps) {
   const prefersReducedMotion = usePrefersReducedMotion()
   const label = speakerLabel(speaker)
@@ -479,16 +459,34 @@ export function ConversationFrame({
   // 同期処理で0、またはreduced-motionならline.length)から刻む。1文字表示するたびに
   // setRevealedLengthのfunctional updateで最新値を見て続きを刻み、末尾でinterval自身を
   // clearする(次のlineに変わった時は cleanup で確実にclearする)。
+  // intervalIdRefに現在有効なintervalIdを保持し、handleSkip(下記)からも明示的にclearできる
+  // ようにする(#134で発覚した既存の競合状態の修正。スキップでrevealedLengthをline.length
+  // まで直接ジャンプさせても、このintervalは次の自然なtick(最大32ms後)まで生き続けたまま
+  // 自己clearを待つ設計だった。その32ms以内に呼び出し側がlineを次の行へ切り替えると、
+  // 古いintervalのtickが「古いline.lengthを閉じ込めたクロージャ」でsetRevealedLengthを
+  // 呼んでしまい、新しいlineのrevealedLengthを不正に書き換えてisCompleteが早期にtrueへ
+  // なることがあった(スキップ直後に選択を送ると再現。resolve-screen.tsxで選択肢が
+  // 会話ウィンドウchildrenの外=centerPanelへ移ったことで、E2E/vitestの操作タイミングが
+  // わずかに早まり顕在化した)。スキップ時に明示clearすることで解消する。
+  const intervalIdRef = useRef<number | null>(null)
+
   useEffect(() => {
     if (prefersReducedMotion || line.length === 0) return
     const intervalId = window.setInterval(() => {
       setRevealedLength((prev) => {
         const next = Math.min(prev + 1, line.length)
-        if (next >= line.length) window.clearInterval(intervalId)
+        if (next >= line.length) {
+          window.clearInterval(intervalId)
+          intervalIdRef.current = null
+        }
         return next
       })
     }, TYPEWRITER_CHAR_INTERVAL_MS)
-    return () => window.clearInterval(intervalId)
+    intervalIdRef.current = intervalId
+    return () => {
+      window.clearInterval(intervalId)
+      if (intervalIdRef.current === intervalId) intervalIdRef.current = null
+    }
   }, [line, prefersReducedMotion])
 
   // 全文表示が完了した瞬間(タイプライター完走 or スキップ)に1度だけ通知・フォーカス移動する。
@@ -509,6 +507,13 @@ export function ConversationFrame({
     if (document.activeElement === event.currentTarget) {
       focusFirstChildOnRevealRef.current = true
     }
+    // 実行中のintervalを明示的にclearする(上記intervalIdRefのコメント参照。自己clearを
+    // 待つと、呼び出し側が次のlineへ即座に切り替えた場合に古いtickが新しいlineの
+    // revealedLengthを不正に書き換える競合状態があった)。
+    if (intervalIdRef.current !== null) {
+      window.clearInterval(intervalIdRef.current)
+      intervalIdRef.current = null
+    }
     setRevealedLength(line.length)
   }
 
@@ -523,6 +528,11 @@ export function ConversationFrame({
 
   function handleOverlayActivate() {
     if (!isComplete) {
+      // 上記handleSkipと同じ理由でintervalを明示的にclearする(intervalIdRefのコメント参照)。
+      if (intervalIdRef.current !== null) {
+        window.clearInterval(intervalIdRef.current)
+        intervalIdRef.current = null
+      }
       setRevealedLength(line.length)
       return
     }
@@ -643,7 +653,7 @@ export function ConversationFrame({
   // shrink/grow挙動(overlay限定・stacked=shrink-0固定/overlay=flex-1 min-h-0で縮む)は
   // 呼び出し側がextraClassNameで指定する(#124: 同じユーティリティを2箇所で異なる方向に
   // 上書きするとTailwindのクラス優先順位が不定になるため、基底クラスにはshrink系を含めない)。
-  function renderPortraitRow(extraClassName: string, sizeClass: string) {
+  function renderPortraitRow(extraClassName: string, sizeClass: string, center?: ReactNode) {
     return (
       <div
         className={cn(
@@ -664,6 +674,9 @@ export function ConversationFrame({
         ) : (
           <EmptyPortraitSlot sizeClass={sizeClass} />
         )}
+        {/* 中央の選択パネル(解決⑤専用・横長、DESIGN.md「解決の会話モード」節「配置」・#134):
+            左右の立ち絵の間、self-centerで縦方向は行の中央に揃える(items-endの対象外)。 */}
+        {center && <div className="self-center">{center}</div>}
         {twoSlot.right ? (
           <Portrait
             display={twoSlot.right}
@@ -693,21 +706,7 @@ export function ConversationFrame({
     // (=縮んだ行の実高さ)を基準にし、`max-h-[Xcqh]`で上限を掛ける(cqh単独だと行の実際の
     // 空きに追従しないため、上限としてのみ使う)。会話ウィンドウは`overflow-y-auto`+
     // `max-h-full`を最後の安全弁として残すが、通常の表示状態では発火しない設計
-    // (E2E/E2E-shot.mjsのno-scroll確認対象)。#136/#137: `shrink-0`/`max-h-full`/`relative
-    // z-10`は、cornerSlot(ゲーム内時刻バッジ)を挟むために追加した外側ラッパー
-    // (下記`<div className="relative flex max-h-full shrink-0 flex-col">`)へ移した。
-    // このラッパーに`z-10`を明示すると、それ自体が新しいスタッキングコンテキストを作ってしまい、
-    // 内部のcornerSlot(z-20)が立ち絵の行(renderPortraitRowのz-20)より**下**に閉じ込められる
-    // (両者とも兄弟レベルでz-20同士を比較する必要があるが、ラッパーに明示z-indexがあると
-    // cornerSlotの比較対象がラッパー内部に限定されてしまうため。秘書レビュー2026-09-15・
-    // PR#149で発覚: 2人目の立ち絵が実際に描画されている場面でバッジが完全に見えなくなっていた)。
-    // ラッパー自体は`z-index`を指定しない(`relative`のみ)ことで、window(旧・単体でz-10を
-    // 持っていた要素。現在はwindow自身も明示z-indexを持たず、z-index:autoとして扱われる)は
-    // 従来どおり立ち絵の行より下に留まりつつ(#124の意図的な重なり=立ち絵が窓の上端に
-    // わずかに被さる演出を維持)、cornerSlotだけがz-20として立ち絵の行と同じ土俵で
-    // 比較され、DOM順(cornerSlot側が後)で立ち絵より手前に出る。
-    // windowRef自体(`data-testid="conversation-window"`)は変わらず、この段落が指す
-    // 「会話ウィンドウ側」は実質そのラッパーを指す。
+    // (E2E/E2E-shot.mjsのno-scroll確認対象)。
     const portraitSizeClass = PORTRAIT_BOX_RELATIVE_SIZE_CLASS[boxOrientation]
     return (
       <div
@@ -721,46 +720,31 @@ export function ConversationFrame({
           onClick={onOutsideDismiss ? handleOutsideActivate : undefined}
           {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
         >
-          {renderPortraitRow('min-h-0 flex-1 -mb-2 sm:-mb-4', portraitSizeClass)}
-          {/* #136/#137: ゲーム内時刻バッジ(cornerSlot)を挟む外側ラッパー。shrink-0/max-h-full/
-              z-10(flexの縮小挙動・重ね順)はこのラッパーへ移し、windowRef自体は内側のまま保つ
-              (windowRefはonOutsideDismissのcontains判定・onDismiss時のマウントフォーカスが
-              参照するDOM要素のため、参照先は変えない)。cornerSlotはwindowRefの兄弟として
-              絶対配置し、windowRefが`role="button"`(onDismiss指定時)になってもARIAの
-              children-presentational化の影響を受けないようにする(上記cornerSlot JSDoc参照)。 */}
-          <div className="relative flex max-h-full shrink-0 flex-col">
-            {cornerSlot && (
-              // 秘書レビュー(2026-09-15・PR#149): 会話ウィンドウの内側(top-2/top-3)に置くと、
-              // #147時点から名前の帯(NamePlate)がウィンドウ幅いっぱいに伸びる不具合(#138で
-              // 名前箱を立ち絵の下へ移す際に解消予定・本Issueの範囲外)と重なって見えた。
-              // `bottom-full`でウィンドウの**外側**・上辺のすぐ上(タブのように接する。
-              // ウィンドウの矩形とは重ならない)へ変更した。右オフセットは固定値ではなく
-              // TIME_BADGE_CORNER_RIGHT_OFFSET_CLASS(上記コメント参照)で、右の立ち絵と
-              // 重ならないよう箱の向きに応じて逃がす。
-              <div
-                className={cn(
-                  'pointer-events-none absolute bottom-full z-20',
-                  TIME_BADGE_CORNER_RIGHT_OFFSET_CLASS[boxOrientation],
-                )}
-              >
-                {cornerSlot}
-              </div>
+          {/* 中央の選択パネル(解決⑤専用・#134、DESIGN.md「縦長（9:16）の構成」節): 縦長の箱では
+              立ち絵の間に挟む横幅の余裕が無いため、立ち絵の行の**上**に独立した行として積む
+              (横長は下のrenderPortraitRowの3列目に渡し、立ち絵の間に配置する)。 */}
+          {centerPanel && boxOrientation === 'portrait' && (
+            <div className="relative z-20 mb-2 shrink-0 pt-14 sm:pt-16">{centerPanel}</div>
+          )}
+          {renderPortraitRow(
+            'min-h-0 flex-1 -mb-2 sm:-mb-4',
+            portraitSizeClass,
+            boxOrientation === 'landscape' ? centerPanel : undefined,
+          )}
+          <div
+            ref={windowRef}
+            data-testid="conversation-window"
+            className={cn(
+              // 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel、DESIGN.md「半透明（ガラス風）
+              // パネル」節・#133) + 上辺に primary(ネオンブルー)のアクセント(旧ゴールドは#132で撤回)。
+              'border-primary glass-panel relative z-10 flex min-w-0 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
+              'max-h-full',
+              onDismiss &&
+                'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
             )}
-            <div
-              ref={windowRef}
-              data-testid="conversation-window"
-              className={cn(
-                // 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel、DESIGN.md「半透明（ガラス風）
-                // パネル」節・#133) + 上辺に primary(ネオンブルー)のアクセント(旧ゴールドは#132で撤回)。
-                'border-primary glass-panel relative flex min-w-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
-                'max-h-full',
-                onDismiss &&
-                  'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
-              )}
-              {...dismissWindowProps}
-            >
-              {windowContent}
-            </div>
+            {...dismissWindowProps}
+          >
+            {windowContent}
           </div>
         </div>
       </div>
@@ -774,36 +758,25 @@ export function ConversationFrame({
       onKeyDown={onOutsideDismiss ? handleOutsideKeyDown : undefined}
       {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
     >
+      {/* 中央の選択パネル(解決⑤専用・#134): 背景の箱を持たないstackedレイアウト(scenario.scenesが
+          無いマップのフォールバック)でも、立ち絵の行の上に積む(縦長overlayと同じ考え方)。 */}
+      {centerPanel && <div className="mb-2 shrink-0">{centerPanel}</div>}
       {/* 立ち絵(左右2枠、#108/#110): 主人公の立ち絵は出さない。stackedは背景の箱を持たない
           画面向けのため固定pxのまま(PORTRAIT_SIZE_CLASS)、縮小しない(shrink-0)。 */}
       {renderPortraitRow('shrink-0 px-2 sm:gap-12 -mb-4', PORTRAIT_SIZE_CLASS)}
       {/* 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel) + 上辺に primary(ネオンブルー、
-          旧ゴールドは#132で撤回)のアクセント。#136/#137: cornerSlot(ゲーム内時刻バッジ)は
-          windowRef自体ではなくその兄弟として重ねる(overlay分岐と同じ理由、上記cornerSlot
-          JSDoc参照)。ラッパーに`z-10`を明示しない理由もoverlay分岐と同じ(上記
-          `if (layout === 'overlay')`ブロック内のコメント参照): cornerSlot(z-20)が
-          立ち絵の行(renderPortraitRowのz-20)と同じ土俵で比較され、DOM順で手前に出るように
-          するため。 */}
-      <div className="relative flex flex-col">
-        {cornerSlot && (
-          // 秘書レビュー(2026-09-15・PR#149): overlay分岐と同じ理由で、ウィンドウの外側・
-          // 上辺のすぐ上(bottom-full)へ変更した(上記overlay分岐のコメント参照)。
-          <div className="pointer-events-none absolute right-2 bottom-full z-20 sm:right-3">
-            {cornerSlot}
-          </div>
+          旧ゴールドは#132で撤回)のアクセント。 */}
+      <div
+        ref={windowRef}
+        data-testid="conversation-window"
+        className={cn(
+          'border-primary glass-panel relative z-10 flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
+          onDismiss &&
+            'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
         )}
-        <div
-          ref={windowRef}
-          data-testid="conversation-window"
-          className={cn(
-            'border-primary glass-panel relative flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
-            onDismiss &&
-              'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
-          )}
-          {...dismissWindowProps}
-        >
-          {windowContent}
-        </div>
+        {...dismissWindowProps}
+      >
+        {windowContent}
       </div>
     </div>
   )

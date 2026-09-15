@@ -182,7 +182,8 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
 
     // --- 解決(会話モード): q-entry-point → q-initial-response → q-response-policy の3問。 ---
     const entryPrompt = '今回の侵入、どこから入られたと見る？'
-    await expect(page.getByText(entryPrompt)).toBeVisible()
+    // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
+    await expect(page.getByText(entryPrompt).first()).toBeVisible()
     await skipTypewriter(page, entryPrompt)
     await page
       .getByRole('button', {
@@ -192,7 +193,7 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
 
     const initialResponsePrompt =
       'ランサムウェアによる暗号化が確認された状況で、感染したサーバへの初動対応は？'
-    await expect(page.getByText(initialResponsePrompt)).toBeVisible()
+    await expect(page.getByText(initialResponsePrompt).first()).toBeVisible()
     await skipTypewriter(page, initialResponsePrompt)
 
     // わざと「直ちに再起動する」を選び、誤答フォローで問い・選択肢が残ることを確認する
@@ -204,7 +205,7 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
         exact: false,
       }),
     ).toBeVisible()
-    await expect(page.getByText(initialResponsePrompt)).toBeVisible()
+    await expect(page.getByText(initialResponsePrompt).first()).toBeVisible()
     await expect(rebootChoice).toBeVisible()
 
     // 再挑戦で正しい初動(論理的な切り離し・証拠保全)を選ぶ。
@@ -216,7 +217,7 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
 
     const policyPrompt =
       'バックアップも暗号化され、復旧の目処が立たない状況です。今後の対応方針は？'
-    await expect(page.getByText(policyPrompt)).toBeVisible()
+    await expect(page.getByText(policyPrompt).first()).toBeVisible()
     await skipTypewriter(page, policyPrompt)
     await page
       .getByRole('button', {
@@ -280,7 +281,7 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
 
     const initialResponsePrompt =
       'ランサムウェアによる暗号化が確認された状況で、感染したサーバへの初動対応は？'
-    await expect(page.getByText(initialResponsePrompt)).toBeVisible()
+    await expect(page.getByText(initialResponsePrompt).first()).toBeVisible()
     await skipTypewriter(page, initialResponsePrompt)
     await page
       .getByRole('button', {
@@ -290,7 +291,7 @@ test.describe('S2「VPN装置の脆弱性放置とランサムウェア感染」
 
     const policyPrompt =
       'バックアップも暗号化され、復旧の目処が立たない状況です。今後の対応方針は？'
-    await expect(page.getByText(policyPrompt)).toBeVisible()
+    await expect(page.getByText(policyPrompt).first()).toBeVisible()
     await skipTypewriter(page, policyPrompt)
     await page
       .getByRole('button', {

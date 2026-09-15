@@ -171,11 +171,18 @@ export function IntroScreen() {
               )}
             </div>
 
-            {/* SKIPは箱の右上(常時表示・不透明ボタン)。タイプライターの進行状況に関わらず
-                いつでも押せ、即座に導入全体を飛ばして探索へ進む(既存の導線を壊さない)。
-                ConversationFrameの外側の兄弟要素のため、SKIPクリックがdismissAnywhere側の
-                進行処理と二重発火することはない。 */}
-            <div className="absolute top-2 right-2 z-30">
+            {/* 右上のボタン群: SKIP(常時表示・不透明ボタン。タイプライターの進行状況に関わらず
+                いつでも押せ、即座に導入全体を飛ばして探索へ進む。既存の導線を壊さない)と
+                ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節・#149秘書レビュー2回目・
+                代表決定2026-09-15「画面右上、ボタン群と同じ行でボタンの左隣。入らなければ
+                ボタン群のすぐ下に右寄せ」)を同じ行に並べる(game_time省略時はGameTimeBadgeが
+                nullを返し何も表示しない)。ConversationFrameの外側の兄弟要素のため、
+                クリックがdismissAnywhere側の進行処理と二重発火することはない。 */}
+            <div className="absolute top-2 right-2 z-30 flex flex-wrap items-center justify-end gap-2">
+              <GameTimeBadge
+                gameTime={scenario.intro.game_time}
+                compact={boxOrientation === 'portrait'}
+              />
               <Button
                 type="button"
                 variant="outline"
@@ -200,14 +207,6 @@ export function IntroScreen() {
               onDismiss={handleAdvanceTurn}
               onEscape={() => {}}
               dismissAnywhere
-              // ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節): game_time省略時は
-              // GameTimeBadgeがnullを返し何も表示しない。
-              cornerSlot={
-                <GameTimeBadge
-                  gameTime={scenario.intro.game_time}
-                  compact={boxOrientation === 'portrait'}
-                />
-              }
             />
           </BackgroundBox>
         ) : (

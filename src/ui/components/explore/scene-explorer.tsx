@@ -370,14 +370,6 @@ export function SceneExplorer({
     portraitControlsTopOffset,
   )
 
-  // ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節「探索④は例外」): 探索状態(会話
-  // ウィンドウが出ていない間)は箱の右下が「解決へ進む」ボタンと衝突するため表示せず、シーン
-  // タブの行と重ならないようシーンタブの下に表示する。タブ・右上ボタン群と反対側(左)に置くことで、
-  // 「調査ポイント一覧」トグルパネル(right-2、同じtop-16/top-28)とも重ならない。シーンが1つ
-  // (タブ無し)の場合は左上が空くため箱の上端に置く。
-  const exploreTimeTopClass =
-    scenes.length > 1 ? (boxOrientation === 'portrait' ? 'top-28' : 'top-16') : 'top-2'
-
   // 現在のシーンidを呼び出し側へ通知する(#119/#124、上記SceneExplorerPropsのJSDoc参照)。
   // マウント時(初期シーン)・シーン切替のたびに発火すればよいため依存配列はactiveSceneIdのみ。
   useEffect(() => {
@@ -717,8 +709,16 @@ export function SceneExplorer({
             1行に収まる)。 */}
         <div
           data-testid="top-controls-row"
-          className="absolute top-2 right-2 z-50 flex flex-wrap items-start justify-end gap-2"
+          className="absolute top-2 right-2 z-50 flex flex-wrap items-center justify-end gap-2"
         >
+          {/* ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節・#149秘書レビュー2回目・
+              代表決定2026-09-15「画面右上、ボタン群と同じ行でボタンの左隣。入らなければ
+              ボタン群のすぐ下に右寄せ」): 右上ボタン群の列の先頭に置くことで、1行に収まる間は
+              ボタン群の左隣になり、収まらない場合はflex-wrapでボタン群の下(右寄せ)へ折り返す。
+              探索状態・会話状態のどちらでも常時表示する(旧「探索状態のみシーンタブの下」は
+              撤回)。時刻は現在アクティブなシーン(activeScene)のgame_timeを使う(探索中は
+              シーンを行き来できるが、各シーンの時刻を固定表示する。代表承認2026-09-15)。 */}
+          <GameTimeBadge gameTime={activeScene.game_time} compact={boxOrientation === 'portrait'} />
           <CardDrawer cards={ownedCards} triggerVariant="label" />
           <Button
             type="button"
@@ -763,16 +763,6 @@ export function SceneExplorer({
             )}
           >
             {investigationList}
-          </div>
-        )}
-
-        {/* ゲーム内時刻(#136/#137): 探索状態(会話ウィンドウが出ていない間)のみここに表示する
-            (会話状態の間はConversationFrameのcornerSlot=会話ウィンドウ帯の右上端へ表示先が
-            移る、DESIGN.md「ゲーム内時刻」節「探索④は例外」)。シーンタブの左側と同じ左寄せで、
-            タブの行の下(exploreTimeTopClass)に置く。 */}
-        {!isConversationActive && (
-          <div className={cn('pointer-events-none absolute left-2 z-20', exploreTimeTopClass)}>
-            <GameTimeBadge gameTime={activeScene.game_time} />
           </div>
         )}
 
@@ -960,16 +950,6 @@ export function SceneExplorer({
             expression={currentTurn.expression}
             onDismiss={isLastTurn ? closeConversation : advanceConversationTurn}
             onEscape={closeConversation}
-            // ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節「探索④は例外」): 会話状態
-            // (調査結果/danger)では、右下が「解決へ進む」ボタンと衝突しうるため会話ウィンドウ帯の
-            // 右上端に表示する。時刻は現在アクティブなシーン(activeScene)のgame_timeを使う
-            // (探索中はシーンを行き来できるが、各シーンの時刻を固定表示する。代表承認2026-09-15)。
-            cornerSlot={
-              <GameTimeBadge
-                gameTime={activeScene.game_time}
-                compact={boxOrientation === 'portrait'}
-              />
-            }
           >
             <p className="text-muted-foreground text-xs">
               {conversation.kind === 'collect'
