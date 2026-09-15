@@ -191,7 +191,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     // --- 解決(会話モード): q-entry-point → q-immediate-response → q-response-policy の3問。 ---
     const entryPrompt =
       'カード情報は自社のデータベースに保存していなかった。それなのになぜ漏れたと見る？'
-    await expect(page.getByText(entryPrompt)).toBeVisible()
+    // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
+    await expect(page.getByText(entryPrompt).first()).toBeVisible()
     await skipTypewriter(page, entryPrompt)
 
     // わざと「SQLインジェクション」を選び、誤答フォローで問い・選択肢が残ることを確認する
@@ -203,7 +204,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await expect(
       page.getByText('そもそもカード番号は保存されていない', { exact: false }),
     ).toBeVisible()
-    await expect(page.getByText(entryPrompt)).toBeVisible()
+    // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
+    await expect(page.getByText(entryPrompt).first()).toBeVisible()
     await expect(sqliChoice).toBeVisible()
 
     // 再挑戦で正しい起点(フォームジャッキング)を選ぶ。
@@ -214,7 +216,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
       .click()
 
     const immediatePrompt = '決済ページの改ざんが確認できました。技術的にまず取るべき対応は？'
-    await expect(page.getByText(immediatePrompt)).toBeVisible()
+    await expect(page.getByText(immediatePrompt).first()).toBeVisible()
     await skipTypewriter(page, immediatePrompt)
     await page
       .getByRole('button', {
@@ -223,7 +225,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
       .click()
 
     const policyPrompt = 'クレジットカード情報の漏えいが濃厚な状況です。今後の対応方針は？'
-    await expect(page.getByText(policyPrompt)).toBeVisible()
+    await expect(page.getByText(policyPrompt).first()).toBeVisible()
     await skipTypewriter(page, policyPrompt)
     await page
       .getByRole('button', {
@@ -287,7 +289,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
       .click()
 
     const immediatePrompt = '決済ページの改ざんが確認できました。技術的にまず取るべき対応は？'
-    await expect(page.getByText(immediatePrompt)).toBeVisible()
+    await expect(page.getByText(immediatePrompt).first()).toBeVisible()
     await skipTypewriter(page, immediatePrompt)
     await page
       .getByRole('button', {
@@ -296,7 +298,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
       .click()
 
     const policyPrompt = 'クレジットカード情報の漏えいが濃厚な状況です。今後の対応方針は？'
-    await expect(page.getByText(policyPrompt)).toBeVisible()
+    await expect(page.getByText(policyPrompt).first()).toBeVisible()
     await skipTypewriter(page, policyPrompt)
     await page
       .getByRole('button', {

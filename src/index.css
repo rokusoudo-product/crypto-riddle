@@ -73,6 +73,74 @@
   -webkit-backdrop-filter: blur(var(--glass-panel-blur));
 }
 
+/* 解決⑤の選択肢の5状態（DESIGN.md「解決の会話モード」節「選択肢の5状態」・#134）。
+   surface-2（--secondary）地に opaque な枠線ボタンとして実装する。#133 で判明した
+   shadcn Button variant="outline" の `dark:bg-input/30`（alpha 0.3）上書き問題
+   （このファイル冒頭の glass-panel コメント参照）を避けるため、Button コンポーネントの
+   outline variant は使わず、この専用ユーティリティ＋素の<button>で組む。
+   通常: surface-2 地・text-primary文字・border枠。
+   ホバー/フォーカス: primary(ネオンブルー)の光彩で縁取りを光らせる＋枠をprimaryに
+   （ホバーとキーボードのフォーカスで同じ光彩、DESIGN.md該当節）。フォーカスはさらに
+   2px solid primary・2pxオフセットの可視フォーカスリングを重ねる(WCAG 2.4.7)。
+   押下（回答確定）: primaryで塗りつぶし、文字はprimary-foreground。ホバーの光彩とは
+   別の状態として区別する（光彩・リングは出さない）。
+   無効: 彩度・不透明度を下げる（disabled属性＋aria-describedbyで理由を保持、呼び出し側実装）。
+   prefers-reduced-motion: reduceでは、光彩のアニメーション(neon-pulse)のみ止める。
+   静止した光彩(box-shadow)自体は残す(情報が消えないように、DESIGN.md該当節)。 */
+@utility resolve-choice {
+  background-color: var(--secondary) !important;
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  transition:
+    box-shadow 150ms ease,
+    border-color 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--primary);
+    box-shadow: 0 0 var(--neon-glow-blur) var(--neon-glow-spread) var(--primary);
+  }
+
+  &:focus-visible:not(:disabled) {
+    border-color: var(--primary);
+    outline: none;
+    box-shadow:
+      0 0 var(--neon-glow-blur) var(--neon-glow-spread) var(--primary),
+      0 0 0 var(--neon-focus-ring-offset) var(--card),
+      0 0 0 calc(var(--neon-focus-ring-offset) + var(--neon-focus-ring-width)) var(--primary);
+  }
+
+  &:active:not(:disabled) {
+    background-color: var(--primary) !important;
+    color: var(--primary-foreground);
+    border-color: var(--primary);
+    box-shadow: none;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .resolve-choice:hover:not(:disabled),
+  .resolve-choice:focus-visible:not(:disabled) {
+    animation: neon-pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes neon-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.25);
+  }
+}
+
 @theme inline {
   /* 本文・操作UI: Noto Sans JP（ゴシック） */
   --font-sans:
@@ -193,6 +261,12 @@
      上記 @utility glass-panel から参照する。 */
   --glass-panel-min-alpha: 0.81;
   --glass-panel-blur: 12px;
+  /* 解決⑤選択肢のホバー/フォーカスのネオン光彩・可視フォーカスリング（DESIGN.md「選択肢の
+     5状態」節・#134）。カラーコード・サイズの直書き禁止のためトークン化する。 */
+  --neon-glow-blur: 12px;
+  --neon-glow-spread: 2px;
+  --neon-focus-ring-width: 2px;
+  --neon-focus-ring-offset: 2px;
   /* 以下、DESIGN.md のカラートークン表に定めのないトークン（本アプリでは未使用）。
      旧 .dark ブロックの値をそのまま引き継ぐ（単一テーマ化に伴う整理のみで、意味のある変更なし）。 */
   --chart-1: oklch(0.87 0 0);

@@ -205,7 +205,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     // --- 解決(会話モード): q-cause → q-report-duty → q-corrective-action の3問。 ---
     const causePrompt = '顧客の個人データが漏えいした原因は、どこにあると見る？'
-    await expect(page.getByText(causePrompt)).toBeVisible()
+    // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
+    await expect(page.getByText(causePrompt).first()).toBeVisible()
     await skipTypewriter(page, causePrompt)
 
     // わざと「委託先の従業員が意図的に持ち出した」を選び、誤答フォローで問い・選択肢が残ることを確認する
@@ -217,7 +218,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await expect(
       page.getByText('共有設定の誤変更という単純なミスだ', { exact: false }),
     ).toBeVisible()
-    await expect(page.getByText(causePrompt)).toBeVisible()
+    // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
+    await expect(page.getByText(causePrompt).first()).toBeVisible()
     await expect(insiderChoice).toBeVisible()
 
     // 再挑戦で正しい原因(共有設定ミス)を選ぶ。
@@ -229,7 +231,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     const reportDutyPrompt =
       '個人データの漏えいのおそれが確認できました。報告義務は誰に生じると考えますか？'
-    await expect(page.getByText(reportDutyPrompt)).toBeVisible()
+    await expect(page.getByText(reportDutyPrompt).first()).toBeVisible()
     await skipTypewriter(page, reportDutyPrompt)
     await page
       .getByRole('button', {
@@ -238,7 +240,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
       .click()
 
     const correctivePrompt = '再発防止に向けて、今後どのような方針を取るべきですか？'
-    await expect(page.getByText(correctivePrompt)).toBeVisible()
+    await expect(page.getByText(correctivePrompt).first()).toBeVisible()
     await skipTypewriter(page, correctivePrompt)
     await page
       .getByRole('button', {
@@ -303,7 +305,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     const reportDutyPrompt =
       '個人データの漏えいのおそれが確認できました。報告義務は誰に生じると考えますか？'
-    await expect(page.getByText(reportDutyPrompt)).toBeVisible()
+    await expect(page.getByText(reportDutyPrompt).first()).toBeVisible()
     await skipTypewriter(page, reportDutyPrompt)
     await page
       .getByRole('button', {
@@ -312,7 +314,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
       .click()
 
     const correctivePrompt = '再発防止に向けて、今後どのような方針を取るべきですか？'
-    await expect(page.getByText(correctivePrompt)).toBeVisible()
+    await expect(page.getByText(correctivePrompt).first()).toBeVisible()
     await skipTypewriter(page, correctivePrompt)
     await page
       .getByRole('button', {

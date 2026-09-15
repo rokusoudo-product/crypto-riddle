@@ -1,10 +1,11 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { MAX_CONSULTS } from '@/core/scenario'
 import { BackgroundBox } from '@/ui/components/background-box'
 import { CardDrawer } from '@/ui/components/card-drawer'
 import { ConversationFrame } from '@/ui/components/conversation-frame'
+import { ResolveChoicePanel } from '@/ui/components/resolve/resolve-choice-panel'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
@@ -25,14 +26,25 @@ import { useScreenState } from '@/ui/state/use-screen-state'
 // 単一解・厳密一致（spec §8.2）。
 //
 // 2026-09-10(#42・#45・T033): DESIGN.md「会話フレーム」を使った会話モードUIとして本実装した。
-// - 選択肢: 問いごとに2〜3個、縦積み・各48px以上・キーボード(Tab/Enter/Space)で完遂できる素の<button>。
-// - 相談ボタン: 残数(マップ3回)を会話ウィンドウ内に表示。0回で disabled + 理由テキスト(aria-describedby)。
-// - カードドロワー: 探索で得た手持ちカードをいつでも無料で閲覧できる(相談=回数消費とは明示的に区別)。
-// - 誤答時: 選択肢は残したまま、相手の reply + 段階解説(explanations)を会話ウィンドウ内に
-//   aria-live="polite" で表示する(role="alert" にしない。ゲーム内の返答は緊急の警告ではないため)。
-//   会話フレームの line(発話内容)は常に問い文(prompt)のまま保つ(誤答時に line を reply に
-//   差し替えると、プレイヤーが何を問われていたか見失うため)。
-// - 正解時(次の問いがある場合): 直前の正解 reply(あれば)を新しい問いの上に一言添える。
+//
+// 2026-09-15(#134・代表決定2026-09-14・#132): 中央選択パネル(ResolveChoicePanel)へ刷新。
+// 旧実装(選択肢・相談・カードドロワーを会話ウィンドウのchildrenとして表示)は撤回し、以下に
+// 置き換えた(DESIGN.md「解決の会話モード」節「配置」「会話ウィンドウとの役割分担」):
+// - 問い(prompt)＋選択肢＋相談ボタンは、背景の箱の中央のResolveChoicePanel(ConversationFrameの
+//   centerPanel prop)にまとめる。パネルは問いを静的テキストとして常に表示し続ける
+//   (会話ウィンドウのタイプライターとは独立)。
+// - 会話ウィンドウ(ConversationFrameのline)は台詞(タイプライター)専用にする: 通常は問い文、
+//   誤答時は相手の返答(reply)に切り替えてタイプライターで表示する(windowLine参照。パネルは
+//   開いたまま=選択肢は残る)。誤答の段階解説(explanations)は話者が問いの出題キャラと異なる
+//   場合があるため(explanation.ts参照)、会話ウィンドウの発話者を変えずに済むようパネル側に
+//   静的表示する(誤答のreplyのみ会話ウィンドウ、explanationはパネル)。
+// - 選択肢・相談ボタンは、問いの全文表示(またはスキップ)が完了するまで無効状態にする
+//   (revealedPromptQuestionId・handleLineRevealed参照。誤答後の返答の再タイプライター中は
+//   無効化し直さない=DESIGN.mdの「問いの全文表示」原則は問いにのみ適用され、選択肢は
+//   「残したまま」再挑戦できる仕様のため)。
+// - カードドロワーは背景の箱の右上へ独立したボタンとして移設(探索④の「ヒント確認」と同じ
+//   位置・見た目・不透明表示、文言のみ「手持ちカード」)。
+// - 正解時(次の問いがある場合): 直前の正解 reply(あれば)を新しい問いのパネル上部に一言添える。
 //   最後の問い(クリア)の場合は reply を表示する間もなく /result へ遷移するため、
 //   結果画面(⑦)側で progress.lastAnswerFeedback を参照して表示する(result-screen.tsx)。
 export function ResolveScreen() {
@@ -44,6 +56,13 @@ export function ResolveScreen() {
   const [cipherAnswer, setCipherAnswer] = useState('')
   // 相談で開いたヒントは「今の問いで相談を押した後」だけ表示する(問いが変わったら自動的に隠れる)。
   const [hintRevealedForQuestionId, setHintRevealedForQuestionId] = useState<string | null>(null)
+  // 選択パネルの選択肢・相談ボタンは、問いの全文表示(またはスキップ)が完了するまで無効にする
+  // (#134・DESIGN.md「解決の会話モード」節「表示タイミング」)。問いが変わるとidが変わるため
+  // 自動的に無効へ戻る。誤答後の返答(reply)の再タイプライター中はこのidを更新しない
+  // (=無効化し直さない。onLineRevealedは返答完了時にも呼ばれるが、同じquestion.idを
+  // 再セットするだけなので実害はない)。
+  const [revealedPromptQuestionId, setRevealedPromptQuestionId] = useState<string | null>(null)
+  const firstChoiceRef = useRef<HTMLButtonElement>(null)
   // 解決⑤の背景(代表決定2026-09-13・#119/#124): 独自の背景画像は持たず、「解決へ進む」を
   // 押した時点で表示していた探索シーンの背景をそのまま使う(新しい画像は作らない)。
   // `lastExploredSceneId`(探索④が更新するUI専用の値、game-store.ts参照)で探すシーンが
@@ -69,6 +88,22 @@ export function ResolveScreen() {
     resolveBoxOrientationValue,
     resolveSceneHasPortraitAsset,
   )
+
+  const question =
+    progress.resolutionStage === 'question'
+      ? scenario.resolution.questions[progress.questionIndex]
+      : undefined
+
+  // 選択パネルの有効/無効(#134): 問いの全文表示(またはスキップ)が完了しているか。
+  const choicesEnabled = question !== undefined && revealedPromptQuestionId === question.id
+
+  // 問いの全文表示完了(キーボード操作の流れを保つため、最初の選択肢へフォーカスを移す。
+  // #134・advisor指摘: 選択肢が会話ウィンドウの外(centerPanel)へ移ったため、
+  // ConversationFrameのフォーカス引き継ぎ(windowRef内を検索)はもう選択肢を見つけられない)。
+  // Rules of Hooksのため、下の早期return(まだ解決パートではない場合)より前に置く。
+  useEffect(() => {
+    if (choicesEnabled) firstChoiceRef.current?.focus()
+  }, [choicesEnabled])
 
   if (progress.part !== 'resolution' || progress.resolutionStage === null) {
     return (
@@ -106,10 +141,24 @@ export function ResolveScreen() {
     }
   }
 
-  const question =
-    progress.resolutionStage === 'question'
-      ? scenario.resolution.questions[progress.questionIndex]
-      : undefined
+  // 会話ウィンドウ(ConversationFrame)のlineが全文表示された瞬間に呼ばれる(#134)。問いの
+  // 全文表示(またはスキップ)完了を選択パネルの有効化条件にする(DESIGN.md「表示タイミング」節)。
+  // 誤答時の返答(reply)の再タイプライター完了時にも呼ばれるが、同じquestion.idを再セット
+  // するだけで実害はない(選択肢は誤答後も「残したまま」なので無効化し直す必要が無い)。
+  function handleLineRevealed() {
+    if (!question) return
+    if (revealedPromptQuestionId === question.id) {
+      // 誤答時の返答(reply)の全文表示完了(#134): 会話ウィンドウは全文表示後、スキップ用
+      // <button>が消えてただの<p>になる。スキップボタンにフォーカスがあった場合、消滅に
+      // 伴いフォーカスがdocument.bodyへ落ち、次のTabがページ先頭からやり直しになってしまう
+      // (ConversationFrame側の「children内の最初のフォーカス可能要素へ戻す」仕組みは、
+      // 選択肢がchildrenの外=centerPanelへ移ったことで対象を見つけられなくなったため)。
+      // 選択パネルの最初の選択肢へ明示的に戻し、キーボード操作の連続性を保つ。
+      firstChoiceRef.current?.focus()
+      return
+    }
+    setRevealedPromptQuestionId(question.id)
+  }
 
   const ownedCards = scenario.cards.filter((card) => progress.ownedCardIds.includes(card.id))
   const consultRemaining = MAX_CONSULTS - progress.consultsUsed
@@ -126,79 +175,63 @@ export function ResolveScreen() {
       ? resolveExplanation(question, priorWrongAttempts)
       : null
 
-  // 解決の会話モードで会話フレーム上に載せる要素(選択肢・誤答フィードバック・相談・
-  // カードドロワー)。背景の箱の有無(resolveScene)でConversationFrameのlayout/親要素が
-  // 変わるだけで中身は共通のため、変数として切り出して両分岐で使い回す(#119/#124)。
-  const questionChildren = question ? (
-    <>
-      {progress.lastAnswerFeedback?.correct === true && progress.lastAnswerFeedback.reply && (
-        <p className="border-border bg-background rounded-lg border p-3 text-sm">
-          {progress.lastAnswerFeedback.reply}
-        </p>
-      )}
+  // 会話ウィンドウ(ConversationFrame)のline(#134): 通常は問い文(prompt)、誤答直後は相手の
+  // 返答(reply)に切り替えてタイプライターで表示する(DESIGN.md「会話ウィンドウとの役割分担」)。
+  // replyが無い誤答(choiceにreply省略時)はprompt表示のまま。
+  const windowLine =
+    question && progress.lastAnswerFeedback?.correct === false && progress.lastAnswerFeedback.reply
+      ? progress.lastAnswerFeedback.reply
+      : (question?.prompt ?? '')
 
-      {/* 選択肢を先にレンダーし、相談・カードドロワーより前の Tab 順にする。 */}
-      <ul className="flex flex-col gap-2">
-        {question.choices.map((choice, index) => (
-          <li key={index}>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-auto min-h-12 w-full justify-start px-4 py-3 text-left text-base whitespace-normal"
-              onClick={() => handleQuestionAnswer(index)}
-            >
-              {choice.text}
-            </Button>
-          </li>
-        ))}
-      </ul>
-
-      {progress.lastAnswerFeedback?.correct === false && (
-        <div
-          aria-live="polite"
-          className="border-border bg-background rounded-lg border p-3 text-sm"
-        >
-          {progress.lastAnswerFeedback.reply && <p>{progress.lastAnswerFeedback.reply}</p>}
-          {/* 段階解説の話者表示(#100/#102): explanationsのunion要素(string |
-              DialogueLine)を{character, line}へ正規化してから、結果画面(result-screen.tsx)の
-              clear_explanationと同じ表示形式(話者名+「台詞」)を流用する。 */}
-          {resolvedExplanation && (
-            <p className="text-muted-foreground">
-              <span className="font-semibold">{resolvedExplanation.character}</span>「
-              {resolvedExplanation.line}」
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-4">
-          <Button
-            type="button"
-            variant="secondary"
-            className="h-12 min-w-12 px-6"
-            disabled={consultDisabled}
-            aria-describedby={consultDisabled ? 'consult-disabled-reason' : undefined}
-            onClick={handleConsult}
-          >
-            相談する（残り{Math.max(consultRemaining, 0)}回・XP減）
-          </Button>
-          {consultDisabled && (
-            <p id="consult-disabled-reason" className="text-muted-foreground text-sm">
-              相談はこのマップで使い切りました（マップ単位3回まで）。
-            </p>
-          )}
-        </div>
-        {hintRevealedForQuestionId === question.id && (
-          <p role="status" className="border-border bg-background rounded-lg border p-3 text-sm">
-            {question.consult_hint}
-          </p>
-        )}
-      </div>
-
-      <CardDrawer cards={ownedCards} />
-    </>
+  // 中央選択パネル(#134): 問い＋選択肢＋相談ボタン。誤答の段階解説(explanations)もここに表示
+  // する(相手の返答=replyは会話ウィンドウ側、上記windowLine参照)。
+  const centerPanel = question ? (
+    <ResolveChoicePanel
+      className={
+        // DESIGN.md「縦長（9:16）の構成」節: 横長は箱の50〜55%程度、縦長は立ち絵の上に
+        // 積むため幅いっぱい(padding分を除く)に近い幅を使う。
+        // 秘書レビュー(2026-09-15・PR#151)指摘の修正: 縦長は立ち絵の行が`flex-1 min-h-0`で
+        // 残り空間を埋める構造のため、パネルの高さに上限を付けないと誤答の段階解説ぶん
+        // パネルが伸びた際に立ち絵の取り分(残り空間)が圧迫され、立ち絵が問1表示時より
+        // 縮んでしまっていた。パネルの高さに上限(48cqh)を付け、超えた分はパネル内部だけ
+        // スクロールさせる(ページ全体の縦スクロールは出さない。立ち絵は常に一定の大きさを保つ)。
+        // 48cqhは「問い＋選択肢3個＋相談ボタン」(段階解説の無い通常時)が実機計測(390×844)で
+        // クリップされない最小値(実測約47.2cqh)に安全マージンを足した値。段階解説が加わった
+        // 状態(実測約57.5cqh)は上限を超えるため、その部分だけパネル内スクロールになる
+        // (代表・秘書了承済み、PR本文参照)。
+        // 横長は選択肢の列が立ち絵の間の1列(self-center)で、立ち絵の高さは列全体の残り空間
+        // ではなく個々のsizeClass(h-full+max-h)で決まるため対象外(#151秘書レビューで横長は
+        // 問題なしと確認済み)。
+        resolveBoxOrientationValue === 'landscape'
+          ? 'w-[52cqw]'
+          : 'w-full max-h-[48cqh] overflow-y-auto'
+      }
+      prompt={question.prompt}
+      priorCorrectReply={
+        progress.lastAnswerFeedback?.correct === true
+          ? (progress.lastAnswerFeedback.reply ?? null)
+          : null
+      }
+      choices={question.choices}
+      choicesEnabled={choicesEnabled}
+      onSelectChoice={handleQuestionAnswer}
+      wrongExplanation={progress.lastAnswerFeedback?.correct === false ? resolvedExplanation : null}
+      consultRemaining={consultRemaining}
+      consultDisabled={consultDisabled}
+      onConsult={handleConsult}
+      hintText={hintRevealedForQuestionId === question.id ? question.consult_hint : null}
+      firstChoiceRef={firstChoiceRef}
+    />
   ) : null
+
+  // カードドロワー(#134): 背景の箱の右上へ独立したボタンとして移設(探索④の「ヒント確認」と
+  // 同じ位置・見た目・不透明表示。文言のみ「手持ちカード」、DESIGN.md「解決の会話モード」節
+  // 「カードドロワー」)。中央の選択パネルとは重ねない。
+  const cardDrawerButton = (
+    <div className="absolute top-2 right-2 z-50">
+      <CardDrawer cards={ownedCards} triggerVariant="label" triggerLabel="手持ちカード" />
+    </div>
+  )
 
   // #124・代表決定2026-09-14「背景は画面いっぱいに表示」: 背景の箱を持つのは
   // resolutionStage==='question'かつresolveSceneがある場合のみ(cipherステージ・一覧
@@ -264,23 +297,29 @@ export function ResolveScreen() {
                 speakerHistory={scenario.resolution.questions
                   .slice(0, progress.questionIndex + 1)
                   .map((q) => q.speaker)}
-                line={question.prompt}
-              >
-                {questionChildren}
-              </ConversationFrame>
+                line={windowLine}
+                onLineRevealed={handleLineRevealed}
+                centerPanel={centerPanel}
+              />
+              {cardDrawerButton}
             </BackgroundBox>
           ) : (
             // scenario.scenesが無いマップ(一覧フォールバックのみ)は背景の箱を持たないため、
             // 従来どおりstacked layout(背景の箱を持たない画面向け)のまま描画する。
-            <ConversationFrame
-              speaker={question.speaker}
-              speakerHistory={scenario.resolution.questions
-                .slice(0, progress.questionIndex + 1)
-                .map((q) => q.speaker)}
-              line={question.prompt}
-            >
-              {questionChildren}
-            </ConversationFrame>
+            <div className="relative flex flex-col gap-4">
+              <ConversationFrame
+                speaker={question.speaker}
+                speakerHistory={scenario.resolution.questions
+                  .slice(0, progress.questionIndex + 1)
+                  .map((q) => q.speaker)}
+                line={windowLine}
+                onLineRevealed={handleLineRevealed}
+                centerPanel={centerPanel}
+              />
+              <div className="self-end">
+                <CardDrawer cards={ownedCards} />
+              </div>
+            </div>
           ))}
       </StateFrame>
     </ScreenContainer>

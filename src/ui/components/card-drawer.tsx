@@ -41,16 +41,22 @@ export interface CardDrawerProps {
   cards: readonly Card[]
   /**
    * 開閉ボタンの見せ方。'text'(既定): 解決画面の文言ボタン(「手持ちカードを見る（無料・N枚）」)。
-   * 'label': 探索の会話オーバーレイ右上ボタン群用の「ヒント確認」文言ボタン(#52 Phase4.7 追補・
-   * T048。旧'icon'の後継。aria-labelは固定文言「手持ちカードを見る（無料）」を維持、
-   * DESIGN.md「探索シーン」節「右上のボタン群」)。展開パネルは背景シーンの箱
-   * (aspect-video・overflow-hidden)からはみ出さないよう幅・高さを制限しスクロールにする。
+   * 'label': 右上ボタン群用の短い文言ボタン(#52 Phase4.7 追補・T048。旧'icon'の後継。
+   * aria-labelは固定文言「手持ちカードを見る（無料）」を維持、DESIGN.md「探索シーン」節
+   * 「右上のボタン群」)。展開パネルは背景シーンの箱(aspect-video・overflow-hidden)から
+   * はみ出さないよう幅・高さを制限しスクロールにする。
    */
   triggerVariant?: 'text' | 'label'
+  /**
+   * triggerVariant='label'時のボタンの可視文言(#134: 解決⑤は「手持ちカード」、探索④は
+   * 従来どおり「ヒント確認」)。aria-labelは両画面共通の固定文言のまま変えない(WCAG 1.4.1、
+   * 上記triggerVariantのJSDoc参照)。省略時は従来どおり「ヒント確認」。
+   */
+  triggerLabel?: string
 }
 
 /** 手持ちカードを無料でいつでも閲覧できるドロワー(相談=回数消費とは異なることをラベルで明示)。 */
-export function CardDrawer({ cards, triggerVariant = 'text' }: CardDrawerProps) {
+export function CardDrawer({ cards, triggerVariant = 'text', triggerLabel }: CardDrawerProps) {
   const [open, setOpen] = useState(false)
   const panelId = useId()
 
@@ -72,7 +78,7 @@ export function CardDrawer({ cards, triggerVariant = 'text' }: CardDrawerProps) 
           aria-label="手持ちカードを見る（無料）"
           onClick={() => setOpen((v) => !v)}
         >
-          ヒント確認
+          {triggerLabel ?? 'ヒント確認'}
         </Button>
       ) : (
         <Button
