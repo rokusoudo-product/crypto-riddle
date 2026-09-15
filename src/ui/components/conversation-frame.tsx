@@ -11,6 +11,13 @@
 // `layout="intro"`・固定`PORTRAIT_ORDER`・`compact` propは削除済み(このコメントでは以後
 // 言及しない。旧実装の経緯を知りたい場合はgit historyを参照)。
 //
+// 2026-09-15(代表決定・#138): 名前箱を会話ウィンドウ左上のピル(NamePlate)から、いま話して
+// いる人の立ち絵の下(サンプルの位置。初期サイズはDESIGN.md「名前箱」節の数値=サンプルの
+// 約半分)へ移した。NPC発話(立ち絵を持たない)のときだけ、従来どおり会話ウィンドウ左上に
+// 同じ見た目の名前箱を出す(#153の幅ルール=横長12.5%・縦長25%・左詰め・min-w-fitを継続)。
+// 旧`NamePlate`はNPC専用の`NpcNameBox`に改名し、新規`PortraitNameBox`(立ち絵の下)を追加した。
+// 「名前が出るのは1箇所だけ」(#119)は変えていない。詳細は下記の各コンポーネントのJSDoc参照。
+//
 // DESIGN.md「会話フレーム(共通コンポーネント・#42で導入)」節が正本:
 // - レイアウト: 画面下部に会話ウィンドウ、その上に左右2枠の立ち絵。導入③・探索④・解決⑤の
 //   すべてで共通(#108)。
@@ -38,8 +45,9 @@
 // - 表情フォールバック(#100/#102): `expression` propで発話者の立ち絵の表情差分を指定できる。
 //   該当PNGが無ければneutralにフォールバックする(resolvePortraitSrc参照)。待機中の立ち絵は
 //   常にneutralを使う。
-// - 名札: 会話ウィンドウ左上に primary背景+ダーク文字のピル。
-// - 会話文は明朝(font-heading)、名札・操作UIはゴシック(既定のsans)。
+// - 名前箱(#138): いま話している人の立ち絵の下に primary背景+primary-foreground文字の
+//   ピル(NpcNameBox/PortraitNameBox共通の見た目)。NPC発話時のみ会話ウィンドウ左上に出す。
+// - 会話文は明朝(font-heading)、名前箱・操作UIはゴシック(既定のsans)。
 // - 主人公の立ち絵は出さない(docs/characters.md §3)。
 // - タイプライター表示(#52 Phase4.7/#64/T042): 会話文は1文字ずつ時間差で表示する。
 //   タップ/Enterで即全文(スキップ)、prefers-reduced-motionでは即全文(アニメなし)。
@@ -184,6 +192,75 @@ const PORTRAIT_BOX_RELATIVE_SIZE_CLASS: Record<BoxOrientation, string> = {
   portrait: 'h-full max-h-[32cqh] w-auto aspect-[3/4]',
 }
 
+// 名前箱(#138・DESIGN.md「名前箱」節「初期サイズ」): 高さ=背景の箱の高さの約5%(横長・縦長
+// とも共通の比率、「縦長（9:16）の構成」節「比率は横長と共通」)。幅は立ち絵カードの幅以下に
+// なるよう、立ち絵の最大幅(上記PORTRAIT_BOX_RELATIVE_SIZE_CLASSの48cqh/32cqhという高さ上限に
+// 3:4のアスペクト比を掛けた36cqh/24cqh)を上限(max-w)に採り、実際の幅は名前のテキスト長に
+// fitさせる(w-fit、下記PortraitNameBoxのbase class参照)。
+const PORTRAIT_NAME_BOX_SIZE_CLASS_BY_ORIENTATION: Record<BoxOrientation, string> = {
+  landscape: 'h-[5cqh] max-w-[36cqh]',
+  portrait: 'h-[5cqh] max-w-[24cqh]',
+}
+// 名前箱を立ち絵の下に確保する分、立ち絵カード自身の高さを名前箱の高さ(5cqh)ぶん差し引く
+// (`calc(100%-5cqh)`)。ラッパー(下記renderPortraitSlot)側で`h-full`(ROWの実高さ)を確定
+// させたうえでこの計算式を使うため、名前箱を表示する/しない(非発話側は`invisible`)に関わらず
+// 立ち絵の高さは左右で常に同じになり、位置が揺れない。max-hは従来どおり上限として重ねて掛ける
+// (会話ウィンドウが大きく箱の残り空間が小さいときは、この上限より先に縮む)。
+const PORTRAIT_IN_COLUMN_SIZE_CLASS_BY_ORIENTATION: Record<BoxOrientation, string> = {
+  landscape: 'h-[calc(100%-5cqh)] max-h-[48cqh] w-auto aspect-[3/4]',
+  portrait: 'h-[calc(100%-5cqh)] max-h-[32cqh] w-auto aspect-[3/4]',
+}
+// overlay限定: 立ち絵+名前箱をまとめる縦積みラッパーの追加クラス。ROWの実高さを`h-full`で
+// 確定させ、内側のPORTRAIT_IN_COLUMN_SIZE_CLASS_BY_ORIENTATIONの`calc(100%-5cqh)`が正しく
+// 解決できるようにする(stackedは固定pxで完結するため不要)。
+const PORTRAIT_COLUMN_WRAPPER_CLASS_OVERLAY = 'h-full min-h-0'
+// stackedは背景の箱(BackgroundBoxの`[container-type:size]`)を持たずcqh単位が使えないため、
+// 立ち絵の固定px(PORTRAIT_SIZE_CLASS、下記で定義)に対する近似値(高さ約5%相当・幅は立ち絵の
+// 固定幅を上限)を使う。stackedは背景の箱を持たない画面向けのフォールバックのため、cqhベースの
+// 厳密な比率は求めない(目安値)。
+const STACKED_PORTRAIT_NAME_BOX_SIZE_CLASS = 'h-2 max-w-30 sm:h-4 sm:max-w-60'
+
+/** 立ち絵+名前箱の縦積み1枠ぶんのサイズ設定(#138)。overlay(箱高さ比率cqh)/stacked(固定px)
+ * で値の作り方が異なるため、renderPortraitRowの呼び出し元がまとめて渡す(下記
+ * OVERLAY_PORTRAIT_COLUMN_SIZING_BY_ORIENTATION/STACKED_PORTRAIT_COLUMN_SIZING参照)。 */
+interface PortraitColumnSizing {
+  /** 空き枠(EmptyPortraitSlot)自身のサイズ(名前箱を持たないため、名前箱ぶんの詰めは無し)。 */
+  emptySizeClass: string
+  /** 名前箱を確保するぶん高さを詰めた、占有枠でのPortraitのサイズ。 */
+  portraitInColumnSizeClass: string
+  /** 名前箱自体のサイズ。 */
+  nameBoxSizeClass: string
+  /** 立ち絵+名前箱をまとめる縦積みラッパーに足す追加クラス(overlayのみ`h-full min-h-0`が要る、
+   *  PORTRAIT_IN_COLUMN_SIZE_CLASS_BY_ORIENTATIONのcalcコメント参照。stackedは固定pxで完結
+   *  するため空文字でよい)。 */
+  columnWrapperClassName: string
+}
+
+const OVERLAY_PORTRAIT_COLUMN_SIZING_BY_ORIENTATION: Record<BoxOrientation, PortraitColumnSizing> =
+  {
+    landscape: {
+      emptySizeClass: PORTRAIT_BOX_RELATIVE_SIZE_CLASS.landscape,
+      portraitInColumnSizeClass: PORTRAIT_IN_COLUMN_SIZE_CLASS_BY_ORIENTATION.landscape,
+      nameBoxSizeClass: PORTRAIT_NAME_BOX_SIZE_CLASS_BY_ORIENTATION.landscape,
+      columnWrapperClassName: PORTRAIT_COLUMN_WRAPPER_CLASS_OVERLAY,
+    },
+    portrait: {
+      emptySizeClass: PORTRAIT_BOX_RELATIVE_SIZE_CLASS.portrait,
+      portraitInColumnSizeClass: PORTRAIT_IN_COLUMN_SIZE_CLASS_BY_ORIENTATION.portrait,
+      nameBoxSizeClass: PORTRAIT_NAME_BOX_SIZE_CLASS_BY_ORIENTATION.portrait,
+      columnWrapperClassName: PORTRAIT_COLUMN_WRAPPER_CLASS_OVERLAY,
+    },
+  }
+
+// stacked(背景の箱を持たない画面向けフォールバック)は固定pxで完結するため、占有枠でも
+// emptySizeClassと同じPORTRAIT_SIZE_CLASSをそのまま使う(名前箱ぶんの再計算が不要)。
+const STACKED_PORTRAIT_COLUMN_SIZING: PortraitColumnSizing = {
+  emptySizeClass: PORTRAIT_SIZE_CLASS,
+  portraitInColumnSizeClass: PORTRAIT_SIZE_CLASS,
+  nameBoxSizeClass: STACKED_PORTRAIT_NAME_BOX_SIZE_CLASS,
+  columnWrapperClassName: '',
+}
+
 // 話者の枠(#119/#124/#132/#133): いま話している人の立ち絵カードを、フルカラー表示に加えて
 // 白またはネオンブルーの枠線で囲む(DESIGN.md「会話フレーム」節「話者の枠」)。index.cssの
 // --speaker-frame-white/--speaker-frame-neon-blueトークン経由で両方用意してあり、切り替えは
@@ -201,40 +278,58 @@ const SPEAKER_FRAME_RING_CLASS_BY_COLOR: Record<'white' | 'neon-blue', string> =
 }
 const SPEAKER_FRAME_RING_CLASS = SPEAKER_FRAME_RING_CLASS_BY_COLOR[SPEAKER_FRAME_COLOR]
 
-/** 名札(色だけに頼らず発話者を示す、WCAG 1.4.1)。会話ウィンドウ内のこの1箇所だけに出す
- * (#119/#124: 旧実装は立ち絵カードの下にも同じ名札を重複表示しており、二重表示になっていた。
- * 立ち絵側はaltテキスト(発話中/待機中)のみで発話者を示し、可視の名札はウィンドウ側に一本化する)。
+/** NPC発話時の名前箱(色だけに頼らず発話者を示す、WCAG 1.4.1)。会話ウィンドウ上端の左に
+ * 表示する(#138・DESIGN.md「名前箱」節「NPCが話すとき」)。通常のサポート役キャラが話す
+ * ときは立ち絵の下の名前箱(下記PortraitNameBox)に一本化した(#132/#138)ため、この箱は
+ * NPC発話時(立ち絵を持たない)専用になった。「名前が出るのは1箇所だけ」(#119)は、
+ * 呼び出し側(windowContent)がnpcSpeakingのときだけこのコンポーネントを描画することで保つ。
  *
- * 代表指示(2026-09-15): 名札が会話ウィンドウの幅いっぱいに伸びて長すぎるため、幅を縮め
- * 左詰めにする。原因は親要素(windowContentの`flex flex-col gap-2`)のflexboxデフォルト
- * (align-items: stretch)で、<span>が本来はインライン要素でもflexアイテムとしてクロス軸
- * (=幅)いっぱいに引き伸ばされていたため。`self-start`でこのアイテムだけstretchを
- * 打ち消す。
+ * 旧実装(#119/#124〜#132、旧名NamePlate)は通常のキャラ発話でも常にこの位置に表示していた
+ * ため`speaking`propを持っていたが、実際には常に`speaking={true}`で呼ばれておりグレー
+ * アウト分岐(bg-muted)は使われていなかった。#138でNPC専用になり呼び出し側が「話している」
+ * 場面でしか描画しなくなったため、未使用だった分岐ごと削除した。
  *
- * 代表指示・第2回(2026-09-15): 縦長は約4分の1(`w-1/4`)のまま維持し、横長はさらに半分の
- * 約8分の1(`w-1/8`、1280×800で約150px)にする。横長・縦長の判定は画面幅のブレークポイント
- * ではなく、背景の箱の向き(呼び出し側の`boxOrientation` prop、DESIGN.md「背景の箱」節の
- * 既存の仕組み=画面幅ではなくorientationで判定)に合わせる(タブレットを横に持ったときも
- * 横長扱いになる)。`min-w-fit`は両orientationで維持し、長い名前(例:「経理部長 夏目」)が
- * 幅より広い場合でも折り返し・省略されないよう、テキストの内在幅を下限として保証する。 */
-function NamePlate({
-  label,
-  speaking,
-  boxOrientation,
-}: {
-  label: string
-  speaking: boolean
-  boxOrientation: BoxOrientation
-}) {
+ * 代表指示(2026-09-15・#153): 幅は横長=会話ウィンドウ内側の12.5%(`w-1/8`)・縦長=25%
+ * (`w-1/4`)・左詰め(`self-start`)・`min-w-fit`(長い名前で折り返し・省略されない)。
+ * 横長・縦長の判定は画面幅のブレークポイントではなく、背景の箱の向き(呼び出し側の
+ * `boxOrientation` prop、DESIGN.md「背景の箱」節の既存の仕組み)に合わせる。 */
+function NpcNameBox({ label, boxOrientation }: { label: string; boxOrientation: BoxOrientation }) {
   return (
     <span
       className={cn(
-        'self-start min-w-fit rounded-full font-semibold',
+        'bg-primary text-primary-foreground self-start min-w-fit rounded-full px-3 py-0.5 text-xs font-semibold',
         boxOrientation === 'landscape' ? 'w-1/8' : 'w-1/4',
-        'px-3 py-0.5 text-xs',
-        speaking
-          ? 'bg-primary text-primary-foreground'
-          : 'bg-muted text-muted-foreground border-border border',
+      )}
+    >
+      {label}
+    </span>
+  )
+}
+
+/** 立ち絵の下の名前箱(#138・DESIGN.md「名前箱」節)。primary背景+primary-foreground文字の
+ * 不透明ピル(会話ウィンドウの半透明ガラス風パネルとは別扱い=常時判読できるよう不透明のまま、
+ * NpcNameBoxと同じ見た目)。「いま話している側の枠にのみ表示する」(DESIGN.md「配置」小節)
+ * ため、呼び出し側(renderPortraitSlot)は非発話側にも同寸法のこのコンポーネントを
+ * `visible={false}`で描画し、`invisible`(visibility:hidden。displayは保つ)にする。
+ * これにより左右どちらの立ち絵も下端の位置がそろい(レイアウトが揺れない)、かつ「名前が
+ * 出るのは1箇所だけ」(#119)を常に満たす。 */
+function PortraitNameBox({
+  label,
+  sizeClass,
+  visible,
+}: {
+  label: string
+  sizeClass: string
+  visible: boolean
+}) {
+  return (
+    <span
+      data-testid="portrait-name-box"
+      aria-hidden={visible ? undefined : true}
+      className={cn(
+        'flex w-fit min-w-fit shrink-0 items-center justify-center truncate rounded-full px-2 text-xs font-semibold sm:px-3',
+        sizeClass,
+        visible ? 'bg-primary text-primary-foreground' : 'invisible',
       )}
     >
       {label}
@@ -437,6 +532,16 @@ export function ConversationFrame({
   // 左右2枠の並び(#108/#110): speakerHistory省略時は履歴なし(=この1ターンだけ)として扱う。
   const twoSlot = layoutTwoSlotFrame(speakerHistory ?? [speaker])
 
+  // 会話ウィンドウの表示可否(代表決定2026-09-15「会話ウィンドウが空のときは隠す」)。
+  // line(台詞本文)が空文字で、かつNPC名札(NpcNameBox、windowContent参照)を表示する場面でも
+  // ないとき(=ウィンドウに出す中身が何も無いとき)は、ウィンドウ自体を描画しない。
+  // 解決⑤(resolve-screen.tsx)の問い表示中(誤答直後を除く)がこれに当たる: 問いの文は
+  // 中央選択パネル側に静的表示され、会話ウィンドウのlineは空文字のままになる(#134)。
+  // NPC名のみの表示(twoSlot.npcSpeaking、立ち絵を持たないNPCの発話)は「中身がある」扱いに
+  // する(名札だけでも発話者を示す情報のため隠さない)。導入③・探索④はlineが空になる場面が
+  // 無いため挙動に影響しない(代表確認済み、PR本文参照)。
+  const hasWindowContent = line.length > 0 || twoSlot.npcSpeaking
+
   // line(または prefers-reduced-motion 設定)が変わったら、レンダー中に即座に表示位置を
   // 先頭(またはreduced-motionなら全文)へ戻す。useEffectでの事後リセットだと、変更後の最初の
   // 1フレームだけ古い revealedLength を新しい line.length と比較した誤った isComplete で
@@ -632,12 +737,16 @@ export function ConversationFrame({
       }
     : {}
 
-  // 名札+会話文(タイプライター/全文)+children。stacked/overlay で共有する会話ウィンドウの
-  // 中身(外枠のサイズ・配置だけがレイアウトごとに異なる、#52・T047)。
+  // 名札(NPC発話時のみ)+会話文(タイプライター/全文)+children。stacked/overlay で共有する
+  // 会話ウィンドウの中身(外枠のサイズ・配置だけがレイアウトごとに異なる、#52・T047)。
+  // 名前箱(#138): 通常のキャラ発話は立ち絵の下の名前箱(PortraitNameBox、renderPortraitSlot
+  // 参照)に一本化したため、会話ウィンドウ側にはNPC発話時(twoSlot.npcSpeaking、立ち絵を
+  // 持たないためDESIGN.md「NPCが話すとき」の位置=会話ウィンドウ上端の左を使う)だけ出す
+  // (「名前が出るのは1箇所だけ」#119を維持)。
   const windowContent = (
     <>
       <div className="flex flex-col gap-2">
-        <NamePlate label={label} speaking boxOrientation={boxOrientation} />
+        {twoSlot.npcSpeaking && <NpcNameBox label={label} boxOrientation={boxOrientation} />}
         {isComplete ? (
           <p className="font-heading text-base leading-relaxed sm:text-lg">{line}</p>
         ) : onDismiss ? (
@@ -667,15 +776,52 @@ export function ConversationFrame({
     </>
   )
 
-  // 左右2枠の立ち絵(#108/#110): 空の枠は同寸法の不可視プレースホルダーで埋め、位置がずれない
-  // ようにする。NPC発話中(npcSpeaking)はどちらの枠も現在の占有者のまま・speaking=falseに
-  // なる(layoutTwoSlotFrame参照)ため、Portrait側の描画は変更不要(通常の待機中表示と同じ)。
-  // sizeClassはlayoutごとに呼び出し元が選ぶ(stacked=固定px/overlay=箱高さ比率cqh、上記
-  // PORTRAIT_SIZE_CLASS/PORTRAIT_BOX_RELATIVE_SIZE_CLASS参照)。
-  // shrink/grow挙動(overlay限定・stacked=shrink-0固定/overlay=flex-1 min-h-0で縮む)は
-  // 呼び出し側がextraClassNameで指定する(#124: 同じユーティリティを2箇所で異なる方向に
-  // 上書きするとTailwindのクラス優先順位が不定になるため、基底クラスにはshrink系を含めない)。
-  function renderPortraitRow(extraClassName: string, sizeClass: string, center?: ReactNode) {
+  // 立ち絵1枠(+名前箱)ぶんの描画(#138)。占有枠は「立ち絵の下端に名前箱」(DESIGN.md「名前箱」
+  // 節「配置」)の縦積みにする。名前箱は「いま話している側の枠にのみ表示する」ため、非発話側にも
+  // 同寸法のPortraitNameBoxを`visible={false}`で描画してinvisible(display:contents的には
+  // 消さずvisibility:hiddenのみ)にすることで、左右どちらの立ち絵も高さがそろい位置が揺れない
+  // ようにする(上記PortraitNameBoxのJSDoc参照)。空き枠(まだ誰も入っていない)は名前箱を
+  // 持たない従来どおりのEmptyPortraitSlotのまま(#108/#110)。
+  function renderPortraitSlot(
+    display: TwoSlotDisplay | null,
+    slot: 'left' | 'right',
+    sizing: PortraitColumnSizing,
+  ) {
+    if (!display) return <EmptyPortraitSlot sizeClass={sizing.emptySizeClass} />
+    return (
+      <div
+        className={cn(
+          // justify-end: overlay(columnWrapperClassNameに`h-full`が入る)では、立ち絵の高さが
+          // max-h上限(48cqh/32cqh)で頭打ちになり`calc(100%-5cqh)`いっぱいまで使わないことが
+          // 多いため、既定のjustify-content:flex-start(先頭寄せ)だと立ち絵+名前箱の下に
+          // 大きな空白が残り、名前箱が会話ウィンドウから離れてしまう(実機確認で判明)。
+          // 常に列の下端(=ROWの下端=会話ウィンドウの上辺)へ寄せることで、立ち絵の下端に
+          // 名前箱、その下に会話ウィンドウという積み順(DESIGN.md「立ち絵の拡大」節)を保つ。
+          'flex flex-col items-center justify-end gap-1',
+          sizing.columnWrapperClassName,
+        )}
+      >
+        <Portrait
+          display={display}
+          slot={slot}
+          expression={display.speaking ? expression : undefined}
+          sizeClass={sizing.portraitInColumnSizeClass}
+        />
+        <PortraitNameBox
+          label={display.character}
+          sizeClass={sizing.nameBoxSizeClass}
+          visible={display.speaking}
+        />
+      </div>
+    )
+  }
+
+  // 左右2枠の立ち絵+名前箱の行(#108/#110・#138)。NPC発話中(npcSpeaking)はどちらの枠も
+  // 現在の占有者のまま・speaking=falseになる(layoutTwoSlotFrame参照)ため、両側とも名前箱は
+  // invisibleになる(NPC名は会話ウィンドウ側のNpcNameBoxに出る、windowContent参照)。
+  // sizingはlayoutごとに呼び出し元が選ぶ(stacked=固定px/overlay=箱高さ比率cqh、上記
+  // OVERLAY_PORTRAIT_COLUMN_SIZING_BY_ORIENTATION/STACKED_PORTRAIT_COLUMN_SIZING参照)。
+  function renderPortraitRow(extraClassName: string, sizing: PortraitColumnSizing, center?: ReactNode) {
     return (
       <div
         className={cn(
@@ -686,29 +832,11 @@ export function ConversationFrame({
           extraClassName,
         )}
       >
-        {twoSlot.left ? (
-          <Portrait
-            display={twoSlot.left}
-            slot="left"
-            expression={twoSlot.left.speaking ? expression : undefined}
-            sizeClass={sizeClass}
-          />
-        ) : (
-          <EmptyPortraitSlot sizeClass={sizeClass} />
-        )}
+        {renderPortraitSlot(twoSlot.left, 'left', sizing)}
         {/* 中央の選択パネル(解決⑤専用・横長、DESIGN.md「解決の会話モード」節「配置」・#134):
             左右の立ち絵の間、self-centerで縦方向は行の中央に揃える(items-endの対象外)。 */}
         {center && <div className="self-center">{center}</div>}
-        {twoSlot.right ? (
-          <Portrait
-            display={twoSlot.right}
-            slot="right"
-            expression={twoSlot.right.speaking ? expression : undefined}
-            sizeClass={sizeClass}
-          />
-        ) : (
-          <EmptyPortraitSlot sizeClass={sizeClass} />
-        )}
+        {renderPortraitSlot(twoSlot.right, 'right', sizing)}
       </div>
     )
   }
@@ -729,7 +857,7 @@ export function ConversationFrame({
     // 空きに追従しないため、上限としてのみ使う)。会話ウィンドウは`overflow-y-auto`+
     // `max-h-full`を最後の安全弁として残すが、通常の表示状態では発火しない設計
     // (E2E/E2E-shot.mjsのno-scroll確認対象)。
-    const portraitSizeClass = PORTRAIT_BOX_RELATIVE_SIZE_CLASS[boxOrientation]
+    const portraitColumnSizing = OVERLAY_PORTRAIT_COLUMN_SIZING_BY_ORIENTATION[boxOrientation]
     return (
       <div
         data-testid="conversation-frame-overlay"
@@ -748,26 +876,35 @@ export function ConversationFrame({
           {centerPanel && boxOrientation === 'portrait' && (
             <div className="relative z-20 mb-2 shrink-0 pt-14 sm:pt-16">{centerPanel}</div>
           )}
+          {/* #138: 立ち絵の下端に名前箱を積むようになったため、旧・立ち絵行を会話ウィンドウへ
+              少しめり込ませていた負のmargin-bottom(-mb-2/-mb-4)は撤回した(名前箱が窓の
+              上辺に隠れてしまうため)。立ち絵の行と会話ウィンドウは`gap-0`のまま隙間なく
+              接する(DESIGN.md「立ち絵の拡大」節「立ち絵の下端に名前箱、その下に会話
+              ウィンドウ」の積み順どおり)。 */}
           {renderPortraitRow(
-            'min-h-0 flex-1 -mb-2 sm:-mb-4',
-            portraitSizeClass,
+            'min-h-0 flex-1',
+            portraitColumnSizing,
             boxOrientation === 'landscape' ? centerPanel : undefined,
           )}
-          <div
-            ref={windowRef}
-            data-testid="conversation-window"
-            className={cn(
-              // 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel、DESIGN.md「半透明（ガラス風）
-              // パネル」節・#133) + 上辺に primary(ネオンブルー)のアクセント(旧ゴールドは#132で撤回)。
-              'border-primary glass-panel relative z-10 flex min-w-0 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
-              'max-h-full',
-              onDismiss &&
-                'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
-            )}
-            {...dismissWindowProps}
-          >
-            {windowContent}
-          </div>
+          {/* 会話ウィンドウが空のときは隠す(代表決定2026-09-15、上記hasWindowContentコメント
+              参照)。ウィンドウを描画しないだけで、立ち絵の行・centerPanelの表示には影響しない。 */}
+          {hasWindowContent && (
+            <div
+              ref={windowRef}
+              data-testid="conversation-window"
+              className={cn(
+                // 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel、DESIGN.md「半透明（ガラス風）
+                // パネル」節・#133) + 上辺に primary(ネオンブルー)のアクセント(旧ゴールドは#132で撤回)。
+                'border-primary glass-panel relative z-10 flex min-w-0 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
+                'max-h-full',
+                onDismiss &&
+                  'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
+              )}
+              {...dismissWindowProps}
+            >
+              {windowContent}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -784,22 +921,27 @@ export function ConversationFrame({
           無いマップのフォールバック)でも、立ち絵の行の上に積む(縦長overlayと同じ考え方)。 */}
       {centerPanel && <div className="mb-2 shrink-0">{centerPanel}</div>}
       {/* 立ち絵(左右2枠、#108/#110): 主人公の立ち絵は出さない。stackedは背景の箱を持たない
-          画面向けのため固定pxのまま(PORTRAIT_SIZE_CLASS)、縮小しない(shrink-0)。 */}
-      {renderPortraitRow('shrink-0 px-2 sm:gap-12 -mb-4', PORTRAIT_SIZE_CLASS)}
+          画面向けのため固定pxのまま(PORTRAIT_SIZE_CLASS)、縮小しない(shrink-0)。#138: 名前箱を
+          立ち絵の下に積むようになったため、旧・負のmargin-bottom(-mb-4、会話ウィンドウへの
+          めり込み)は撤回した(overlay側と同じ理由、renderPortraitRow呼び出し部のコメント参照)。 */}
+      {renderPortraitRow('shrink-0 px-2 sm:gap-12', STACKED_PORTRAIT_COLUMN_SIZING)}
       {/* 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel) + 上辺に primary(ネオンブルー、
-          旧ゴールドは#132で撤回)のアクセント。 */}
-      <div
-        ref={windowRef}
-        data-testid="conversation-window"
-        className={cn(
-          'border-primary glass-panel relative z-10 flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
-          onDismiss &&
-            'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
-        )}
-        {...dismissWindowProps}
-      >
-        {windowContent}
-      </div>
+          旧ゴールドは#132で撤回)のアクセント。空のときは隠す(代表決定2026-09-15、上記
+          hasWindowContentコメント参照)。 */}
+      {hasWindowContent && (
+        <div
+          ref={windowRef}
+          data-testid="conversation-window"
+          className={cn(
+            'border-primary glass-panel relative z-10 flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
+            onDismiss &&
+              'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
+          )}
+          {...dismissWindowProps}
+        >
+          {windowContent}
+        </div>
+      )}
     </div>
   )
 }

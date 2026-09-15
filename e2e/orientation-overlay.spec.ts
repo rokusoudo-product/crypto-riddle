@@ -198,6 +198,13 @@ for (const [label, viewport] of Object.entries({
         await expect(page.getByRole('button', { name: choice })).toBeInViewport()
       }
       await expect(page.getByRole('button', { name: /相談する/ })).toBeInViewport()
+
+      // 会話ウィンドウは代表決定2026-09-15(決定2)により、line(台詞本文)が空文字(問い表示中)
+      // のときは描画されなくなった。会話ウィンドウ自体のスクロール確認(#124「解決の会話
+      // ウィンドウが窮屈」の回帰確認)は、誤答時の返答(reply)で実際に会話ウィンドウが描画
+      // される状態に対して行う(誤答直後に自動で開くヒントダイアログ=代表決定2026-09-15は、
+      // 会話ウィンドウの表示・スクロールには影響しない別要素のため、閉じずに確認してよい)。
+      await page.getByRole('button', { name: '公開サーバーの脆弱性を突かれた侵入' }).click()
       await expectNoWindowScroll(page)
 
       // 立ち絵(霧島)の頭が箱の上端で切れていない。

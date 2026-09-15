@@ -519,6 +519,118 @@ describe('ConversationFrame(#64/T042 タイプライター表示)', () => {
     })
   })
 
+  describe('名前箱(立ち絵の下・#138。旧・会話ウィンドウ左上の名札ピルを廃止)', () => {
+    it('通常の発話者は立ち絵の下の名前箱に表示され、会話ウィンドウ内には出ない(名前は1箇所だけ・#119)', () => {
+      render(
+        <ConversationFrame
+          speaker="橘"
+          speakerHistory={['霧島', '橘']}
+          line={LINE}
+          layout="overlay"
+        />,
+      )
+
+      // 立ち絵の下の名前箱: 発話中(橘)は可視、もう一方(霧島)は同寸法のまま不可視
+      // (invisible。位置が揺れないよう同寸法のまま残す、PortraitNameBoxのJSDoc参照)。
+      const nameBoxes = screen.getAllByTestId('portrait-name-box')
+      expect(nameBoxes).toHaveLength(2)
+      const visibleBox = nameBoxes.find((el) => el.getAttribute('aria-hidden') !== 'true')
+      const hiddenBox = nameBoxes.find((el) => el.getAttribute('aria-hidden') === 'true')
+      expect(visibleBox).toHaveTextContent('橘')
+      expect(hiddenBox).toHaveTextContent('霧島')
+
+      // 会話ウィンドウ内には名前が出ない(名前は1箇所だけ、#119。旧・会話ウィンドウ左上の
+      // 名札ピルは廃止した)。
+      const conversationWindow = screen.getByTestId('conversation-window')
+      expect(conversationWindow).not.toHaveTextContent('橘')
+      expect(conversationWindow).not.toHaveTextContent('霧島')
+    })
+
+    it('NPC発話時は会話ウィンドウ左上の名前箱にのみ表示され、立ち絵の下の名前箱はどちらも不可視のまま(#138のNPC専用位置)', () => {
+      render(
+        <ConversationFrame
+          speaker={{ npc: '中野' }}
+          speakerHistory={['霧島', '橘', { npc: '中野' }]}
+          line={LINE}
+          layout="overlay"
+        />,
+      )
+
+      const conversationWindow = screen.getByTestId('conversation-window')
+      expect(conversationWindow).toHaveTextContent('中野')
+
+      // NPC発話中は枠を動かさず両方グレーアウトするため(two-slot-frame.ts)、立ち絵の下の
+      // 名前箱はどちらも「いま話している側」ではない=不可視のまま(名前は会話ウィンドウ側の
+      // 1箇所だけ)。
+      const nameBoxes = screen.getAllByTestId('portrait-name-box')
+      expect(nameBoxes).toHaveLength(2)
+      for (const box of nameBoxes) {
+        expect(box).toHaveAttribute('aria-hidden', 'true')
+      }
+    })
+
+    it('stackedレイアウト(scenario.scenesが無いマップのフォールバック)でも同様に名前は1箇所だけ', () => {
+      render(<ConversationFrame speaker="橘" speakerHistory={['霧島', '橘']} line={LINE} />)
+
+      const nameBoxes = screen.getAllByTestId('portrait-name-box')
+      expect(nameBoxes).toHaveLength(2)
+      const visibleBox = nameBoxes.find((el) => el.getAttribute('aria-hidden') !== 'true')
+      expect(visibleBox).toHaveTextContent('橘')
+
+      const conversationWindow = screen.getByTestId('conversation-window')
+      expect(conversationWindow).not.toHaveTextContent('橘')
+      expect(conversationWindow).not.toHaveTextContent('霧島')
+    })
+  })
+
+  describe('会話ウィンドウが空のときは隠す(代表決定2026-09-15)', () => {
+    it('lineが空文字・NPC発話でもないときは会話ウィンドウ自体を描画しない(overlay)', () => {
+      render(
+        <ConversationFrame
+          speaker="橘"
+          speakerHistory={['霧島', '橘']}
+          line=""
+          layout="overlay"
+        />,
+      )
+
+      expect(screen.queryByTestId('conversation-window')).not.toBeInTheDocument()
+      // 立ち絵・名前箱の描画自体には影響しない(発話中の橘の名前箱は可視のまま)。
+      const nameBoxes = screen.getAllByTestId('portrait-name-box')
+      expect(nameBoxes).toHaveLength(2)
+      expect(nameBoxes.find((el) => el.getAttribute('aria-hidden') !== 'true')).toHaveTextContent(
+        '橘',
+      )
+    })
+
+    it('lineが空文字・NPC発話でもないときは会話ウィンドウ自体を描画しない(stacked)', () => {
+      render(<ConversationFrame speaker="霧島" speakerHistory={['霧島']} line="" />)
+
+      expect(screen.queryByTestId('conversation-window')).not.toBeInTheDocument()
+    })
+
+    it('lineが非空なら通常どおり会話ウィンドウを表示する', () => {
+      render(<ConversationFrame speaker="霧島" speakerHistory={['霧島']} line={LINE} layout="overlay" />)
+
+      expect(screen.getByTestId('conversation-window')).toBeInTheDocument()
+    })
+
+    it('lineが空文字でもNPC発話(名札のみ)のときは会話ウィンドウを表示する', () => {
+      render(
+        <ConversationFrame
+          speaker={{ npc: '中野' }}
+          speakerHistory={['霧島', { npc: '中野' }]}
+          line=""
+          layout="overlay"
+        />,
+      )
+
+      const conversationWindow = screen.getByTestId('conversation-window')
+      expect(conversationWindow).toBeInTheDocument()
+      expect(conversationWindow).toHaveTextContent('中野')
+    })
+  })
+
   describe('表情フォールバック(resolvePortraitSrc・#100/#102)', () => {
     it('該当表情のPNGが無ければneutralにフォールバックする(現在生成済みは3名ともneutralのみ)', () => {
       const neutral = resolvePortraitSrc('霧島', 'neutral')

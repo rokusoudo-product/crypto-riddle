@@ -18,8 +18,6 @@
 //   ためのゲートだった。問いの文を会話ウィンドウに出さなくなった(代表決定2026-09-15)ことで
 //   この問いの見出しはもとから静的テキスト(タイプライターなし)であり、ゲートの前提が無く
 //   なったため撤回した(resolve-screen.tsx参照)。
-// - 誤答フィードバック: 選択肢はパネルに残したまま、段階解説(explanations)を話者付きで
-//   このパネルに表示する(相手の返答=replyは会話ウィンドウ側、上記役割分担参照)。
 // - 選択肢の5状態: 通常/ホバー/フォーカス/押下/無効(index.cssの`resolve-choice`ユーティリティ、
 //   ホバーとキーボードのフォーカスで同じネオン光彩、prefers-reduced-motionでは光彩の
 //   アニメーションのみ止める)。各48px以上・素の<button>・Tab/Enter/Spaceで完遂できる。
@@ -33,98 +31,49 @@
 // XPバーをパネルの最上部に置くのは、DESIGN.md「縦長（9:16）の構成」節の「XPバー|選択パネルの
 // 上辺」を、横長・縦長どちらの縦積みでも満たすため(resolve-screen.tsx側にXPバー専用の
 // レイアウト分岐を増やさない。resolve-xp-bar.tsx冒頭コメント参照)。
-import { MessageCircleQuestion, TriangleAlert } from 'lucide-react'
-import { type ReactNode, type RefObject, useId } from 'react'
+//
+// 2026-09-15(代表決定・ヒントダイアログ化): 地の文(直前の正解への一言・誤答の段階解説・相談で
+// 開いたヒント・相談使い切りの注意)は、本パネル内の`FreeTextBlock`(旧実装。#134/#152/#154/
+// #138で縦長の高さ制約と繰り返し衝突した経緯はgit history参照)からモーダルのヒントダイアログ
+// (resolve-hint-dialog.tsx)へ完全に移した。本パネルはXPバー・問い・選択肢・相談ボタン・
+// 「解説を見る」ボタンだけの構成にし、地の文は一切表示しない(呼び出し側=resolve-screen.tsxが
+// 内容を計算し、ResolveHintDialogへ渡す)。「解説を見る」ボタンは、現在の問いに表示できる
+// 内容がある(hasHintContent)ときだけ出し、押すと同じ内容をもう一度開く。
+// interactionDisabled(ヒントダイアログ表示中)は選択肢・相談ボタン・「解説を見る」ボタンの
+// すべてを無効化する: 呼び出し側がラップするinert属性(実ブラウザでのクリック・フォーカス
+// 抑止)と二重の防御。jsdomはinert属性の実効果(pointer-events/フォーカス抑止)を再現しない
+// ため、単体テスト(「ダイアログ表示中は選択肢を押せない」)で確実に検証できるよう、disabled
+// 属性でも明示的にブロックする(advisor指摘)。
+import { BookOpenText, MessageCircleQuestion, TriangleAlert } from 'lucide-react'
+import { type RefObject, useId } from 'react'
 
-import type { ResolvedExplanation } from '@/ui/lib/explanation'
 import { cn } from '@/ui/lib/utils'
 import { CONSULT_XP_PENALTY } from '@/ui/store/save-integration'
 
 import { ResolveXpBar } from './resolve-xp-bar'
 
-/**
- * 地の文(直前の正解への一言・誤答の段階解説・相談で開いたヒント・相談使い切りの注意)専用の
- * ブロック(秘書レビュー2回目・2026-09-15・PR#151指摘の修正、秘書レビュー3回目・PR#152指摘の
- * 修正、秘書レビュー4回目・PR#154指摘の修正でさらに改訂)。
- *
- * 問い・選択肢・相談ボタン・XPバーは常に全体が見えるようにし、伸縮するのはこの地の文の部分
- * だけにする。パネル全体を`max-h`で切り詰めていた実装(相談ボタンが切れる不具合の原因)は
- * 撤回し、可変長になりうるテキストブロック単位で`max-h`+`overflow-y-auto`を掛ける方式にした。
- *
- * 秘書レビュー3回目(2026-09-15・PR#152): 段階解説は学習の中身そのものであり、1行程度の
- * スクロール欄に閉じ込めるのは不可という指摘を受け、優先順位を「1.問い・選択肢・相談ボタン
- * は常に全体表示 → 2.地の文は全文が読める(横長はスクロール無し、縦長も基本は全文表示) →
- * 3.立ち絵の大きさはできるだけ保つ(縦長で場所が足りなければ2を優先し縮んでよい)」に
- * 差し替えた。横長は場所に余裕があるため上限を外し常に全文表示、縦長は基本は全文表示の
- * まま収まるよう、上限を4〜5行相当(24cqh)まで引き上げた(どうしても入らない長さの
- * ときだけ欄内でスクロールする)。
- *
- * 秘書レビュー4回目(2026-09-15・PR#154): 縦長では、誤答の段階解説・相談ヒント・相談使い切りの
- * 注意が同時に表示される状態で、地の文ブロックがそれぞれ独立に最大24cqhを取っていたため
- * 合計height(最大72cqh超)がパネルを押し上げ、立ち絵がほぼ消える・パネルが右上のボタン群に
- * 重なる不具合が見つかった。縦長のみ、地の文(直前の正解への一言/誤答の段階解説・相談ヒント・
- * 相談使い切りの注意)を本コンポーネント自体を1回だけ使って1つの領域にまとめる方式へ
- * 変更した(ResolveChoicePanel参照。横長は個別ブロックのまま変更なし)。
- *
- * 縦長の上限値(`portraitMaxHeightClassName`、既定12cqh=約2〜3行相当): 実測(PR#154本文参照)で
- * 立ち絵の枠を「問い1表示時の高さの50%以上」に保つには、誤答の段階解説1件だけの状態でも
- * 24cqh(旧上限)では余白が足りないことが分かったため、より小さい上限に変更した。1つの文が
- * 上限を超える場合はその領域内でスクロールする(#152の「1つの文だけなら全文が出る」は、
- * 内容が上限に収まる範囲で保たれる。上限自体は縦長の高さ制約から来る妥協点であり、DESIGN.md
- * の優先順位「1.問い・選択肢・相談ボタン→2.地の文→3.立ち絵」に、本PRの必須条件
- * 「立ち絵は50%以上」を両立させるための調整値)。 */
-function FreeTextBlock({
-  children,
-  className,
-  role,
-  boxOrientation,
-  portraitMaxHeightClassName = 'max-h-[7.5cqh] overflow-y-auto',
-}: {
-  children: ReactNode
-  className?: string
-  role?: string
-  boxOrientation: 'landscape' | 'portrait'
-  /** 縦長のときに適用する上限クラス(既定12cqh)。個別ブロック用途では使われず(landscapeのみ
-   * だったため)、#154の縦長merged region専用に導入した。 */
-  portraitMaxHeightClassName?: string
-}) {
-  return (
-    <div
-      role={role}
-      className={cn(
-        // 横長: 場所に余裕があるため上限を外し、常にスクロール無しで全文表示する
-        // (秘書レビュー3回目・PR#152の代表判断)。
-        // 縦長: 立ち絵50%以上を保つための上限(上記コメント参照)。超える場合のみ欄内で
-        // スクロールする。
-        boxOrientation === 'landscape' ? '' : portraitMaxHeightClassName,
-        className,
-      )}
-    >
-      {children}
-    </div>
-  )
-}
-
 export interface ResolveChoicePanelProps {
   className?: string
-  /** 背景の箱の向き(#134・秘書レビュー3回目・PR#152)。地の文(FreeTextBlock)の高さの
-   * 扱いを横長・縦長で分けるために使う(横長=上限なし、縦長=24cqh)。 */
+  /** 背景の箱の向き(#134・秘書レビュー3回目・PR#152)。縦長/横長でXPバーのcompact表示等を
+   * 切り替えるために使う。 */
   boxOrientation: 'landscape' | 'portrait'
   /** 問い(キャラの台詞、resolution.questions[].prompt)。会話ウィンドウのタイプライターとは
    * 独立した静的テキストとして常に表示する(上記コメント参照)。 */
   prompt: string
-  /** 直前の問いの正解時の一言(あれば)。新しい問いの上に一言添える(#42/#46からの既存挙動)。 */
-  priorCorrectReply?: string | null
   choices: readonly { readonly text: string }[]
   onSelectChoice: (index: number) => void
-  /** 誤答時の段階解説(話者付き)。相手の返答(reply)は会話ウィンドウ側で表示するため、
-   * このパネルには含めない(役割分担、上記コメント参照)。 */
-  wrongExplanation?: ResolvedExplanation | null
   consultRemaining: number
   consultDisabled: boolean
   onConsult: () => void
-  /** 相談で開いたヒント(あれば)。 */
-  hintText?: string | null
+  /** ヒントダイアログに表示できる内容(誤答の段階解説・相談ヒント・相談使い切りの注意・直前の
+   * 正解への一言)が現在の問いにあるかどうか(代表決定2026-09-15)。trueのときだけ「解説を見る」
+   * ボタンを表示する(resolve-screen.tsxがResolveHintDialogへ渡すentriesと同じ判定を共有する)。 */
+  hasHintContent: boolean
+  /** 「解説を見る」ボタン押下時に呼ぶ(resolve-screen.tsx側でヒントダイアログをopenにする)。 */
+  onOpenHint: () => void
+  /** ヒントダイアログ表示中(背景暗転中)は選択肢・相談ボタン・「解説を見る」ボタンをすべて
+   * 無効化する(上記コメント参照)。省略時はfalse(無効化しない)。 */
+  interactionDisabled?: boolean
   /** 新しい問いが表示されるたびに最初の選択肢へフォーカスを移すための参照
    * (resolve-screen.tsx参照)。 */
   firstChoiceRef?: RefObject<HTMLButtonElement | null>
@@ -137,20 +86,20 @@ export interface ResolveChoicePanelProps {
   maxXp: number
 }
 
-/** 解決⑤の中央選択パネル(XPバー＋問い＋選択肢＋相談ボタン、DESIGN.md「解決の会話モード」節・
- * 「XPバー」節・#134/#135)。 */
+/** 解決⑤の中央選択パネル(XPバー＋問い＋選択肢＋相談ボタン＋解説を見るボタン、DESIGN.md
+ * 「解決の会話モード」節・「XPバー」節・#134/#135/代表決定2026-09-15)。 */
 export function ResolveChoicePanel({
   className,
   boxOrientation,
   prompt,
-  priorCorrectReply,
   choices,
   onSelectChoice,
-  wrongExplanation,
   consultRemaining,
   consultDisabled,
   onConsult,
-  hintText,
+  hasHintContent,
+  onOpenHint,
+  interactionDisabled = false,
   firstChoiceRef,
   estimatedXp,
   maxXp,
@@ -159,50 +108,6 @@ export function ResolveChoicePanel({
   const consultRemainingClamped = Math.max(consultRemaining, 0)
   const isPortrait = boxOrientation === 'portrait'
 
-  // 地の文の中身(秘書レビュー4回目・PR#154): 縦長では1つの領域にまとめて表示するため、
-  // ノードを先に組み立てておく(横長は従来どおり個別のFreeTextBlockとしてそのままの位置に
-  // 表示する。下記JSX参照)。priorCorrectReplyとwrongExplanationは
-  // lastAnswerFeedback.correctがtrue/falseの排他状態から来るため同時には発生しない。
-  //
-  // 縦長のみtext-xs(DESIGN.mdタイポグラフィのスケール12/14/16/20/24/32の最小段)に縮める
-  // (秘書レビュー4回目・PR#154): 立ち絵50%以上の必須条件を満たすための調整(実測はPR本文参照。
-  // 横長はtext-smのまま変更なし)。
-  const freeTextClass = cn('text-muted-foreground', isPortrait ? 'text-xs leading-snug' : 'text-sm')
-
-  const priorCorrectNode = priorCorrectReply ? (
-    <p className={freeTextClass}>{priorCorrectReply}</p>
-  ) : null
-
-  const wrongExplanationNode = wrongExplanation ? (
-    <p className={freeTextClass}>
-      <span className="font-semibold">{wrongExplanation.character}</span>「{wrongExplanation.line}」
-    </p>
-  ) : null
-
-  // 相談ヒント(秘書レビュー4回目・PR#154指摘の修正=修正3): 枠線・背景付きの箱だと選択肢
-  // ボタンと見分けが付きにくい(#152で直した「その通りだ、新人…」と同じ問題)。枠線・背景を
-  // やめ、アイコン(相談ボタンと同じMessageCircleQuestion)＋「相談：」の見出しを付けた
-  // 地の文にして、選択肢とは明確に区別しつつ読みやすさ(コントラスト)は保つ
-  // (text-muted-foregroundはglass-panel上で検証済み、scripts/check-contrast.mjs参照)。
-  const hintNode = hintText ? (
-    <div role="status" className="flex items-start gap-2">
-      <MessageCircleQuestion
-        aria-hidden="true"
-        className={cn('text-muted-foreground mt-0.5 shrink-0', isPortrait ? 'size-3.5' : 'size-4')}
-      />
-      <p className={freeTextClass}>
-        <span className="font-semibold">相談：</span>
-        {hintText}
-      </p>
-    </div>
-  ) : null
-
-  const disabledReasonNode = consultDisabled ? (
-    <p id={consultDisabledReasonId} className={freeTextClass}>
-      相談はこのマップで使い切りました（マップ単位3回まで）。
-    </p>
-  ) : null
-
   return (
     <div
       data-testid="resolve-choice-panel"
@@ -210,9 +115,8 @@ export function ResolveChoicePanel({
         // コントロールパネル風の半透明パネル(glass-panel、DESIGN.md「半透明（ガラス風）
         // パネル」節)。primaryの枠でコンソールらしさを出す(会話ウィンドウのborder-t-4と
         // 揃え、上下左右を枠で囲む点のみ差別化する)。
-        // 縦長のみgap-2に詰める(秘書レビュー4回目・PR#154): 立ち絵50%以上の必須条件を
-        // 満たすため、パネル内の各要素間の余白をわずかに削って縦の専有を減らす
-        // (横長はgap-3 sm:gap-4のまま変更なし)。
+        // 縦長のみgap-2に詰める(秘書レビュー4回目・PR#154): パネル内の各要素間の余白を
+        // わずかに削って縦の専有を減らす(横長はgap-3 sm:gap-4のまま変更なし)。
         'glass-panel border-primary/60 flex w-full flex-col rounded-lg border p-3 shadow-lg',
         isPortrait ? 'gap-2' : 'gap-3 sm:gap-4 sm:p-4',
         className,
@@ -224,19 +128,13 @@ export function ResolveChoicePanel({
       <ResolveXpBar
         estimatedXp={estimatedXp}
         maxXp={maxXp}
-        // 縦長は場所が非常に限られる(#152の優先順位を崩さないこと・#135のスコープ注記)ため、
-        // ラベル文+数値の行を省き、バーと数値を1行にまとめて縦の専有を抑える
-        // (resolve-xp-bar.tsxのcompact参照。GameTimeBadgeのcompactと同じ考え方)。
+        // 縦長は場所が非常に限られるため、ラベル文+数値の行を省き、バーと数値を1行に
+        // まとめて縦の専有を抑える(resolve-xp-bar.tsxのcompact参照。GameTimeBadgeの
+        // compactと同じ考え方)。
         compact={boxOrientation === 'portrait'}
       />
 
       <p className="font-heading text-sm leading-relaxed sm:text-base">{prompt}</p>
-
-      {/* 横長: 従来どおり、直前の正解への一言を選択肢の直前に個別ブロックで表示する
-          (秘書レビュー4回目・PR#154「横長は今のまま変えない」)。 */}
-      {!isPortrait && priorCorrectNode && (
-        <FreeTextBlock boxOrientation={boxOrientation}>{priorCorrectNode}</FreeTextBlock>
-      )}
 
       <ul className="flex flex-col gap-2">
         {choices.map((choice, index) => (
@@ -244,6 +142,7 @@ export function ResolveChoicePanel({
             <button
               type="button"
               ref={index === 0 ? firstChoiceRef : undefined}
+              disabled={interactionDisabled}
               onClick={() => onSelectChoice(index)}
               className={cn(
                 'resolve-choice h-auto min-h-12 w-full rounded-lg px-4 py-3 text-left text-sm leading-relaxed whitespace-normal sm:text-base',
@@ -255,47 +154,20 @@ export function ResolveChoicePanel({
         ))}
       </ul>
 
-      {/* 横長: 従来どおり、誤答の段階解説を選択肢の直後に個別ブロックで表示する。 */}
-      {!isPortrait && wrongExplanationNode && (
-        <FreeTextBlock boxOrientation={boxOrientation}>{wrongExplanationNode}</FreeTextBlock>
-      )}
-
-      {/* 縦長(秘書レビュー4回目・PR#154指摘の修正=修正1・修正2): 地の文(直前の正解への
-          一言・誤答の段階解説・相談ヒント・相談使い切りの注意)を1つの領域にまとめ、
-          合計で12cqh程度に抑える(個別に最大24cqhずつ積み上がっていた旧実装は縦長で
-          立ち絵がほぼ消える・パネルが右上のボタン群に重なる不具合の原因だったため、
-          1つのFreeTextBlock(内部でoverflow-y-auto)にまとめて合計の縦専有を固定した。
-          上限値の実測根拠はFreeTextBlockのコメント参照)。選択肢・相談ボタン・XPバーは
-          この領域の外にあるため常に全体が見える。 */}
-      {/* 表示順(縦長のみ): hintNode・disabledReasonNodeを先頭に置く。領域が上限を超えて
-          スクロール可能になったとき、既定のスクロール位置は先頭(=最新の操作結果)になる
-          ようにするため(相談直後にhintNodeが末尾にあると、スクロールしないと見えない
-          位置に隠れてしまう不具合を秘書レビュー4回目・PR#154の実機確認で発見)。
-          priorCorrectNode/wrongExplanationNodeは前の問い/前回の試行の文脈のため、
-          スクロールしないと見えなくても実害が小さい(既に一度表示済みの情報)。 */}
-      {isPortrait &&
-        (priorCorrectNode || wrongExplanationNode || hintNode || disabledReasonNode) && (
-          <FreeTextBlock boxOrientation={boxOrientation} className="flex flex-col gap-1">
-            {hintNode}
-            {disabledReasonNode}
-            {priorCorrectNode}
-            {wrongExplanationNode}
-          </FreeTextBlock>
-        )}
-
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-4">
           {/* 相談ボタン(#135・DESIGN.md「相談ボタン」節): 残り回数をカウンタアイコン
               (数字付きバッジ)、XPが減ることを警告アイコン(TriangleAlert)で示す。
               色だけに頼らず、可視テキスト(バッジの数字・「XP-15」表記)でも同じ情報を
               伝え、aria-labelにも「相談する・残りn回・使うとXPが15減る」相当を持たせる
-              (WCAG 1.4.1)。0回のときはdisabled(既存のconsultDisabled)のまま、理由の
-              表示(aria-describedby先の<p>。縦長ではdisabledReasonNodeとして上の
-              地の文領域内、横長では直下に表示。id自体はconsultDisabledReasonIdで
-              どちらの場合も同じなのでaria-describedbyの参照先は変わらない)も維持する。 */}
+              (WCAG 1.4.1)。0回のとき、またはヒントダイアログ表示中はdisabledにする
+              (interactionDisabled、上記コメント参照)。理由の表示(aria-describedby先の
+              <p>)は、地の文がダイアログへ移ったことに伴い可視表示は無くしたが、
+              aria-describedbyの参照先自体は残す(sr-only、下記参照。相談ボタン単体に
+              フォーカスした際もスクリーンリーダーで理由が読めるようにするため)。 */}
           <button
             type="button"
-            disabled={consultDisabled}
+            disabled={consultDisabled || interactionDisabled}
             aria-describedby={consultDisabled ? consultDisabledReasonId : undefined}
             aria-label={`相談する・残り${consultRemainingClamped}回・使うとXPが${CONSULT_XP_PENALTY}減る`}
             onClick={onConsult}
@@ -316,11 +188,27 @@ export function ResolveChoicePanel({
               XP−{CONSULT_XP_PENALTY}
             </span>
           </button>
-          {/* 横長: 従来どおり、相談ボタンの直後に理由文を表示する。 */}
-          {!isPortrait && disabledReasonNode}
+          {consultDisabled && (
+            <p id={consultDisabledReasonId} className="sr-only">
+              相談はこのマップで使い切りました（マップ単位3回まで）。
+            </p>
+          )}
+          {/* 「解説を見る」ボタン(代表決定2026-09-15): 誤答の段階解説・相談ヒント・相談
+              使い切りの注意・直前の正解への一言のいずれかが現在の問いにあるときだけ表示する
+              (hasHintContent)。押すとヒントダイアログ(resolve-hint-dialog.tsx)が同じ内容で
+              再度開く。 */}
+          {hasHintContent && (
+            <button
+              type="button"
+              disabled={interactionDisabled}
+              onClick={onOpenHint}
+              className="border-border hover:bg-secondary focus-visible:ring-ring inline-flex h-12 min-w-12 items-center gap-2 rounded-lg border px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-3 focus-visible:outline-none sm:px-6"
+            >
+              <BookOpenText aria-hidden="true" className="size-5" />
+              解説を見る
+            </button>
+          )}
         </div>
-        {/* 横長: 従来どおり、ボタン行の下に相談ヒントを個別ブロックで表示する。 */}
-        {!isPortrait && hintNode}
       </div>
     </div>
   )

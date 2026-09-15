@@ -62,6 +62,19 @@ async function skipTypewriter(page: import('@playwright/test').Page, line: strin
 }
 
 /**
+ * ヒントダイアログ(代表決定2026-09-15)を閉じる共通手順。誤答直後・相談直後(使い切り含む)・
+ * 正解直後(次の問いがある場合)に自動で開くため、これらの操作の直後に呼ぶ。表示中は背景
+ * (選択パネル・会話ウィンドウ・立ち絵・右上のボタン群)がinert化されaria-hiddenになる
+ * (resolve-screen.tsx参照)ため、閉じるまではrole基準のクエリで背景の要素を引けない
+ * (getByTextベースの文言確認は影響を受けない)。
+ */
+async function closeHintDialog(page: import('@playwright/test').Page): Promise<void> {
+  await expect(page.getByRole('dialog', { name: '解説' })).toBeVisible()
+  await page.getByRole('button', { name: '閉じる' }).click()
+  await expect(page.getByRole('dialog', { name: '解説' })).toBeHidden()
+}
+
+/**
  * マップ選択でS1「標的型メールからの侵入」を選ぶ(2026-09-11(#74)以降、store.scenariosに
  * S2「VPN装置の脆弱性放置とランサムウェア感染」も並ぶため、単純な
  * `getByRole('button', { name: 'マップを選ぶ' })` は両マップの行にヒットしstrict modeで
@@ -144,12 +157,13 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
       })
       .click()
 
-    // q-initial-response(橘)へ進む。正解時の一言(reply)が新しい問いの上に表示される
-    // (誤答肢の reply 本執筆(#46/T035)により、この reply も本 PR で新規に追加した内容)。
+    // q-initial-response(橘)へ進む。正解時の一言(reply)は、代表決定2026-09-15により
+    // 自動で開くヒントダイアログに表示され、閉じるまで次の問いの選択肢は操作できない。
     await expect(page.getByText('感染が疑われる端末への初動対応は？')).toBeVisible()
     await expect(
       page.getByText('その通りだ、新人。フィッシングメールの実在', { exact: false }),
     ).toBeVisible()
+    await closeHintDialog(page)
     await page
       .getByRole('button', {
         name: 'ネットワークから論理的に隔離し(LANケーブル抜線・無線LAN無効化)、電源は落とさず揮発性メモリとディスクの証拠を保全する',
@@ -249,6 +263,9 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
       })
       .click()
     await expect(page.getByText('感染が疑われる端末への初動対応は？')).toBeVisible()
+    // 直前の正解への一言(代表決定2026-09-15)はヒントダイアログに自動で開く。閉じるまでは
+    // 次の問いの選択肢は操作できない。
+    await closeHintDialog(page)
 
     // わざと「電源を直ちに落とす」対策(教育的失敗の分岐)を選ぶ。
     const shutdownChoice = page.getByRole('button', {
@@ -256,8 +273,9 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
     })
     await shutdownChoice.click()
 
-    // 誤答フォロー: 揮発性メモリの証拠喪失が解説され、問い文・選択肢は残ったまま再挑戦できる
-    // (⑥失敗解説の独立画面は廃止済み。会話モード内で完結する)。
+    // 誤答フォロー: 相手の返答(reply)は引き続き会話ウィンドウにタイプライターで表示される
+    // (変更なし)。段階解説(explanations)は代表決定2026-09-15により、誤答直後に自動で開く
+    // ヒントダイアログへ移った(⑥失敗解説の独立画面は廃止済み。会話モード内で完結する)。
     await expect(
       page.getByText('電源を切れば、証拠になり得る揮発性メモリの情報が失われるわ', {
         exact: false,
@@ -265,14 +283,19 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
     ).toBeVisible()
     // 段階解説(explanations)は話者付きオブジェクト(台本v2.2/#100/#103: 霧島→橘の2段)。
     // このq-initial-responseの出題キャラは橘だが、1回目の誤答で表示されるのは
-    // explanations[0](霧島)であることを、名札込みの表示(「{character}「{line}」」、
-    // resolve-screen.tsxがexplanation.lib/explanation.tsのresolveExplanationを使う)で確認する。
+    // explanations[0](霧島)であることを、名札込みの見出し(ヒントダイアログの見出し、
+    // resolve-screen.tsxのcomputeHintEntriesがexplanation.lib/explanation.tsの
+    // resolveExplanationを使う)で確認する。
+    await expect(page.getByRole('dialog', { name: '解説' })).toBeVisible()
     await expect(
-      page.getByText('霧島「揮発性メモリには、動作中のプロセスや通信先が乗っている', {
+      page.getByText('揮発性メモリには、動作中のプロセスや通信先が乗っている', {
         exact: false,
       }),
     ).toBeVisible()
     await expect(page.getByText('感染が疑われる端末への初動対応は？')).toBeVisible()
+
+    // ヒントダイアログを閉じると、問い文・選択肢は残ったまま再挑戦できる。
+    await closeHintDialog(page)
     await expect(shutdownChoice).toBeVisible()
 
     // 再挑戦で正しい初動(論理的隔離)を選べばクリアできる。

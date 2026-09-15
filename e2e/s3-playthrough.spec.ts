@@ -20,6 +20,16 @@ async function skipTypewriter(page: import('@playwright/test').Page, line: strin
   await page.getByRole('button', { name: line, exact: true }).click()
 }
 
+/**
+ * ヒントダイアログ(代表決定2026-09-15)を閉じる共通手順(e2e/s1-playthrough.spec.tsと対)。
+ * 誤答直後・正解直後(次の問いがある場合)に自動で開くため、これらの操作の直後に呼ぶ。
+ */
+async function closeHintDialog(page: import('@playwright/test').Page): Promise<void> {
+  await expect(page.getByRole('dialog', { name: '解説' })).toBeVisible()
+  await page.getByRole('button', { name: '閉じる' }).click()
+  await expect(page.getByRole('dialog', { name: '解説' })).toBeHidden()
+}
+
 /** マップ選択でS3「ECサイトのカード情報漏洩」を選ぶ(S1/S2と3件並ぶため、一覧行(li)を
  * タイトルの文言で絞り込んでから押す。e2e/s1-playthrough.spec.ts の selectS1Map・
  * e2e/s2-playthrough.spec.ts の selectS2Map と対)。 */
@@ -205,6 +215,9 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     ).toBeVisible()
     // 問いの文は中央選択パネルだけに出る(代表決定2026-09-15・会話ウィンドウには出さない)。
     await expect(page.getByText(entryPrompt)).toBeVisible()
+
+    // 誤答直後はヒントダイアログが自動で開く。閉じると問い・選択肢は残ったまま再挑戦できる。
+    await closeHintDialog(page)
     await expect(sqliChoice).toBeVisible()
 
     // 再挑戦で正しい起点(フォームジャッキング)を選ぶ。
@@ -216,6 +229,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
 
     const immediatePrompt = '決済ページの改ざんが確認できました。技術的にまず取るべき対応は？'
     await expect(page.getByText(immediatePrompt)).toBeVisible()
+    // 直前の正解への一言(代表決定2026-09-15)はヒントダイアログに自動で開く。
+    await closeHintDialog(page)
     await page
       .getByRole('button', {
         name: '決済ページを一時停止するかカード決済の受付を止め、改ざんされたファイルと通信先を保全した上で、脆弱性のあるプラグインを修正してから正規のファイルに戻す',
@@ -224,6 +239,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
 
     const policyPrompt = 'クレジットカード情報の漏えいが濃厚な状況です。今後の対応方針は？'
     await expect(page.getByText(policyPrompt)).toBeVisible()
+    await closeHintDialog(page)
     await page
       .getByRole('button', {
         name: 'カード会社・決済代行事業者へ速やかに連絡するとともに、個人データの漏えいのおそれがある以上、個人情報保護委員会への報告要否を速やかに判断し、必要な範囲で本人への通知も行う',
@@ -287,6 +303,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
 
     const immediatePrompt = '決済ページの改ざんが確認できました。技術的にまず取るべき対応は？'
     await expect(page.getByText(immediatePrompt)).toBeVisible()
+    // 直前の正解への一言(代表決定2026-09-15)はヒントダイアログに自動で開く。
+    await closeHintDialog(page)
     await page
       .getByRole('button', {
         name: '決済ページを一時停止するかカード決済の受付を止め、改ざんされたファイルと通信先を保全した上で、脆弱性のあるプラグインを修正してから正規のファイルに戻す',
@@ -295,6 +313,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
 
     const policyPrompt = 'クレジットカード情報の漏えいが濃厚な状況です。今後の対応方針は？'
     await expect(page.getByText(policyPrompt)).toBeVisible()
+    await closeHintDialog(page)
     await page
       .getByRole('button', {
         name: 'カード会社・決済代行事業者へ速やかに連絡するとともに、個人データの漏えいのおそれがある以上、個人情報保護委員会への報告要否を速やかに判断し、必要な範囲で本人への通知も行う',
