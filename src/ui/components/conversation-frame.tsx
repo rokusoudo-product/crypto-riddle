@@ -205,18 +205,32 @@ const SPEAKER_FRAME_RING_CLASS = SPEAKER_FRAME_RING_CLASS_BY_COLOR[SPEAKER_FRAME
  * (#119/#124: 旧実装は立ち絵カードの下にも同じ名札を重複表示しており、二重表示になっていた。
  * 立ち絵側はaltテキスト(発話中/待機中)のみで発話者を示し、可視の名札はウィンドウ側に一本化する)。
  *
- * 代表指示(2026-09-15): 名札が会話ウィンドウの幅いっぱいに伸びて長すぎるため、幅を
- * 約4分の1に縮め左詰めにする。原因は親要素(windowContentの`flex flex-col gap-2`)の
- * flexboxデフォルト(align-items: stretch)で、<span>が本来はインライン要素でも
- * flexアイテムとしてクロス軸(=幅)いっぱいに引き伸ばされていたため。`self-start`で
- * このアイテムだけstretchを打ち消し、`w-1/4`で会話ウィンドウ内側の幅の約4分の1にする。
- * `min-w-fit`は、長い名前(例:「経理部長 夏目」)が4分の1幅より広い場合でも折り返し・
- * 省略されないよう、テキストの内在幅を下限として保証する。 */
-function NamePlate({ label, speaking }: { label: string; speaking: boolean }) {
+ * 代表指示(2026-09-15): 名札が会話ウィンドウの幅いっぱいに伸びて長すぎるため、幅を縮め
+ * 左詰めにする。原因は親要素(windowContentの`flex flex-col gap-2`)のflexboxデフォルト
+ * (align-items: stretch)で、<span>が本来はインライン要素でもflexアイテムとしてクロス軸
+ * (=幅)いっぱいに引き伸ばされていたため。`self-start`でこのアイテムだけstretchを
+ * 打ち消す。
+ *
+ * 代表指示・第2回(2026-09-15): 縦長は約4分の1(`w-1/4`)のまま維持し、横長はさらに半分の
+ * 約8分の1(`w-1/8`、1280×800で約150px)にする。横長・縦長の判定は画面幅のブレークポイント
+ * ではなく、背景の箱の向き(呼び出し側の`boxOrientation` prop、DESIGN.md「背景の箱」節の
+ * 既存の仕組み=画面幅ではなくorientationで判定)に合わせる(タブレットを横に持ったときも
+ * 横長扱いになる)。`min-w-fit`は両orientationで維持し、長い名前(例:「経理部長 夏目」)が
+ * 幅より広い場合でも折り返し・省略されないよう、テキストの内在幅を下限として保証する。 */
+function NamePlate({
+  label,
+  speaking,
+  boxOrientation,
+}: {
+  label: string
+  speaking: boolean
+  boxOrientation: BoxOrientation
+}) {
   return (
     <span
       className={cn(
-        'self-start w-1/4 min-w-fit rounded-full font-semibold',
+        'self-start min-w-fit rounded-full font-semibold',
+        boxOrientation === 'landscape' ? 'w-1/8' : 'w-1/4',
         'px-3 py-0.5 text-xs',
         speaking
           ? 'bg-primary text-primary-foreground'
@@ -623,7 +637,7 @@ export function ConversationFrame({
   const windowContent = (
     <>
       <div className="flex flex-col gap-2">
-        <NamePlate label={label} speaking />
+        <NamePlate label={label} speaking boxOrientation={boxOrientation} />
         {isComplete ? (
           <p className="font-heading text-base leading-relaxed sm:text-lg">{line}</p>
         ) : onDismiss ? (
