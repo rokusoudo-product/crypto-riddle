@@ -175,22 +175,41 @@ export function IntroScreen() {
                 いつでも押せ、即座に導入全体を飛ばして探索へ進む。既存の導線を壊さない)と
                 ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節・#149秘書レビュー2回目・
                 代表決定2026-09-15「画面右上、ボタン群と同じ行でボタンの左隣。入らなければ
-                ボタン群のすぐ下に右寄せ」)を同じ行に並べる(game_time省略時はGameTimeBadgeが
-                nullを返し何も表示しない)。ConversationFrameの外側の兄弟要素のため、
-                クリックがdismissAnywhere側の進行処理と二重発火することはない。 */}
-            <div className="absolute top-2 right-2 z-30 flex flex-wrap items-center justify-end gap-2">
-              <GameTimeBadge
-                gameTime={scenario.intro.game_time}
-                compact={boxOrientation === 'portrait'}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="bg-card hover:bg-muted dark:bg-card dark:hover:bg-muted h-12 min-w-12 px-6 shadow-sm"
-                onClick={handleAdvance}
-              >
-                SKIP
-              </Button>
+                ボタン群のすぐ下に右寄せ」)を並べる(game_time省略時はGameTimeBadgeがnullを
+                返し何も表示しない)。ConversationFrameの外側の兄弟要素のため、クリックが
+                dismissAnywhere側の進行処理と二重発火することはない。
+                秘書レビュー3回目(2026-09-15)指摘: 縦長は会社紹介パネル(箱の左上・
+                `max-w-[min(70%,32rem)]`で画面幅の70%まで伸びうる)が横長より広い割合を占め、
+                右上ボタン群を1行(バッジ+SKIP)のまま右寄せしても、バッジの左端がパネルの右端の
+                内側に入り込んで見出し行と重なっていた。縦長のみSKIPを単独の行にし、
+                バッジはその**すぐ下に右寄せ**で2段目に置く(横長は従来どおり同じ行でよいと
+                確認済みのため変更しない)。 */}
+            <div className="absolute top-2 right-2 z-30 flex flex-col items-end gap-2">
+              {boxOrientation === 'landscape' ? (
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <GameTimeBadge gameTime={scenario.intro.game_time} />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="bg-card hover:bg-muted dark:bg-card dark:hover:bg-muted h-12 min-w-12 px-6 shadow-sm"
+                    onClick={handleAdvance}
+                  >
+                    SKIP
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="bg-card hover:bg-muted dark:bg-card dark:hover:bg-muted h-12 min-w-12 px-6 shadow-sm"
+                    onClick={handleAdvance}
+                  >
+                    SKIP
+                  </Button>
+                  <GameTimeBadge gameTime={scenario.intro.game_time} compact />
+                </>
+              )}
             </div>
 
             {/* 台詞送り(#108/#110): 「タップで進行」ボタンは廃止し、探索と同じく画面のどこを
