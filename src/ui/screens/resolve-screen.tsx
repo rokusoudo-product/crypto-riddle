@@ -200,11 +200,16 @@ export function ResolveScreen() {
         // 相談ボタンが半分隠れる不具合になった。パネル自体の上限は撤回し、可変長になりうる
         // 地の文(直前の正解への一言・誤答の段階解説・相談ヒント)だけを
         // ResolveChoicePanel内部のFreeTextBlockで個別にmax-h+overflow-y-autoにする方式へ
-        // 変更した(問い・選択肢・相談ボタンは常に全体が見える)。立ち絵が縮まない・ページに
-        // 縦スクロールが出ない条件は、地の文の伸びが小さいブロック単位の上限で抑えられて
-        // いることで維持される(PR本文の実測値参照)。
+        // 変更した(問い・選択肢・相談ボタンは常に全体が見える)。
+        // 秘書レビュー3回目(2026-09-15・PR#152)指摘の修正: 地の文(段階解説)は学習の中身
+        // そのものであり、1行程度のスクロール欄に閉じ込めるのは不可との指摘を受け、
+        // FreeTextBlock側の上限を横長=無し・縦長=24cqh(4〜5行相当)へ引き上げた
+        // (boxOrientation propとして渡す、下記参照)。立ち絵の大きさは優先順位3位に
+        // 後退し、縦長の誤答直後など場所が足りない場面では縮んでよい(ページの縦スクロール
+        // 無しは維持。実測値はPR本文参照)。
         resolveBoxOrientationValue === 'landscape' ? 'w-[52cqw]' : 'w-full'
       }
+      boxOrientation={resolveBoxOrientationValue}
       prompt={question.prompt}
       priorCorrectReply={
         progress.lastAnswerFeedback?.correct === true

@@ -33,31 +33,43 @@ import { cn } from '@/ui/lib/utils'
 
 /**
  * 地の文(直前の正解への一言・誤答の段階解説・相談で開いたヒント)専用のブロック
- * (秘書レビュー2回目・2026-09-15・PR#151指摘の修正)。
+ * (秘書レビュー2回目・2026-09-15・PR#151指摘の修正、秘書レビュー3回目・PR#152指摘の
+ * 修正でさらに改訂)。
  *
- * 問い・選択肢・相談ボタンは縦長でパネルの高さに上限を付けても常に全体が見えるようにし、
- * 伸縮するのはこの地の文の部分だけにする。パネル全体を`max-h`で切り詰めていた前回の実装
- * (相談ボタンが切れる不具合の原因)は撤回し、可変長になりうるテキストブロック単位で
- * `max-h`+`overflow-y-auto`を掛ける方式に変更した。
+ * 問い・選択肢・相談ボタンは常に全体が見えるようにし、伸縮するのはこの地の文の部分だけに
+ * する。パネル全体を`max-h`で切り詰めていた実装(相談ボタンが切れる不具合の原因)は撤回し、
+ * 可変長になりうるテキストブロック単位で`max-h`+`overflow-y-auto`を掛ける方式にした。
  *
- * 3cqh(縦長390×844の実機計測で約20px、本文1行の半分程度)という小さい値にしている理由:
- * 問い＋選択肢3個＋相談ボタン(常時全体表示・実測約47cqh)に加え、誤答時は会話ウィンドウの
- * 返答(reply)もタイプライター表示で伸びる(#124の既存設計により会話ウィンドウは`shrink-0`
- * で縮めない)。縦長の箱の高さ予算(100cqh)から右上ボタンのオフセット・返答表示中の会話
- * ウィンドウ・立ち絵の取り分を差し引くと、この地の文ブロックに残せる余裕は数cqh程度しか
- * 無い(秘書レビュー2回目・PR#151の実測値参照)。「場所が足りない場合は地の文の上限を
- * 小さくする」(代表・秘書了承済み)の対応として、常にスクロール前提の値まで詰めている。 */
+ * 秘書レビュー3回目(2026-09-15・PR#152): 段階解説は学習の中身そのものであり、1行程度の
+ * スクロール欄に閉じ込めるのは不可という指摘を受け、優先順位を「1.問い・選択肢・相談ボタン
+ * は常に全体表示 → 2.地の文は全文が読める(横長はスクロール無し、縦長も基本は全文表示) →
+ * 3.立ち絵の大きさはできるだけ保つ(縦長で場所が足りなければ2を優先し縮んでよい)」に
+ * 差し替えた。横長は場所に余裕があるため上限を外し常に全文表示、縦長は基本は全文表示の
+ * まま収まるよう、上限を4〜5行相当(24cqh)まで引き上げた(どうしても入らない長さの
+ * ときだけ欄内でスクロールする)。立ち絵の縮み具合の実測はPR本文参照。 */
 function FreeTextBlock({
   children,
   className,
   role,
+  boxOrientation,
 }: {
   children: ReactNode
   className?: string
   role?: string
+  boxOrientation: 'landscape' | 'portrait'
 }) {
   return (
-    <div role={role} className={cn('max-h-[3cqh] overflow-y-auto', className)}>
+    <div
+      role={role}
+      className={cn(
+        // 横長: 場所に余裕があるため上限を外し、常にスクロール無しで全文表示する
+        // (秘書レビュー3回目・PR#152の代表判断)。
+        // 縦長: 基本は全文表示のまま収まるよう4〜5行相当(24cqh)を確保し、それでも
+        // 入らない長さのときだけ欄内でスクロールする。
+        boxOrientation === 'landscape' ? '' : 'max-h-[24cqh] overflow-y-auto',
+        className,
+      )}
+    >
       {children}
     </div>
   )
@@ -65,6 +77,9 @@ function FreeTextBlock({
 
 export interface ResolveChoicePanelProps {
   className?: string
+  /** 背景の箱の向き(#134・秘書レビュー3回目・PR#152)。地の文(FreeTextBlock)の高さの
+   * 扱いを横長・縦長で分けるために使う(横長=上限なし、縦長=24cqh)。 */
+  boxOrientation: 'landscape' | 'portrait'
   /** 問い(キャラの台詞、resolution.questions[].prompt)。会話ウィンドウのタイプライターとは
    * 独立した静的テキストとして常に表示する(上記コメント参照)。 */
   prompt: string
@@ -88,6 +103,7 @@ export interface ResolveChoicePanelProps {
 /** 解決⑤の中央選択パネル(問い＋選択肢＋相談ボタン、DESIGN.md「解決の会話モード」節・#134)。 */
 export function ResolveChoicePanel({
   className,
+  boxOrientation,
   prompt,
   priorCorrectReply,
   choices,
@@ -121,7 +137,7 @@ export function ResolveChoicePanel({
         // 無い地の文」にして、ボタンと明確に区別する。
         // 秘書レビュー2回目(2026-09-15)指摘の修正: 問い・選択肢・相談ボタンは常に全体が
         // 見えるようにし、伸縮するのは地の文(このブロック)だけにする(下記FreeTextBlock参照)。
-        <FreeTextBlock>
+        <FreeTextBlock boxOrientation={boxOrientation}>
           <p className="text-muted-foreground text-sm">{priorCorrectReply}</p>
         </FreeTextBlock>
       )}
@@ -144,7 +160,7 @@ export function ResolveChoicePanel({
       </ul>
 
       {wrongExplanation && (
-        <FreeTextBlock>
+        <FreeTextBlock boxOrientation={boxOrientation}>
           <p className="text-muted-foreground text-sm">
             <span className="font-semibold">{wrongExplanation.character}</span>「
             {wrongExplanation.line}」
@@ -174,6 +190,7 @@ export function ResolveChoicePanel({
         {hintText && (
           <FreeTextBlock
             role="status"
+            boxOrientation={boxOrientation}
             className="border-border bg-background/60 rounded-lg border p-2"
           >
             <p className="text-sm">{hintText}</p>
