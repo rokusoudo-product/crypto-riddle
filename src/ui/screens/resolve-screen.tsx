@@ -5,6 +5,7 @@ import { MAX_CONSULTS } from '@/core/scenario'
 import { BackgroundBox } from '@/ui/components/background-box'
 import { CardDrawer } from '@/ui/components/card-drawer'
 import { ConversationFrame } from '@/ui/components/conversation-frame'
+import { GameTimeBadge } from '@/ui/components/game-time-badge'
 import { ResolveChoicePanel } from '@/ui/components/resolve/resolve-choice-panel'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
@@ -224,11 +225,20 @@ export function ResolveScreen() {
     />
   ) : null
 
-  // カードドロワー(#134): 背景の箱の右上へ独立したボタンとして移設(探索④の「ヒント確認」と
-  // 同じ位置・見た目・不透明表示。文言のみ「手持ちカード」、DESIGN.md「解決の会話モード」節
-  // 「カードドロワー」)。中央の選択パネルとは重ねない。
-  const cardDrawerButton = (
-    <div className="absolute top-2 right-2 z-50">
+  // 右上のボタン群(#134): カードドロワーは背景の箱の右上へ独立したボタンとして移設(探索④の
+  // 「ヒント確認」と同じ位置・見た目・不透明表示。文言のみ「手持ちカード」、DESIGN.md
+  // 「解決の会話モード」節「カードドロワー」)。中央の選択パネルとは重ねない。
+  // ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節・#149秘書レビュー2回目・
+  // 代表決定2026-09-15「画面右上、ボタン群と同じ行でボタンの左隣。入らなければボタン群の
+  // すぐ下に右寄せ」): ボタン群と同じ行に先に並べることで、両方とも1行に収まる場合は
+  // ボタンの左隣になり、収まらない場合はflex-wrapでボタン群の下(右寄せ)へ折り返す
+  // (scene-explorer.tsxのtop-controls-rowと同じ考え方)。
+  const topRightControls = (
+    <div className="absolute top-2 right-2 z-50 flex flex-wrap items-center justify-end gap-2">
+      <GameTimeBadge
+        gameTime={scenario.resolution.game_time}
+        compact={resolveBoxOrientationValue === 'portrait'}
+      />
       <CardDrawer cards={ownedCards} triggerVariant="label" triggerLabel="手持ちカード" />
     </div>
   )
@@ -301,11 +311,13 @@ export function ResolveScreen() {
                 onLineRevealed={handleLineRevealed}
                 centerPanel={centerPanel}
               />
-              {cardDrawerButton}
+              {topRightControls}
             </BackgroundBox>
           ) : (
             // scenario.scenesが無いマップ(一覧フォールバックのみ)は背景の箱を持たないため、
-            // 従来どおりstacked layout(背景の箱を持たない画面向け)のまま描画する。
+            // 従来どおりstacked layout(背景の箱を持たない画面向け)のまま描画する。「背景の箱」を
+            // 前提にするゲーム内時刻(#136/#137)はここでは表示しない(DESIGN.md「ゲーム内時刻」節・
+            // #149秘書レビュー2回目・代表決定2026-09-15の「背景の箱に対する相対位置」の対象外)。
             <div className="relative flex flex-col gap-4">
               <ConversationFrame
                 speaker={question.speaker}

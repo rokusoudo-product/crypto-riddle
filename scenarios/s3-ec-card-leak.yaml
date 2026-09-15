@@ -65,6 +65,8 @@ related_terms:
   - term-appi-breach-report
 
 intro:
+  # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+  game_time: "23:40"
   background: 深夜、通信販売会社「つきかげ通販」に、複数の顧客から「身に覚えのないカード利用明細が届いた」という問い合わせが立て続けに入った。調べると、いずれも直近で自社ECサイトで買い物をした顧客だった。カード番号は自社のデータベースには一切保存していないはずなのに、なぜカード情報が漏れたのか——対策室に緊急招集がかかる。
   victim_company:
     name: 株式会社つきかげ通販
@@ -128,6 +130,8 @@ scenes:
   - id: scene-office
     title: 執務室
     background: bg-s3-office
+    # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: "00:50"
     hotspots:
       - object_type: pc
         position:
@@ -195,6 +199,8 @@ scenes:
   - id: scene-ops-room
     title: システム運用ルーム
     background: bg-s3-ops-room
+    # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: "01:30"
     hotspots:
       - object_type: device
         position:
@@ -356,6 +362,8 @@ cards:
 resolution:
   # #75の題材はSQLインジェクション・WAF・PCI DSS・CSP・改ざん検知・フォームジャッキングが中心で
   # 暗号解読を含まないため、S1/S2と同様に0件とする(初動対応・方針判断中心)。
+  # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+  game_time: "02:15"
   cipher_stages: []
 
   # 会話モード(#42/T030)の問い列。#75指定の「起点→原因特定→対策/対応」の3問構成。誤答肢の reply は

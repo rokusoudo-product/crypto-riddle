@@ -46,6 +46,8 @@ export const s2VpnRansomwareFixture: Scenario = {
     'term-appi-breach-report',
   ],
   intro: {
+    // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: '08:40',
     background:
       'ある朝、精密機械部品メーカーの生産管理システムが一斉に使用不能になった。共有フォルダのファイルには見慣れない拡張子が付き、画面には身代金を要求するメッセージが表示されている。数か月前から更新の通知が滞っていた境界のVPN装置が、実は侵入の入口だったことが、対策室の到着後まもなく明らかになる。',
     victim_company: {
@@ -126,6 +128,8 @@ export const s2VpnRansomwareFixture: Scenario = {
       id: 'scene-office',
       title: '執務室',
       background: 'bg-s2-office',
+      // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+      game_time: '09:50',
       hotspots: [
         {
           object_type: 'pc',
@@ -216,6 +220,8 @@ export const s2VpnRansomwareFixture: Scenario = {
       id: 'scene-server',
       title: 'サーバ室',
       background: 'bg-s2-server',
+      // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+      game_time: '10:30',
       hotspots: [
         {
           object_type: 'person',
@@ -394,6 +400,8 @@ export const s2VpnRansomwareFixture: Scenario = {
     },
   ],
   resolution: {
+    // ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: '11:15',
     cipher_stages: [],
     questions: [
       {

@@ -699,9 +699,9 @@ export function ConversationFrame({
     // 縦スクロールを出さない要件(#119)を満たせなかったため撤回した)。
     // 2026-09-14改訂(#124・代表FB「解決の会話ウィンドウが窮屈」): 内側のラッパーに`h-full`
     // (箱の実高さに確定させる)を与え、立ち絵の行を`flex-1 min-h-0`(縮小可・content優先で
-    // 縮める)、会話ウィンドウを`shrink-0`(縮めない=内容を絶対に切り詰めない)にすることで、
+    // 縮める)、会話ウィンドウ側を`shrink-0`(縮めない=内容を絶対に切り詰めない)にすることで、
     // 「立ち絵→ウィンドウ」の合計が箱の高さを超える場合は立ち絵の行**だけ**が自動的に縮む
-    // (window有りだけがshrink-0なのでflexboxの縮小配分は立ち絵の行に全て乗る、標準的な
+    // (会話ウィンドウ側だけがshrink-0なのでflexboxの縮小配分は立ち絵の行に全て乗る、標準的な
     // flexbox shrink計算)。立ち絵カード自身(PORTRAIT_BOX_RELATIVE_SIZE_CLASS)も`h-full`
     // (=縮んだ行の実高さ)を基準にし、`max-h-[Xcqh]`で上限を掛ける(cqh単独だと行の実際の
     // 空きに追従しないため、上限としてのみ使う)。会話ウィンドウは`overflow-y-auto`+
@@ -768,6 +768,7 @@ export function ConversationFrame({
           旧ゴールドは#132で撤回)のアクセント。 */}
       <div
         ref={windowRef}
+        data-testid="conversation-window"
         className={cn(
           'border-primary glass-panel relative z-10 flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
           onDismiss &&

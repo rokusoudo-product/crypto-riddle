@@ -123,6 +123,7 @@ import type {
 import { BackgroundBox } from '@/ui/components/background-box'
 import { CardDrawer } from '@/ui/components/card-drawer'
 import { ConversationFrame, type ConversationSpeaker } from '@/ui/components/conversation-frame'
+import { GameTimeBadge } from '@/ui/components/game-time-badge'
 import { Button } from '@/ui/components/ui/button'
 import {
   hasPortraitAsset,
@@ -708,8 +709,16 @@ export function SceneExplorer({
             1行に収まる)。 */}
         <div
           data-testid="top-controls-row"
-          className="absolute top-2 right-2 z-50 flex flex-wrap items-start justify-end gap-2"
+          className="absolute top-2 right-2 z-50 flex flex-wrap items-center justify-end gap-2"
         >
+          {/* ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節・#149秘書レビュー2回目・
+              代表決定2026-09-15「画面右上、ボタン群と同じ行でボタンの左隣。入らなければ
+              ボタン群のすぐ下に右寄せ」): 右上ボタン群の列の先頭に置くことで、1行に収まる間は
+              ボタン群の左隣になり、収まらない場合はflex-wrapでボタン群の下(右寄せ)へ折り返す。
+              探索状態・会話状態のどちらでも常時表示する(旧「探索状態のみシーンタブの下」は
+              撤回)。時刻は現在アクティブなシーン(activeScene)のgame_timeを使う(探索中は
+              シーンを行き来できるが、各シーンの時刻を固定表示する。代表承認2026-09-15)。 */}
+          <GameTimeBadge gameTime={activeScene.game_time} compact={boxOrientation === 'portrait'} />
           <CardDrawer cards={ownedCards} triggerVariant="label" />
           <Button
             type="button"

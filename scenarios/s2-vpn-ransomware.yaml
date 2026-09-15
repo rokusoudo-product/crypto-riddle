@@ -61,6 +61,8 @@ related_terms:
   - term-appi-breach-report
 
 intro:
+  # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+  game_time: "08:40"
   background: ある朝、精密機械部品メーカーの生産管理システムが一斉に使用不能になった。共有フォルダのファイルには見慣れない拡張子が付き、画面には身代金を要求するメッセージが表示されている。数か月前から更新の通知が滞っていた境界のVPN装置が、実は侵入の入口だったことが、対策室の到着後まもなく明らかになる。
   victim_company:
     name: 株式会社みなと精工
@@ -122,6 +124,8 @@ scenes:
   - id: scene-office
     title: 執務室
     background: bg-s2-office
+    # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: "09:50"
     hotspots:
       - object_type: pc
         position:
@@ -189,6 +193,8 @@ scenes:
   - id: scene-server
     title: サーバ室
     background: bg-s2-server
+    # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+    game_time: "10:30"
     hotspots:
       - object_type: person
         position:
@@ -344,6 +350,8 @@ resolution:
   # #6の題材はCVE/CVSS・資産管理・ラテラルムーブメント・Pass-the-Hash・バックアップ3-2-1・
   # 身代金支払いの是非が中心で暗号解読を含まないため、S1と同様に0件とする(初動対応・方針判断
   # 中心。difficulty=2はcipherではなく問い数の増加(2→3)による)。
+  # ゲーム内時刻(#136/#137・代表承認2026-09-15)。
+  game_time: "11:15"
   cipher_stages: []
 
   # 会話モード(#42/T030)の問い列。#74指定の「起点→初動→方針」の3問構成。誤答肢の reply は
