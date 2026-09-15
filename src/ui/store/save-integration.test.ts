@@ -158,6 +158,29 @@ describe('computeClearXpReward', () => {
   it('減算がCLEAR_XP_REWARDを上回っても0未満にはしない(下限)', () => {
     expect(computeClearXpReward(progressWith({ 'q-1': 20 }, 3))).toBe(0)
   })
+
+  // #135受け入れ基準「XPバーの計算とクリア時の獲得XPが同じ関数から出ていて、一致を確認する
+  // 単体テストがある」: 解決⑤のXPバー(resolve-xp-bar.tsx)はresolve-screen.tsxが
+  // computeClearXpReward(progress)を呼んだ結果をそのまま表示する。applyClearToSaveData も
+  // 内部で同じcomputeClearXpReward()を呼ぶため(このファイル冒頭のapplyClearToSaveData実装
+  // 参照)、両者は構造的に同じ値になるが、それを固定回帰として明示的に確認する。
+  it('クリア時にapplyClearToSaveDataがXPへ加算する量は、computeClearXpRewardの戻り値と一致する(複数の誤答・相談パターンで確認)', () => {
+    const cases: [Record<string, number>, number][] = [
+      [{}, 0],
+      [{ 'q-1': 1 }, 0],
+      [{ 'q-1': 2, 'q-2': 1 }, 2],
+      [{ 'q-1': 20 }, 3], // 下限0に張り付くケースも含める
+    ]
+    for (const [wrongAttemptsByQuestionId, consultsUsed] of cases) {
+      const progress = progressWith(wrongAttemptsByQuestionId, consultsUsed)
+      const expectedXp = computeClearXpReward(progress)
+
+      const before = createDefaultSaveData()
+      const after = applyClearToSaveData(before, s0SampleFixture, progress)
+
+      expect(after.xp - before.xp).toBe(expectedXp)
+    }
+  })
 })
 
 describe('applyClearToSaveData の誤答・相談の記録(T034)', () => {

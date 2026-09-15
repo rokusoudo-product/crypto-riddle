@@ -26,10 +26,21 @@
 //
 // shadcn Buttonのoutline variantは使わない(#133で判明したdark:bg-input/30の上書き問題を
 // 避けるため、index.cssのresolve-choiceユーティリティコメント参照)。
+//
+// 2026-09-15(#135・代表決定2026-09-14・#132の未解決の質問7への回答): 相談ボタンに残り回数の
+// カウンタアイコン・XP減の警告アイコンを付け、XPバー(ResolveXpBar)をパネル最上部(問いの前)に
+// 追加した。カウンタ・警告アイコンはlucide-react(既存依存、DESIGN.md「相談ボタン」節)。
+// XPバーをパネルの最上部に置くのは、DESIGN.md「縦長（9:16）の構成」節の「XPバー|選択パネルの
+// 上辺」を、横長・縦長どちらの縦積みでも満たすため(resolve-screen.tsx側にXPバー専用の
+// レイアウト分岐を増やさない。resolve-xp-bar.tsx冒頭コメント参照)。
+import { MessageCircleQuestion, TriangleAlert } from 'lucide-react'
 import { type ReactNode, type RefObject, useId } from 'react'
 
 import type { ResolvedExplanation } from '@/ui/lib/explanation'
 import { cn } from '@/ui/lib/utils'
+import { CONSULT_XP_PENALTY } from '@/ui/store/save-integration'
+
+import { ResolveXpBar } from './resolve-xp-bar'
 
 /**
  * 地の文(直前の正解への一言・誤答の段階解説・相談で開いたヒント)専用のブロック
@@ -98,9 +109,17 @@ export interface ResolveChoicePanelProps {
   /** 新しい問いが表示されるたびに最初の選択肢へフォーカスを移すための参照
    * (resolve-screen.tsx参照)。 */
   firstChoiceRef?: RefObject<HTMLButtonElement | null>
+  /** このままクリアした場合の獲得XP見込み(#135・DESIGN.md「XPバー」節)。
+   * save-integration.tsのcomputeClearXpReward(progress)をresolve-screen.tsxが呼んだ結果を
+   * そのまま渡す(このパネル自体はXPの計算ロジックを持たない。クリア時に加算されるXPと
+   * 必ず一致させるため、計算はsave-integration.ts側の1関数に一本化する)。 */
+  estimatedXp: number
+  /** 誤答・相談が0回のときの上限値(save-integration.tsのCLEAR_XP_REWARD)。 */
+  maxXp: number
 }
 
-/** 解決⑤の中央選択パネル(問い＋選択肢＋相談ボタン、DESIGN.md「解決の会話モード」節・#134)。 */
+/** 解決⑤の中央選択パネル(XPバー＋問い＋選択肢＋相談ボタン、DESIGN.md「解決の会話モード」節・
+ * 「XPバー」節・#134/#135)。 */
 export function ResolveChoicePanel({
   className,
   boxOrientation,
@@ -114,8 +133,11 @@ export function ResolveChoicePanel({
   onConsult,
   hintText,
   firstChoiceRef,
+  estimatedXp,
+  maxXp,
 }: ResolveChoicePanelProps) {
   const consultDisabledReasonId = useId()
+  const consultRemainingClamped = Math.max(consultRemaining, 0)
 
   return (
     <div
@@ -128,6 +150,18 @@ export function ResolveChoicePanel({
         className,
       )}
     >
+      {/* XPバー(#135・DESIGN.md「XPバー」節「縦長（9:16）の構成」節「選択パネルの上辺」):
+          パネル最上部(問いより前)に置くことで、横長・縦長どちらの縦積みでも「選択パネルの
+          上辺」の位置になる(resolve-screen.tsx側にXPバー専用の分岐は増やさない)。 */}
+      <ResolveXpBar
+        estimatedXp={estimatedXp}
+        maxXp={maxXp}
+        // 縦長は場所が非常に限られる(#152の優先順位を崩さないこと・#135のスコープ注記)ため、
+        // ラベル文+数値の行を省き、バーと数値を1行にまとめて縦の専有を抑える
+        // (resolve-xp-bar.tsxのcompact参照。GameTimeBadgeのcompactと同じ考え方)。
+        compact={boxOrientation === 'portrait'}
+      />
+
       <p className="font-heading text-sm leading-relaxed sm:text-base">{prompt}</p>
 
       {priorCorrectReply && (
@@ -170,16 +204,34 @@ export function ResolveChoicePanel({
 
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-4">
-          {/* 相談ボタン: 位置をパネル内へ移すのみ(#134スコープ)。見た目の刷新(残数の
-              カウンタアイコン・XP警告アイコン等)は#135の範囲のため入れない。 */}
+          {/* 相談ボタン(#135・DESIGN.md「相談ボタン」節): 残り回数をカウンタアイコン
+              (数字付きバッジ)、XPが減ることを警告アイコン(TriangleAlert)で示す。
+              色だけに頼らず、可視テキスト(バッジの数字・「XP-15」表記)でも同じ情報を
+              伝え、aria-labelにも「相談する・残りn回・使うとXPが15減る」相当を持たせる
+              (WCAG 1.4.1)。0回のときはdisabled(既存のconsultDisabled)のまま、理由の
+              表示(下のaria-describedby先の<p>)も維持する。 */}
           <button
             type="button"
             disabled={consultDisabled}
             aria-describedby={consultDisabled ? consultDisabledReasonId : undefined}
+            aria-label={`相談する・残り${consultRemainingClamped}回・使うとXPが${CONSULT_XP_PENALTY}減る`}
             onClick={onConsult}
-            className="bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] focus-visible:ring-ring h-12 min-w-12 rounded-lg px-6 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-3 focus-visible:outline-none"
+            className="bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] focus-visible:ring-ring inline-flex h-12 min-w-12 items-center gap-2 rounded-lg px-4 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-3 focus-visible:outline-none sm:px-6"
           >
-            相談する（残り{Math.max(consultRemaining, 0)}回・XP減）
+            <span aria-hidden="true" className="relative inline-flex shrink-0 items-center">
+              <MessageCircleQuestion className="size-5" />
+              <span className="bg-primary text-primary-foreground absolute -top-2 -right-2 flex size-4 items-center justify-center rounded-full text-xs leading-none font-bold">
+                {consultRemainingClamped}
+              </span>
+            </span>
+            <span aria-hidden="true">相談する（残り{consultRemainingClamped}回）</span>
+            <span
+              aria-hidden="true"
+              className="text-warning inline-flex items-center gap-1 text-xs font-semibold"
+            >
+              <TriangleAlert className="size-3.5" />
+              XP−{CONSULT_XP_PENALTY}
+            </span>
           </button>
           {consultDisabled && (
             <p id={consultDisabledReasonId} className="text-muted-foreground text-sm">

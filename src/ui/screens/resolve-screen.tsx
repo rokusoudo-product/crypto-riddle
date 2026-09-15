@@ -21,6 +21,7 @@ import { EXPLORE_BACKGROUND_SRC } from '@/ui/lib/explore-background-assets'
 import { useIsPortraitScreen } from '@/ui/lib/orientation'
 import { routeForProgress } from '@/ui/screens/navigation'
 import { useGameStore } from '@/ui/store/game-store'
+import { CLEAR_XP_REWARD, computeClearXpReward } from '@/ui/store/save-integration'
 import { useScreenState } from '@/ui/state/use-screen-state'
 
 // ⑤解決（ダーク文脈）。目的=会話モードで問いに答え攻撃手段を特定・防衛策を選ぶ（spec §8, #42）。
@@ -162,6 +163,11 @@ export function ResolveScreen() {
   const ownedCards = scenario.cards.filter((card) => progress.ownedCardIds.includes(card.id))
   const consultRemaining = MAX_CONSULTS - progress.consultsUsed
   const consultDisabled = consultRemaining <= 0
+  // XPバー(#135・DESIGN.md「XPバー」節): このままクリアした場合の獲得XP見込み。クリア時に
+  // save-integration.tsのapplyClearToSaveDataが加算する値(computeClearXpReward(progress))と
+  // 同じ純粋関数をそのまま呼ぶ(誤答・相談の反映済みprogressを渡すだけ。計算ロジックは
+  // 重複させない・save-integration.test.tsで一致を確認)。
+  const estimatedClearXp = computeClearXpReward(progress)
 
   // 誤答時の段階解説を話者付きで解決する(#100/#102、docs/scenario_schema.md §2.6)。
   // dispatch後は wrongAttemptsByQuestionId が既に+1されているため、coreのpickExplanationが
@@ -225,6 +231,8 @@ export function ResolveScreen() {
       onConsult={handleConsult}
       hintText={hintRevealedForQuestionId === question.id ? question.consult_hint : null}
       firstChoiceRef={firstChoiceRef}
+      estimatedXp={estimatedClearXp}
+      maxXp={CLEAR_XP_REWARD}
     />
   ) : null
 
