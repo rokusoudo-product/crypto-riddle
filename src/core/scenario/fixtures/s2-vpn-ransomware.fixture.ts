@@ -133,7 +133,7 @@ export const s2VpnRansomwareFixture: Scenario = {
       hotspots: [
         {
           object_type: 'pc',
-          position: { landscape: [0.4, 0.65] },
+          position: { landscape: [0.44, 0.65] },
           label: '情シス管理端末',
           actions: [
             {
@@ -161,7 +161,7 @@ export const s2VpnRansomwareFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: { landscape: [0.2, 0.4] },
+          position: { landscape: [0.62, 0.51] },
           label: '情シス担当',
           actions: [
             {
@@ -175,7 +175,7 @@ export const s2VpnRansomwareFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: { landscape: [0.78, 0.55] },
+          position: { landscape: [0.76, 0.51] },
           label: '管理部門長',
           actions: [
             {
@@ -189,7 +189,7 @@ export const s2VpnRansomwareFixture: Scenario = {
         },
         {
           object_type: 'book',
-          position: { landscape: [0.6, 0.16] },
+          position: { landscape: [0.16, 0.6] },
           label: '資料棚',
           actions: [
             {
@@ -210,7 +210,7 @@ export const s2VpnRansomwareFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: { landscape: [0.95, 0.5] },
+          position: { landscape: [0.92, 0.6] },
           label: 'サーバ室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-server', label: 'サーバ室へ移動する' }],
         },
@@ -225,7 +225,7 @@ export const s2VpnRansomwareFixture: Scenario = {
       hotspots: [
         {
           object_type: 'person',
-          position: { landscape: [0.51, 0.43] },
+          position: { landscape: [0.43, 0.44] },
           label: '保守業者',
           prompt: '保守業者「点検に伺いました。何かありましたか？」',
           actions: [
@@ -248,7 +248,7 @@ export const s2VpnRansomwareFixture: Scenario = {
         },
         {
           object_type: 'device',
-          position: { landscape: [0.18, 0.45] },
+          position: { landscape: [0.63, 0.64] },
           label: 'バックアップサーバ',
           actions: [
             {
@@ -262,7 +262,7 @@ export const s2VpnRansomwareFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: { landscape: [0.5, 0.9] },
+          position: { landscape: [0.52, 0.5] },
           label: '執務室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-office', label: '執務室へ移動する' }],
         },
