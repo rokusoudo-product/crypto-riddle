@@ -203,12 +203,20 @@ const SPEAKER_FRAME_RING_CLASS = SPEAKER_FRAME_RING_CLASS_BY_COLOR[SPEAKER_FRAME
 
 /** 名札(色だけに頼らず発話者を示す、WCAG 1.4.1)。会話ウィンドウ内のこの1箇所だけに出す
  * (#119/#124: 旧実装は立ち絵カードの下にも同じ名札を重複表示しており、二重表示になっていた。
- * 立ち絵側はaltテキスト(発話中/待機中)のみで発話者を示し、可視の名札はウィンドウ側に一本化する)。 */
+ * 立ち絵側はaltテキスト(発話中/待機中)のみで発話者を示し、可視の名札はウィンドウ側に一本化する)。
+ *
+ * 代表指示(2026-09-15): 名札が会話ウィンドウの幅いっぱいに伸びて長すぎるため、幅を
+ * 約4分の1に縮め左詰めにする。原因は親要素(windowContentの`flex flex-col gap-2`)の
+ * flexboxデフォルト(align-items: stretch)で、<span>が本来はインライン要素でも
+ * flexアイテムとしてクロス軸(=幅)いっぱいに引き伸ばされていたため。`self-start`で
+ * このアイテムだけstretchを打ち消し、`w-1/4`で会話ウィンドウ内側の幅の約4分の1にする。
+ * `min-w-fit`は、長い名前(例:「経理部長 夏目」)が4分の1幅より広い場合でも折り返し・
+ * 省略されないよう、テキストの内在幅を下限として保証する。 */
 function NamePlate({ label, speaking }: { label: string; speaking: boolean }) {
   return (
     <span
       className={cn(
-        'rounded-full font-semibold',
+        'self-start w-1/4 min-w-fit rounded-full font-semibold',
         'px-3 py-0.5 text-xs',
         speaking
           ? 'bg-primary text-primary-foreground'
