@@ -217,6 +217,10 @@ export function ExploreScreen() {
   // ゲーム内時刻(#136/#137): 誘導会話もSceneExplorer自身の会話オーバーレイと同じ「現在の
   // シーンのgame_time・会話ウィンドウ帯の右上端」表示にする(DESIGN.md「探索シーン」節
   // 「探索完了→解決への誘導」も同じ会話オーバーレイの仕組みに載ることを踏まえる)。
+  // scenesが無いシナリオ(一覧フォールバックのみ)ではscenesがundefinedのためactiveGameTimeも
+  // undefinedになり、GameTimeBadgeは何も描画しない(背景の箱自体を持たない画面のため、
+  // DESIGN.md「ゲーム内時刻」節の表示先=背景の箱の右下/会話ウィンドウ帯自体が無い。意図的な
+  // 未対応であり、対象4マップ(S1/S2/S3/SL)はいずれもscenesを持つため実害は無い)。
   const activeGameTime =
     scenes?.find((scene) => scene.id === activeSceneId)?.game_time ?? scenes?.[0]?.game_time
 

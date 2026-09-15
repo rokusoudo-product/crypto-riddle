@@ -664,14 +664,18 @@ export function ConversationFrame({
     // 縦スクロールを出さない要件(#119)を満たせなかったため撤回した)。
     // 2026-09-14改訂(#124・代表FB「解決の会話ウィンドウが窮屈」): 内側のラッパーに`h-full`
     // (箱の実高さに確定させる)を与え、立ち絵の行を`flex-1 min-h-0`(縮小可・content優先で
-    // 縮める)、会話ウィンドウを`shrink-0`(縮めない=内容を絶対に切り詰めない)にすることで、
+    // 縮める)、会話ウィンドウ側を`shrink-0`(縮めない=内容を絶対に切り詰めない)にすることで、
     // 「立ち絵→ウィンドウ」の合計が箱の高さを超える場合は立ち絵の行**だけ**が自動的に縮む
-    // (window有りだけがshrink-0なのでflexboxの縮小配分は立ち絵の行に全て乗る、標準的な
+    // (会話ウィンドウ側だけがshrink-0なのでflexboxの縮小配分は立ち絵の行に全て乗る、標準的な
     // flexbox shrink計算)。立ち絵カード自身(PORTRAIT_BOX_RELATIVE_SIZE_CLASS)も`h-full`
     // (=縮んだ行の実高さ)を基準にし、`max-h-[Xcqh]`で上限を掛ける(cqh単独だと行の実際の
     // 空きに追従しないため、上限としてのみ使う)。会話ウィンドウは`overflow-y-auto`+
     // `max-h-full`を最後の安全弁として残すが、通常の表示状態では発火しない設計
-    // (E2E/E2E-shot.mjsのno-scroll確認対象)。
+    // (E2E/E2E-shot.mjsのno-scroll確認対象)。#136/#137: `shrink-0`/`max-h-full`/`relative
+    // z-10`は、cornerSlot(ゲーム内時刻バッジ)を挟むために追加した外側ラッパー
+    // (下記`<div className="relative z-10 flex max-h-full shrink-0 flex-col">`)へ移した。
+    // windowRef自体(`data-testid="conversation-window"`)は変わらず、この段落が指す
+    // 「会話ウィンドウ側」は実質そのラッパーを指す。
     const portraitSizeClass = PORTRAIT_BOX_RELATIVE_SIZE_CLASS[boxOrientation]
     return (
       <div
