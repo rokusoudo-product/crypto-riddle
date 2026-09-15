@@ -378,6 +378,20 @@ export interface ConversationFrameProps {
    * 無視される(固定pxのPORTRAIT_SIZE_CLASSを使う)。省略時は'landscape'。
    */
   boxOrientation?: BoxOrientation
+  /**
+   * 背景の箱の中央に重ねる選択パネル(解決⑤専用、DESIGN.md「解決の会話モード」節「配置」・
+   * #134)。指定時は`layout`ごとに置き場所が変わる:
+   * - overlay(横長): 立ち絵の行の中央(左右2枠の間、`self-center`・幅は呼び出し側の
+   *   className指定に委ねる)に3列目として並べる。
+   * - overlay(縦長・boxOrientation='portrait'): 立ち絵の行の**上**に独立した行として積む
+   *   (DESIGN.md「縦長（9:16）の構成」節: 上から 手持ちカードボタン→選択パネル→
+   *   立ち絵2枠+名前箱→会話ウィンドウ)。
+   * - stacked(背景の箱を持たない画面向け): 立ち絵の行の上に同様に積む(resolve-screen.tsx
+   *   のscenario.scenesが無いマップ向けフォールバック)。
+   * 会話ウィンドウ(children)には含めない: 会話ウィンドウは台詞(タイプライター)専用にする
+   * (DESIGN.md「解決の会話モード」節「会話ウィンドウとの役割分担」)。
+   */
+  centerPanel?: ReactNode
 }
 
 /** 導入・探索の会話・解決の会話モードで共通して使う会話フレーム(DESIGN.md「会話フレーム」節)。 */
@@ -394,6 +408,7 @@ export function ConversationFrame({
   onOutsideDismiss,
   dismissAnywhere = false,
   boxOrientation = 'landscape',
+  centerPanel,
 }: ConversationFrameProps) {
   const prefersReducedMotion = usePrefersReducedMotion()
   const label = speakerLabel(speaker)
@@ -444,16 +459,34 @@ export function ConversationFrame({
   // 同期処理で0、またはreduced-motionならline.length)から刻む。1文字表示するたびに
   // setRevealedLengthのfunctional updateで最新値を見て続きを刻み、末尾でinterval自身を
   // clearする(次のlineに変わった時は cleanup で確実にclearする)。
+  // intervalIdRefに現在有効なintervalIdを保持し、handleSkip(下記)からも明示的にclearできる
+  // ようにする(#134で発覚した既存の競合状態の修正。スキップでrevealedLengthをline.length
+  // まで直接ジャンプさせても、このintervalは次の自然なtick(最大32ms後)まで生き続けたまま
+  // 自己clearを待つ設計だった。その32ms以内に呼び出し側がlineを次の行へ切り替えると、
+  // 古いintervalのtickが「古いline.lengthを閉じ込めたクロージャ」でsetRevealedLengthを
+  // 呼んでしまい、新しいlineのrevealedLengthを不正に書き換えてisCompleteが早期にtrueへ
+  // なることがあった(スキップ直後に選択を送ると再現。resolve-screen.tsxで選択肢が
+  // 会話ウィンドウchildrenの外=centerPanelへ移ったことで、E2E/vitestの操作タイミングが
+  // わずかに早まり顕在化した)。スキップ時に明示clearすることで解消する。
+  const intervalIdRef = useRef<number | null>(null)
+
   useEffect(() => {
     if (prefersReducedMotion || line.length === 0) return
     const intervalId = window.setInterval(() => {
       setRevealedLength((prev) => {
         const next = Math.min(prev + 1, line.length)
-        if (next >= line.length) window.clearInterval(intervalId)
+        if (next >= line.length) {
+          window.clearInterval(intervalId)
+          intervalIdRef.current = null
+        }
         return next
       })
     }, TYPEWRITER_CHAR_INTERVAL_MS)
-    return () => window.clearInterval(intervalId)
+    intervalIdRef.current = intervalId
+    return () => {
+      window.clearInterval(intervalId)
+      if (intervalIdRef.current === intervalId) intervalIdRef.current = null
+    }
   }, [line, prefersReducedMotion])
 
   // 全文表示が完了した瞬間(タイプライター完走 or スキップ)に1度だけ通知・フォーカス移動する。
@@ -474,6 +507,13 @@ export function ConversationFrame({
     if (document.activeElement === event.currentTarget) {
       focusFirstChildOnRevealRef.current = true
     }
+    // 実行中のintervalを明示的にclearする(上記intervalIdRefのコメント参照。自己clearを
+    // 待つと、呼び出し側が次のlineへ即座に切り替えた場合に古いtickが新しいlineの
+    // revealedLengthを不正に書き換える競合状態があった)。
+    if (intervalIdRef.current !== null) {
+      window.clearInterval(intervalIdRef.current)
+      intervalIdRef.current = null
+    }
     setRevealedLength(line.length)
   }
 
@@ -488,6 +528,11 @@ export function ConversationFrame({
 
   function handleOverlayActivate() {
     if (!isComplete) {
+      // 上記handleSkipと同じ理由でintervalを明示的にclearする(intervalIdRefのコメント参照)。
+      if (intervalIdRef.current !== null) {
+        window.clearInterval(intervalIdRef.current)
+        intervalIdRef.current = null
+      }
       setRevealedLength(line.length)
       return
     }
@@ -608,7 +653,7 @@ export function ConversationFrame({
   // shrink/grow挙動(overlay限定・stacked=shrink-0固定/overlay=flex-1 min-h-0で縮む)は
   // 呼び出し側がextraClassNameで指定する(#124: 同じユーティリティを2箇所で異なる方向に
   // 上書きするとTailwindのクラス優先順位が不定になるため、基底クラスにはshrink系を含めない)。
-  function renderPortraitRow(extraClassName: string, sizeClass: string) {
+  function renderPortraitRow(extraClassName: string, sizeClass: string, center?: ReactNode) {
     return (
       <div
         className={cn(
@@ -629,6 +674,9 @@ export function ConversationFrame({
         ) : (
           <EmptyPortraitSlot sizeClass={sizeClass} />
         )}
+        {/* 中央の選択パネル(解決⑤専用・横長、DESIGN.md「解決の会話モード」節「配置」・#134):
+            左右の立ち絵の間、self-centerで縦方向は行の中央に揃える(items-endの対象外)。 */}
+        {center && <div className="self-center">{center}</div>}
         {twoSlot.right ? (
           <Portrait
             display={twoSlot.right}
@@ -672,7 +720,17 @@ export function ConversationFrame({
           onClick={onOutsideDismiss ? handleOutsideActivate : undefined}
           {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
         >
-          {renderPortraitRow('min-h-0 flex-1 -mb-2 sm:-mb-4', portraitSizeClass)}
+          {/* 中央の選択パネル(解決⑤専用・#134、DESIGN.md「縦長（9:16）の構成」節): 縦長の箱では
+              立ち絵の間に挟む横幅の余裕が無いため、立ち絵の行の**上**に独立した行として積む
+              (横長は下のrenderPortraitRowの3列目に渡し、立ち絵の間に配置する)。 */}
+          {centerPanel && boxOrientation === 'portrait' && (
+            <div className="relative z-20 mb-2 shrink-0 pt-14 sm:pt-16">{centerPanel}</div>
+          )}
+          {renderPortraitRow(
+            'min-h-0 flex-1 -mb-2 sm:-mb-4',
+            portraitSizeClass,
+            boxOrientation === 'landscape' ? centerPanel : undefined,
+          )}
           <div
             ref={windowRef}
             data-testid="conversation-window"
@@ -700,6 +758,9 @@ export function ConversationFrame({
       onKeyDown={onOutsideDismiss ? handleOutsideKeyDown : undefined}
       {...(onOutsideDismiss ? { 'data-testid': 'conversation-overlay-backdrop' } : {})}
     >
+      {/* 中央の選択パネル(解決⑤専用・#134): 背景の箱を持たないstackedレイアウト(scenario.scenesが
+          無いマップのフォールバック)でも、立ち絵の行の上に積む(縦長overlayと同じ考え方)。 */}
+      {centerPanel && <div className="mb-2 shrink-0">{centerPanel}</div>}
       {/* 立ち絵(左右2枠、#108/#110): 主人公の立ち絵は出さない。stackedは背景の箱を持たない
           画面向けのため固定pxのまま(PORTRAIT_SIZE_CLASS)、縮小しない(shrink-0)。 */}
       {renderPortraitRow('shrink-0 px-2 sm:gap-12 -mb-4', PORTRAIT_SIZE_CLASS)}

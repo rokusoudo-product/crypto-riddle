@@ -140,7 +140,8 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       // タイプライター演出中でも、問い文の全文は支援技術向けにsr-onlyで一度に渡されているため
       // (#64/T042)、この時点で getByText は見つかる。
       expect(screen.getAllByText('霧島').length).toBeGreaterThanOrEqual(1)
-      expect(screen.getByText('この侵入、どこから入られたと見る？')).toBeInTheDocument()
+      // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため件数のみ確認する。
+      expect(screen.getAllByText('この侵入、どこから入られたと見る？').length).toBeGreaterThan(0)
 
       // 選択肢はタイプライターの全文表示(またはスキップ)後にしか出ない(#64/T042)ため、
       // まずキーボード(Tab→Enter)でスキップする。スキップすると children 内の最初の
@@ -162,8 +163,8 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       expect(
         screen.getByText(/「怪しく見える」ことと「今回の侵入を裏付ける証拠」は違う/),
       ).toBeInTheDocument()
-      // 問い文(line)は誤答後も変わらず表示され続ける(プレイヤーが問いを見失わない)。
-      expect(screen.getByText('この侵入、どこから入られたと見る？')).toBeInTheDocument()
+      // 問い文(選択パネル側)は誤答後も変わらず表示され続ける(プレイヤーが問いを見失わない、#134)。
+      expect(screen.getAllByText('この侵入、どこから入られたと見る？').length).toBeGreaterThan(0)
 
       // --- 相談(コストあり)をキーボードで使う ---
       await user.tab() // choice[2]
@@ -177,9 +178,26 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
         ),
       ).toBeInTheDocument()
 
+      // 誤答時の返答(reply)は会話ウィンドウでタイプライター表示される(#134・DESIGN.md「会話
+      // ウィンドウとの役割分担」)。会話ウィンドウのスキップボタンもTab到達順に含まれるため、
+      // キーボードでスキップしてから続ける(Tab到達順: 選択肢→相談→この返答→手持ちカード)。
+      await user.tab() // 誤答時の返答(会話ウィンドウのスキップボタン)
+      expect(document.activeElement).toHaveTextContent('その場合は境界の通信記録に')
+      await user.keyboard('{Enter}')
+      // スキップ用<button>はDOMから消える(以後はただの<p>)ため、そのままだとフォーカスが
+      // document.bodyへ落ちてTabがページ先頭からやり直しになってしまう。resolve-screen.tsx
+      // 側でこの完了を選択パネルの最初の選択肢へのフォーカスとして引き継ぐため、続く
+      // Tab操作は選択肢の先頭からになる。
+      expect(document.activeElement).toHaveTextContent('取引先を装った請求書メールの添付ファイル')
+
       // --- 手持ちカードをキーボードで無料閲覧する(相談との違いをラベルで明示) ---
-      await user.tab() // カードドロワーの開閉ボタン
-      expect(document.activeElement).toHaveTextContent('手持ちカードを見る（無料')
+      await user.tab() // choice[1]
+      await user.tab() // choice[2]
+      await user.tab() // 相談ボタン
+      await user.tab() // カードドロワーの開閉ボタン(#134: 背景の箱の右上へ移設。可視文言は
+      // 「手持ちカード」、aria-labelは他画面と同じ固定文言「手持ちカードを見る（無料）」)
+      expect(document.activeElement).toHaveTextContent('手持ちカード')
+      expect(document.activeElement).toHaveAccessibleName('手持ちカードを見る（無料）')
       await user.keyboard('{Enter}')
       expect(await screen.findByRole('heading', { name: '手持ちカード' })).toBeInTheDocument()
       // 探索で獲得したカード(is_dummy含む)が並ぶ。
@@ -199,7 +217,9 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       // 再生され、選択肢は再び全文表示(またはスキップ)後まで非表示になる(#64/T042)。
       // 旧版(タイプライター導入前)は選択肢ボタンが同じkeyで再利用されフォーカスが移り続けたが、
       // 現在は children ごと一旦消えるため、ここでも改めてスキップが必要。
-      expect(await screen.findByText('感染が疑われる端末への初動対応は？')).toBeInTheDocument()
+      expect(
+        (await screen.findAllByText('感染が疑われる端末への初動対応は？')).length,
+      ).toBeGreaterThan(0)
       await skipTypewriterByKeyboard(user)
       expect(document.activeElement).toHaveTextContent('ネットワークから論理的に隔離し')
       await user.keyboard('{Enter}')
@@ -250,7 +270,9 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
         name: '取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)',
       }),
     )
-    expect(await screen.findByText('感染が疑われる端末への初動対応は？')).toBeInTheDocument()
+    expect(
+      (await screen.findAllByText('感染が疑われる端末への初動対応は？')).length,
+    ).toBeGreaterThan(0)
     await skipTypewriterByClick(user, '感染が疑われる端末への初動対応は？')
     await user.click(
       screen.getByRole('button', {
