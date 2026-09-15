@@ -47,13 +47,28 @@
    ぼかしは --glass-panel-blur（12px）。コントラストの担保には寄与しない演出用途のみ。
    適用先: 会話ウィンドウ・探索のアクションシート・カードドロワー・導入の会社名説明パネル
    （旧 bg-card/80 等のカラーコード直書きに準ずる不透明度指定をすべてこのトークン経由に統一）。
-   適用しない: 右上のボタン群（ヒント確認・調査ポイント一覧、発見性のため不透明を維持・代表指定）。 */
+   適用しない: 右上のボタン群（ヒント確認・調査ポイント一覧、発見性のため不透明を維持・代表指定）。
+   background-color に !important を付ける理由(秘書レビューで発覚・2026-09-15追加修正):
+   探索のアクションシート選択肢ボタン(scene-explorer.tsx)は shadcn の `<Button variant="outline">`
+   を使っており、そのcva既定クラスに `dark:bg-input/30`（--inputを30%alphaで敷く、本来は
+   outline variantのダーク文脈向けの控えめな背景）が含まれる。本PR(#133)で全画面を単一の
+   ダーク文脈に統一し`class="dark"`を常時適用するようにしたため、この`dark:bg-input/30`が
+   常に有効になった。`glass-panel`ユーティリティ（Tailwindのutilitiesレイヤーの中で通常の
+   utilityと同じ扱い）と`dark:bg-input/30`は同じ詳細度(単一クラスセレクタ)のバリアント違いの
+   別クラスで、tailwind-mergeはカラーの異なる背景クラス同士を「衝突」として重複除去しない
+   ため両方がクラス一覧に残り、生成後CSSのソース順（Tailwindの内部ソート順であり、
+   コンポーネント側のclassName内の記述順とは無関係）次第で`dark:bg-input/30`(alpha 0.3)が
+   `glass-panel`のbackground-colorを上書きしてしまっていた（実機Playwright計測でoptions
+   ボタンのcomputed background-colorのalphaが0.3であることを確認・要求値は0.81以上）。
+   `!important`にすることで、glass-panelを付けたどの要素でも、Buttonのvariant既定など
+   後から合成される他のbg-*ユーティリティに左右されず必ず0.81以上のalphaを保証する
+   （cascade順に依存しない、恒久的な対処）。 */
 @utility glass-panel {
   background-color: color-mix(
     in srgb,
     var(--card) calc(var(--glass-panel-min-alpha) * 100%),
     transparent
-  );
+  ) !important;
   backdrop-filter: blur(var(--glass-panel-blur));
   -webkit-backdrop-filter: blur(var(--glass-panel-blur));
 }
