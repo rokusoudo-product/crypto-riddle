@@ -1,12 +1,14 @@
 import { type FormEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { MAX_CONSULTS } from '@/core/scenario'
+import type { Question, Scenario } from '@/core/model'
+import { MAX_CONSULTS, type ScenarioProgressState } from '@/core/scenario'
 import { BackgroundBox } from '@/ui/components/background-box'
 import { CardDrawer } from '@/ui/components/card-drawer'
 import { ConversationFrame } from '@/ui/components/conversation-frame'
 import { GameTimeBadge } from '@/ui/components/game-time-badge'
 import { ResolveChoicePanel } from '@/ui/components/resolve/resolve-choice-panel'
+import { ResolveHintDialog, type ResolveHintDialogEntry } from '@/ui/components/resolve/resolve-hint-dialog'
 import { ScreenContainer } from '@/ui/components/screen-container'
 import { StateFrame } from '@/ui/components/state-frame'
 import { Button } from '@/ui/components/ui/button'
@@ -23,6 +25,53 @@ import { routeForProgress } from '@/ui/screens/navigation'
 import { useGameStore } from '@/ui/store/game-store'
 import { CLEAR_XP_REWARD, computeClearXpReward } from '@/ui/store/save-integration'
 import { useScreenState } from '@/ui/state/use-screen-state'
+
+// ヒントダイアログ(代表決定2026-09-15・resolve-hint-dialog.tsx)に表示する内容を、現在の問いの
+// 状態(progress)から都度計算する。呼び出し側は2箇所で使う: (1) 通常の描画時(progress=store の
+// progress、question=現在の問い)、(2) 誤答/正解/相談のdispatch直後(progress=dispatchの戻り値
+// `next`、question=`next`に対応する問い)。(2)でstateの再レンダーを待たず`next`を直接渡すのは、
+// 「内容が本当にあるか」を確認してからでないとダイアログをopenできないため(advisor指摘: 空の
+// entriesのままopen=trueにすると、背景をinertにしたのに閉じる手段の無いダイアログが開かない
+// ロックアウト不具合になる。resolve-hint-dialog.tsx側にも同じ防御を二重に入れてある)。
+function computeHintEntries(
+  scenario: Scenario,
+  progress: ScenarioProgressState,
+  question: Question | undefined,
+  hintRevealedForQuestionId: string | null,
+): ResolveHintDialogEntry[] {
+  if (!question) return []
+  const entries: ResolveHintDialogEntry[] = []
+  const consultDisabled = progress.consultsUsed >= MAX_CONSULTS
+
+  // 相談で開いたヒント(あれば、現在の問いに対してのみ)。
+  if (hintRevealedForQuestionId === question.id) {
+    entries.push({ heading: '相談', node: <p>{question.consult_hint}</p> })
+  }
+  // 相談使い切りの注意(マップ単位・問いをまたいで持続する)。
+  if (consultDisabled) {
+    entries.push({
+      heading: '相談',
+      node: <p>相談はこのマップで使い切りました（マップ単位3回まで）。</p>,
+    })
+  }
+  // 直前の正解への一言(新しい問いの表示直前に一度だけ)。
+  if (progress.lastAnswerFeedback?.correct === true && progress.lastAnswerFeedback.reply) {
+    const priorQuestion = scenario.resolution.questions[progress.questionIndex - 1]
+    entries.push({
+      heading: priorQuestion?.speaker ?? '正解',
+      node: <p>{progress.lastAnswerFeedback.reply}</p>,
+    })
+  }
+  // 誤答時の段階解説(話者付き)。
+  if (progress.lastAnswerFeedback?.correct === false) {
+    const priorWrongAttempts = (progress.wrongAttemptsByQuestionId[question.id] ?? 1) - 1
+    const resolved = resolveExplanation(question, priorWrongAttempts)
+    if (resolved) {
+      entries.push({ heading: resolved.character, node: <p>{resolved.line}</p> })
+    }
+  }
+  return entries
+}
 
 // ⑤解決（ダーク文脈）。目的=会話モードで問いに答え攻撃手段を特定・防衛策を選ぶ（spec §8, #42）。
 // 単一解・厳密一致（spec §8.2）。
@@ -66,6 +115,11 @@ export function ResolveScreen() {
   const [cipherAnswer, setCipherAnswer] = useState('')
   // 相談で開いたヒントは「今の問いで相談を押した後」だけ表示する(問いが変わったら自動的に隠れる)。
   const [hintRevealedForQuestionId, setHintRevealedForQuestionId] = useState<string | null>(null)
+  // ヒントダイアログ(代表決定2026-09-15・resolve-hint-dialog.tsx)の開閉状態。誤答直後・
+  // 相談直後(使い切り時も同じ導線)・正解直後(次の問いが表示される前)に自動でtrueにする
+  // (handleQuestionAnswer/handleConsult参照)。「解説を見る」ボタン(ResolveChoicePanel)は
+  // 同じ内容をもう一度開くだけなので、専用の蓄積stateは持たない。
+  const [hintDialogOpen, setHintDialogOpen] = useState(false)
   const firstChoiceRef = useRef<HTMLButtonElement>(null)
   // 解決⑤の背景(代表決定2026-09-13・#119/#124): 独自の背景画像は持たず、「解決へ進む」を
   // 押した時点で表示していた探索シーンの背景をそのまま使う(新しい画像は作らない)。
@@ -136,15 +190,31 @@ export function ResolveScreen() {
     setCipherAnswer('')
   }
 
+  // 誤答直後・正解直後(次の問いがある場合)にヒントダイアログを自動で開く(代表決定
+  // 2026-09-15)。dispatchの戻り値`next`から直接entriesを計算し、実際に表示する内容がある
+  // ときだけopenにする(computeHintEntriesのコメント参照。空のダイアログを開いて背景だけ
+  // inertになるロックアウトを避けるため)。正解でクリア(part==='clear')の場合は結果画面へ
+  // 遷移するため、ダイアログは開かない(従来どおり結果画面側でreplyを表示する)。
   function handleQuestionAnswer(choiceIndex: number) {
     const next = dispatch({ type: 'SUBMIT_QUESTION_ANSWER', choiceIndex })
-    if (next.part === 'clear') navigate('/result')
+    if (next.part === 'clear') {
+      navigate('/result')
+      return
+    }
+    const nextQuestion = scenario.resolution.questions[next.questionIndex]
+    const entries = computeHintEntries(scenario, next, nextQuestion, hintRevealedForQuestionId)
+    if (entries.length > 0) setHintDialogOpen(true)
   }
 
+  // 相談直後(使い切りになった場合も同じ導線)にヒントダイアログを自動で開く(代表決定
+  // 2026-09-15)。consult_hintは常に非空文字のため(docs/scenario_schema.md)、相談が実際に
+  // 成功した(next.consultsUsedが増えた)ときは常にentriesが非空になる。
   function handleConsult() {
     const next = dispatch({ type: 'CONSULT' })
     if (next.consultsUsed > progress.consultsUsed && question) {
       setHintRevealedForQuestionId(question.id)
+      const entries = computeHintEntries(scenario, next, question, question.id)
+      if (entries.length > 0) setHintDialogOpen(true)
     }
   }
 
@@ -169,16 +239,12 @@ export function ResolveScreen() {
   // 重複させない・save-integration.test.tsで一致を確認)。
   const estimatedClearXp = computeClearXpReward(progress)
 
-  // 誤答時の段階解説を話者付きで解決する(#100/#102、docs/scenario_schema.md §2.6)。
-  // dispatch後は wrongAttemptsByQuestionId が既に+1されているため、coreのpickExplanationが
-  // 使った「今回の誤答より前の回数」に戻すには1引く(resolveExplanationのJSDoc参照)。
-  const priorWrongAttempts = question
-    ? (progress.wrongAttemptsByQuestionId[question.id] ?? 1) - 1
-    : 0
-  const resolvedExplanation =
-    question && progress.lastAnswerFeedback?.correct === false
-      ? resolveExplanation(question, priorWrongAttempts)
-      : null
+  // ヒントダイアログ(代表決定2026-09-15)に表示する内容(誤答の段階解説・相談ヒント・相談
+  // 使い切りの注意・直前の正解への一言)を、現在の問いの状態から計算する(computeHintEntries
+  // 参照。旧実装はresolve-choice-panel.tsxのFreeTextBlockが個別に持っていたが、ダイアログ化
+  // に伴いここへ一本化した)。ResolveChoicePanelの「解説を見る」ボタンの表示可否
+  // (hasHintContent)とResolveHintDialogの中身の両方に、同じ配列をそのまま使う。
+  const hintEntries = computeHintEntries(scenario, progress, question, hintRevealedForQuestionId)
 
   // 会話ウィンドウ(ConversationFrame)のline(#134・代表決定2026-09-15): 問いの文は中央選択
   // パネルだけに出し、会話ウィンドウには出さない。resolution.questions[]スキーマ(.strict())
@@ -195,41 +261,30 @@ export function ResolveScreen() {
       ? progress.lastAnswerFeedback.reply
       : ''
 
-  // 中央選択パネル(#134): 問い＋選択肢＋相談ボタン。誤答の段階解説(explanations)もここに表示
-  // する(相手の返答=replyは会話ウィンドウ側、上記windowLine参照)。
+  // 中央選択パネル(#134): XPバー＋問い＋選択肢＋相談ボタン＋「解説を見る」ボタン。誤答の段階
+  // 解説・相談ヒント・相談使い切りの注意・直前の正解への一言は、代表決定2026-09-15により
+  // ヒントダイアログ(centerPanelの外、下記ResolveHintDialog参照)へ移した。このパネル自体は
+  // 地の文を持たない(resolve-choice-panel.tsx冒頭コメント参照)。
   const centerPanel = question ? (
     <ResolveChoicePanel
       className={
         // DESIGN.md「縦長（9:16）の構成」節: 横長は箱の50〜55%程度、縦長は立ち絵の上に
         // 積むため幅いっぱい(padding分を除く)に近い幅を使う。
-        // 秘書レビュー2回目(2026-09-15・PR#151)指摘の修正: パネル全体に上限を付ける方式
-        // (前回の実装)は、問い・選択肢・相談ボタンまで一緒に切り詰めてしまい、縦長の問2で
-        // 相談ボタンが半分隠れる不具合になった。パネル自体の上限は撤回し、可変長になりうる
-        // 地の文(直前の正解への一言・誤答の段階解説・相談ヒント)だけを
-        // ResolveChoicePanel内部のFreeTextBlockで個別にmax-h+overflow-y-autoにする方式へ
-        // 変更した(問い・選択肢・相談ボタンは常に全体が見える)。
-        // 秘書レビュー3回目(2026-09-15・PR#152)指摘の修正: 地の文(段階解説)は学習の中身
-        // そのものであり、1行程度のスクロール欄に閉じ込めるのは不可との指摘を受け、
-        // FreeTextBlock側の上限を横長=無し・縦長=24cqh(4〜5行相当)へ引き上げた
-        // (boxOrientation propとして渡す、下記参照)。立ち絵の大きさは優先順位3位に
-        // 後退し、縦長の誤答直後など場所が足りない場面では縮んでよい(ページの縦スクロール
-        // 無しは維持。実測値はPR本文参照)。
         resolveBoxOrientationValue === 'landscape' ? 'w-[52cqw]' : 'w-full'
       }
       boxOrientation={resolveBoxOrientationValue}
       prompt={question.prompt}
-      priorCorrectReply={
-        progress.lastAnswerFeedback?.correct === true
-          ? (progress.lastAnswerFeedback.reply ?? null)
-          : null
-      }
       choices={question.choices}
       onSelectChoice={handleQuestionAnswer}
-      wrongExplanation={progress.lastAnswerFeedback?.correct === false ? resolvedExplanation : null}
       consultRemaining={consultRemaining}
       consultDisabled={consultDisabled}
       onConsult={handleConsult}
-      hintText={hintRevealedForQuestionId === question.id ? question.consult_hint : null}
+      hasHintContent={hintEntries.length > 0}
+      onOpenHint={() => setHintDialogOpen(true)}
+      // ヒントダイアログ表示中は選択肢・相談ボタン・「解説を見る」ボタンをすべて無効化する
+      // (代表決定2026-09-15。下記のinertラッパーと二重の防御、resolve-choice-panel.tsx
+      // 冒頭コメント参照)。
+      interactionDisabled={hintDialogOpen}
       firstChoiceRef={firstChoiceRef}
       estimatedXp={estimatedClearXp}
       maxXp={CLEAR_XP_REWARD}
@@ -295,55 +350,80 @@ export function ResolveScreen() {
           </form>
         )}
 
-        {progress.resolutionStage === 'question' &&
-          question &&
-          (resolveScene ? (
-            // 解決⑤の背景(代表決定2026-09-13・#119/#124): 「解決へ進む」を押した時点で
-            // 表示していた探索シーンの背景をそのまま使い(新しい画像は作らない)、導入③・
-            // 探索④と同じ「背景の箱」＋立ち絵・会話ウィンドウの重ね配置を適用する。
-            <BackgroundBox
-              orientation={resolveBoxOrientationValue}
-              src={resolveBackgroundSrcValue}
-              alt={`${resolveScene.title}の背景`}
-              placeholderLabel={`${resolveScene.title}（背景 準備中）`}
-              imageRect={resolveImageRect}
-            >
-              <ConversationFrame
-                layout="overlay"
-                boxOrientation={resolveBoxOrientationValue}
-                speaker={question.speaker}
-                // 左右2枠の並び(#108/#110): 解決は問1→問2に進んでも並びを保つ(DESIGN.md
-                // 「左右2枠の入れ替わり方式」節「並びのリセット」)。questions全体の話者列の
-                // うち現在の問いまでを履歴として渡すことで、問いをまたいでも並びが連続する。
-                speakerHistory={scenario.resolution.questions
-                  .slice(0, progress.questionIndex + 1)
-                  .map((q) => q.speaker)}
-                line={windowLine}
-                onLineRevealed={handleLineRevealed}
-                centerPanel={centerPanel}
-              />
-              {topRightControls}
-            </BackgroundBox>
-          ) : (
-            // scenario.scenesが無いマップ(一覧フォールバックのみ)は背景の箱を持たないため、
-            // 従来どおりstacked layout(背景の箱を持たない画面向け)のまま描画する。「背景の箱」を
-            // 前提にするゲーム内時刻(#136/#137)はここでは表示しない(DESIGN.md「ゲーム内時刻」節・
-            // #149秘書レビュー2回目・代表決定2026-09-15の「背景の箱に対する相対位置」の対象外)。
-            <div className="relative flex flex-col gap-4">
-              <ConversationFrame
-                speaker={question.speaker}
-                speakerHistory={scenario.resolution.questions
-                  .slice(0, progress.questionIndex + 1)
-                  .map((q) => q.speaker)}
-                line={windowLine}
-                onLineRevealed={handleLineRevealed}
-                centerPanel={centerPanel}
-              />
-              <div className="self-end">
-                <CardDrawer cards={ownedCards} />
+        {progress.resolutionStage === 'question' && question && (
+          <>
+            {resolveScene ? (
+              // 解決⑤の背景(代表決定2026-09-13・#119/#124): 「解決へ進む」を押した時点で
+              // 表示していた探索シーンの背景をそのまま使い(新しい画像は作らない)、導入③・
+              // 探索④と同じ「背景の箱」＋立ち絵・会話ウィンドウの重ね配置を適用する。
+              // inert(代表決定2026-09-15「ヒントダイアログ表示中の背景の扱い」): ヒント
+              // ダイアログが開いている間、右上の時刻/手持ちカードボタンを含む背景全体を
+              // クリック・フォーカスとも不可にする(className="contents"でレイアウトには
+              // 影響させない)。右上ボタン群だけ操作可能にする案は採らなかった: Radix
+              // Dialogの既定(modal)はbodyへpointer-events:none+aria-hidden(hideOthers)を
+              // 掛けるため、一部だけ除外するとaria-modal="true"のフォーカストラップと
+              // 両立しない(PR本文「代表指示（2026-09-15）で追加した範囲」節参照)。
+              <div className="contents" inert={hintDialogOpen || undefined}>
+                <BackgroundBox
+                  orientation={resolveBoxOrientationValue}
+                  src={resolveBackgroundSrcValue}
+                  alt={`${resolveScene.title}の背景`}
+                  placeholderLabel={`${resolveScene.title}（背景 準備中）`}
+                  imageRect={resolveImageRect}
+                >
+                  <ConversationFrame
+                    layout="overlay"
+                    boxOrientation={resolveBoxOrientationValue}
+                    speaker={question.speaker}
+                    // 左右2枠の並び(#108/#110): 解決は問1→問2に進んでも並びを保つ(DESIGN.md
+                    // 「左右2枠の入れ替わり方式」節「並びのリセット」)。questions全体の話者列の
+                    // うち現在の問いまでを履歴として渡すことで、問いをまたいでも並びが連続する。
+                    speakerHistory={scenario.resolution.questions
+                      .slice(0, progress.questionIndex + 1)
+                      .map((q) => q.speaker)}
+                    line={windowLine}
+                    onLineRevealed={handleLineRevealed}
+                    centerPanel={centerPanel}
+                  />
+                  {topRightControls}
+                </BackgroundBox>
               </div>
-            </div>
-          ))}
+            ) : (
+              // scenario.scenesが無いマップ(一覧フォールバックのみ)は背景の箱を持たないため、
+              // 従来どおりstacked layout(背景の箱を持たない画面向け)のまま描画する。「背景の箱」を
+              // 前提にするゲーム内時刻(#136/#137)はここでは表示しない(DESIGN.md「ゲーム内時刻」節・
+              // #149秘書レビュー2回目・代表決定2026-09-15の「背景の箱に対する相対位置」の対象外)。
+              <div
+                className="relative flex flex-col gap-4"
+                inert={hintDialogOpen || undefined}
+              >
+                <ConversationFrame
+                  speaker={question.speaker}
+                  speakerHistory={scenario.resolution.questions
+                    .slice(0, progress.questionIndex + 1)
+                    .map((q) => q.speaker)}
+                  line={windowLine}
+                  onLineRevealed={handleLineRevealed}
+                  centerPanel={centerPanel}
+                />
+                <div className="self-end">
+                  <CardDrawer cards={ownedCards} />
+                </div>
+              </div>
+            )}
+            {/* ヒントダイアログ(代表決定2026-09-15・resolve-hint-dialog.tsx): 誤答の段階解説・
+                相談ヒント・相談使い切りの注意・直前の正解への一言を選択肢の上へ重ねる。
+                inertでラップした上のツリーの外に置く(Dialogはportalでdocument.bodyへ描画
+                されるため実際の描画位置には影響しないが、ソース上もinertの外に置くことで
+                「このツリーだけは常に操作可能」であることを明確にする)。 */}
+            <ResolveHintDialog
+              open={hintDialogOpen}
+              onOpenChange={setHintDialogOpen}
+              entries={hintEntries}
+              restoreFocusRef={firstChoiceRef}
+            />
+          </>
+        )}
       </StateFrame>
     </ScreenContainer>
   )

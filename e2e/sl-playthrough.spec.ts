@@ -21,6 +21,16 @@ async function skipTypewriter(page: import('@playwright/test').Page, line: strin
   await page.getByRole('button', { name: line, exact: true }).click()
 }
 
+/**
+ * ヒントダイアログ(代表決定2026-09-15)を閉じる共通手順(e2e/s1-playthrough.spec.tsと対)。
+ * 誤答直後・正解直後(次の問いがある場合)に自動で開くため、これらの操作の直後に呼ぶ。
+ */
+async function closeHintDialog(page: import('@playwright/test').Page): Promise<void> {
+  await expect(page.getByRole('dialog', { name: '解説' })).toBeVisible()
+  await page.getByRole('button', { name: '閉じる' }).click()
+  await expect(page.getByRole('dialog', { name: '解説' })).toBeHidden()
+}
+
 /** マップ選択でSL「委託先クラウドストレージからの個人データ漏えい」を選ぶ(S1/S2/S3と4件並ぶため、
  * 一覧行(li)をタイトルの文言で絞り込んでから押す。e2e/s1-playthrough.spec.ts の selectS1Map・
  * e2e/s2-playthrough.spec.ts の selectS2Map・e2e/s3-playthrough.spec.ts の selectS3Map と対)。 */
@@ -219,6 +229,9 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     ).toBeVisible()
     // 問いの文は中央選択パネルだけに出る(代表決定2026-09-15・会話ウィンドウには出さない)。
     await expect(page.getByText(causePrompt)).toBeVisible()
+
+    // 誤答直後はヒントダイアログが自動で開く。閉じると問い・選択肢は残ったまま再挑戦できる。
+    await closeHintDialog(page)
     await expect(insiderChoice).toBeVisible()
 
     // 再挑戦で正しい原因(共有設定ミス)を選ぶ。
@@ -231,6 +244,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     const reportDutyPrompt =
       '個人データの漏えいのおそれが確認できました。報告義務は誰に生じると考えますか？'
     await expect(page.getByText(reportDutyPrompt)).toBeVisible()
+    // 直前の正解への一言(代表決定2026-09-15)はヒントダイアログに自動で開く。
+    await closeHintDialog(page)
     await page
       .getByRole('button', {
         name: '個人データを取り扱う委託元である自社にも個人情報保護委員会への報告義務があり、委託先と連携して対応する必要がある',
@@ -239,6 +254,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     const correctivePrompt = '再発防止に向けて、今後どのような方針を取るべきですか？'
     await expect(page.getByText(correctivePrompt)).toBeVisible()
+    await closeHintDialog(page)
     await page
       .getByRole('button', {
         name: '委託契約の内容を見直し、委託先の安全管理措置の実施状況を定期的に確認する体制を整え、再委託の状況も把握できるようにする',
@@ -303,6 +319,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     const reportDutyPrompt =
       '個人データの漏えいのおそれが確認できました。報告義務は誰に生じると考えますか？'
     await expect(page.getByText(reportDutyPrompt)).toBeVisible()
+    // 直前の正解への一言(代表決定2026-09-15)はヒントダイアログに自動で開く。
+    await closeHintDialog(page)
     await page
       .getByRole('button', {
         name: '個人データを取り扱う委託元である自社にも個人情報保護委員会への報告義務があり、委託先と連携して対応する必要がある',
@@ -311,6 +329,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     const correctivePrompt = '再発防止に向けて、今後どのような方針を取るべきですか？'
     await expect(page.getByText(correctivePrompt)).toBeVisible()
+    await closeHintDialog(page)
     await page
       .getByRole('button', {
         name: '委託契約の内容を見直し、委託先の安全管理措置の実施状況を定期的に確認する体制を整え、再委託の状況も把握できるようにする',

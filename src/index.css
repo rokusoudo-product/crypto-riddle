@@ -73,6 +73,17 @@
   -webkit-backdrop-filter: blur(var(--glass-panel-blur));
 }
 
+/* 背景の暗転スクリム（代表決定2026-09-15・DESIGN.md「解決の会話モード」節「ヒントダイアログ」）。
+   ヒントダイアログ表示中、下層（選択パネル・会話ウィンドウ・立ち絵・右上の時刻/カードドロワー）を
+   覆う強めの半透明幕。backgroundトークン（--background）を不透明度トークン（--scrim-alpha=0.7）
+   だけ変えて合成する（色の直書き禁止、DESIGN.md「カラートークン」節）。glass-panelと同じ
+   color-mix(in srgb, ...)方式にする（sRGBチャンネルの線形補間、計測時にgetComputedStyle()の
+   rgba()値とトークン値の対応が取りやすいようにするため）。ぼかしは掛けない（下の要素を強く
+   隠す・読めなくするのが目的で、glass-panelのような「奥にうっすら透ける」演出とは役割が違う）。 */
+@utility scrim {
+  background-color: color-mix(in srgb, var(--background) calc(var(--scrim-alpha) * 100%), transparent);
+}
+
 /* 解決⑤の選択肢の5状態（DESIGN.md「解決の会話モード」節「選択肢の5状態」・#134）。
    surface-2（--secondary）地に opaque な枠線ボタンとして実装する。#133 で判明した
    shadcn Button variant="outline" の `dark:bg-input/30`（alpha 0.3）上書き問題
@@ -261,6 +272,11 @@
      上記 @utility glass-panel から参照する。 */
   --glass-panel-min-alpha: 0.81;
   --glass-panel-blur: 12px;
+  /* 背景の暗転スクリムの不透明度（代表決定2026-09-15・DESIGN.md「解決の会話モード」節
+     「ヒントダイアログ」）。上記 @utility scrim から参照する。0.7はダイアログ表示中に下層が
+     はっきり読めなくなる強めの暗転として代表が指定した目安値（glass-panelのような
+     コントラスト計算由来の最小値ではないため check-contrast.mjs の対象外）。 */
+  --scrim-alpha: 0.7;
   /* 解決⑤選択肢のホバー/フォーカスのネオン光彩・可視フォーカスリング（DESIGN.md「選択肢の
      5状態」節・#134）。カラーコード・サイズの直書き禁止のためトークン化する。 */
   --neon-glow-blur: 12px;

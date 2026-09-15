@@ -145,19 +145,31 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       expect(document.activeElement).toHaveTextContent('公開サーバーの脆弱性を突かれた侵入')
       await user.keyboard('{Enter}')
 
-      // 誤答フォロー: 選択肢は残ったまま reply + 段階解説が表示される(aria-live, role=alertではない)。
+      // 誤答フォロー: 選択肢は残ったまま reply(会話ウィンドウ、従来どおり)が表示される。
+      // 段階解説(explanations)は代表決定2026-09-15により、誤答直後に自動で開くヒント
+      // ダイアログ(resolve-hint-dialog.tsx)へ移った(旧実装はパネル内に常時表示していた)。
       expect(
         await screen.findByText(
           /その場合は境界の通信記録に、外から内への不審なアクセスが残るはずだ/,
         ),
       ).toBeInTheDocument()
+      expect(await screen.findByRole('dialog', { name: '解説' })).toBeInTheDocument()
       expect(
         screen.getByText(/「怪しく見える」ことと「今回の侵入を裏付ける証拠」は違う/),
       ).toBeInTheDocument()
       // 問い文(選択パネル側)は誤答後も変わらず表示され続ける(プレイヤーが問いを見失わない、#134)。
       expect(screen.getByText('この侵入、どこから入られたと見る？')).toBeInTheDocument()
 
+      // ヒントダイアログはEscapeで閉じる(代表決定2026-09-15「Escapeで閉じる」)。閉じると
+      // 選択パネルの最初の選択肢へフォーカスが戻る(resolve-hint-dialog.tsxのrestoreFocusRef
+      // 参照: 誤答した選択肢自体はダイアログ表示中に無効化=disabledになりブラウザ仕様上
+      // blurされるため、Radixの既定の「直前の要素へ戻す」は使わず常にこの位置へ戻す)。
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog', { name: '解説' })).not.toBeInTheDocument()
+      expect(document.activeElement).toHaveTextContent('取引先を装った請求書メールの添付ファイル')
+
       // --- 相談(コストあり)をキーボードで使う ---
+      await user.tab() // choice[1](誤答)
       await user.tab() // choice[2]
       await user.tab() // 相談ボタン
       expect(document.activeElement).toHaveTextContent('相談する')
@@ -168,10 +180,21 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
           'フィッシングメールの実在・マクロ実行の記録・C2通信の痕跡・中野の証言を分野で整理して提示する。',
         ),
       ).toBeInTheDocument()
+      expect(await screen.findByRole('dialog', { name: '解説' })).toBeInTheDocument()
+
+      // ここでもEscapeで閉じ、選択パネルの最初の選択肢へ戻る(上記と同じ理由)。
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog', { name: '解説' })).not.toBeInTheDocument()
+      expect(document.activeElement).toHaveTextContent('取引先を装った請求書メールの添付ファイル')
 
       // 誤答時の返答(reply)は会話ウィンドウでタイプライター表示される(#134・DESIGN.md「会話
-      // ウィンドウとの役割分担」)。会話ウィンドウのスキップボタンもTab到達順に含まれるため、
-      // キーボードでスキップしてから続ける(Tab到達順: 選択肢→相談→この返答→手持ちカード)。
+      // ウィンドウとの役割分担」・変更なし)。誤答の段階解説がダイアログへ移ったことで
+      // パネルに「解説を見る」ボタンが増えたぶん、会話ウィンドウのスキップボタンまでの
+      // Tab到達順が1つ後ろにずれる(選択肢→相談→解説を見る→この返答→手持ちカード)。
+      await user.tab() // choice[1](誤答)
+      await user.tab() // choice[2]
+      await user.tab() // 相談ボタン
+      await user.tab() // 解説を見るボタン(代表決定2026-09-15。誤答の段階解説がある間は表示される)
       await user.tab() // 誤答時の返答(会話ウィンドウのスキップボタン)
       expect(document.activeElement).toHaveTextContent('その場合は境界の通信記録に')
       await user.keyboard('{Enter}')
@@ -185,6 +208,7 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       await user.tab() // choice[1]
       await user.tab() // choice[2]
       await user.tab() // 相談ボタン
+      await user.tab() // 解説を見るボタン
       await user.tab() // カードドロワーの開閉ボタン(#134: 背景の箱の右上へ移設。可視文言は
       // 「手持ちカード」、aria-labelは他画面と同じ固定文言「手持ちカードを見る（無料）」)
       expect(document.activeElement).toHaveTextContent('手持ちカード')
@@ -204,11 +228,20 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       expect(document.activeElement).toHaveTextContent('取引先を装った請求書メールの添付ファイル')
       await user.keyboard('{Enter}')
 
-      // q-initial-response(橘)へ進む。問いの文は会話ウィンドウを介さずパネルへ直接表示される
-      // ため、選択肢は新しい問いのパネル表示と同時に操作可能になり、resolve-screen.tsxが
-      // 選択パネルの最初の選択肢へ自動的にフォーカスを移す(会話ウィンドウのタイプライターを
-      // スキップする操作は不要)。
+      // q-initial-response(橘)へ進む。直前の正解への一言(代表決定2026-09-15)はヒント
+      // ダイアログに自動で開いて表示され、次の問いの選択肢は閉じるまで操作できない
+      // (resolve-choice-panel.tsxのinteractionDisabled)。
       expect(await screen.findByText('感染が疑われる端末への初動対応は？')).toBeInTheDocument()
+      expect(await screen.findByRole('dialog', { name: '解説' })).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          /その通りだ、新人。フィッシングメールの実在、マクロ実行の記録、C2通信の痕跡/,
+        ),
+      ).toBeInTheDocument()
+      await user.keyboard('{Escape}')
+      expect(screen.queryByRole('dialog', { name: '解説' })).not.toBeInTheDocument()
+      // 閉じると選択パネルの最初の選択肢(新しい問いのchoice[0])へフォーカスが戻る
+      // (resolve-hint-dialog.tsxのrestoreFocusRef、上記と同じ理由)。
       expect(document.activeElement).toHaveTextContent('ネットワークから論理的に隔離し')
       await user.keyboard('{Enter}')
 
@@ -260,6 +293,12 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       }),
     )
     expect(await screen.findByText('感染が疑われる端末への初動対応は？')).toBeInTheDocument()
+    // 直前の正解への一言(代表決定2026-09-15)はヒントダイアログに自動で開く。閉じるボタンで
+    // 閉じてから次の問いへ進む(#138の1回目のテストはEscapeで閉じたため、ここでは閉じる
+    // ボタンでの操作もあわせて確認する)。
+    expect(await screen.findByRole('dialog', { name: '解説' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '閉じる' }))
+    expect(screen.queryByRole('dialog', { name: '解説' })).not.toBeInTheDocument()
     await user.click(
       screen.getByRole('button', {
         name: 'ネットワークから論理的に隔離し(LANケーブル抜線・無線LAN無効化)、電源は落とさず揮発性メモリとディスクの証拠を保全する',

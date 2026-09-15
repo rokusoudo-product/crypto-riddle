@@ -583,6 +583,54 @@ describe('ConversationFrame(#64/T042 タイプライター表示)', () => {
     })
   })
 
+  describe('会話ウィンドウが空のときは隠す(代表決定2026-09-15)', () => {
+    it('lineが空文字・NPC発話でもないときは会話ウィンドウ自体を描画しない(overlay)', () => {
+      render(
+        <ConversationFrame
+          speaker="橘"
+          speakerHistory={['霧島', '橘']}
+          line=""
+          layout="overlay"
+        />,
+      )
+
+      expect(screen.queryByTestId('conversation-window')).not.toBeInTheDocument()
+      // 立ち絵・名前箱の描画自体には影響しない(発話中の橘の名前箱は可視のまま)。
+      const nameBoxes = screen.getAllByTestId('portrait-name-box')
+      expect(nameBoxes).toHaveLength(2)
+      expect(nameBoxes.find((el) => el.getAttribute('aria-hidden') !== 'true')).toHaveTextContent(
+        '橘',
+      )
+    })
+
+    it('lineが空文字・NPC発話でもないときは会話ウィンドウ自体を描画しない(stacked)', () => {
+      render(<ConversationFrame speaker="霧島" speakerHistory={['霧島']} line="" />)
+
+      expect(screen.queryByTestId('conversation-window')).not.toBeInTheDocument()
+    })
+
+    it('lineが非空なら通常どおり会話ウィンドウを表示する', () => {
+      render(<ConversationFrame speaker="霧島" speakerHistory={['霧島']} line={LINE} layout="overlay" />)
+
+      expect(screen.getByTestId('conversation-window')).toBeInTheDocument()
+    })
+
+    it('lineが空文字でもNPC発話(名札のみ)のときは会話ウィンドウを表示する', () => {
+      render(
+        <ConversationFrame
+          speaker={{ npc: '中野' }}
+          speakerHistory={['霧島', { npc: '中野' }]}
+          line=""
+          layout="overlay"
+        />,
+      )
+
+      const conversationWindow = screen.getByTestId('conversation-window')
+      expect(conversationWindow).toBeInTheDocument()
+      expect(conversationWindow).toHaveTextContent('中野')
+    })
+  })
+
   describe('表情フォールバック(resolvePortraitSrc・#100/#102)', () => {
     it('該当表情のPNGが無ければneutralにフォールバックする(現在生成済みは3名ともneutralのみ)', () => {
       const neutral = resolvePortraitSrc('霧島', 'neutral')

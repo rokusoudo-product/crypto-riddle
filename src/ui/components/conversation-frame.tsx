@@ -532,6 +532,16 @@ export function ConversationFrame({
   // 左右2枠の並び(#108/#110): speakerHistory省略時は履歴なし(=この1ターンだけ)として扱う。
   const twoSlot = layoutTwoSlotFrame(speakerHistory ?? [speaker])
 
+  // 会話ウィンドウの表示可否(代表決定2026-09-15「会話ウィンドウが空のときは隠す」)。
+  // line(台詞本文)が空文字で、かつNPC名札(NpcNameBox、windowContent参照)を表示する場面でも
+  // ないとき(=ウィンドウに出す中身が何も無いとき)は、ウィンドウ自体を描画しない。
+  // 解決⑤(resolve-screen.tsx)の問い表示中(誤答直後を除く)がこれに当たる: 問いの文は
+  // 中央選択パネル側に静的表示され、会話ウィンドウのlineは空文字のままになる(#134)。
+  // NPC名のみの表示(twoSlot.npcSpeaking、立ち絵を持たないNPCの発話)は「中身がある」扱いに
+  // する(名札だけでも発話者を示す情報のため隠さない)。導入③・探索④はlineが空になる場面が
+  // 無いため挙動に影響しない(代表確認済み、PR本文参照)。
+  const hasWindowContent = line.length > 0 || twoSlot.npcSpeaking
+
   // line(または prefers-reduced-motion 設定)が変わったら、レンダー中に即座に表示位置を
   // 先頭(またはreduced-motionなら全文)へ戻す。useEffectでの事後リセットだと、変更後の最初の
   // 1フレームだけ古い revealedLength を新しい line.length と比較した誤った isComplete で
@@ -876,21 +886,25 @@ export function ConversationFrame({
             portraitColumnSizing,
             boxOrientation === 'landscape' ? centerPanel : undefined,
           )}
-          <div
-            ref={windowRef}
-            data-testid="conversation-window"
-            className={cn(
-              // 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel、DESIGN.md「半透明（ガラス風）
-              // パネル」節・#133) + 上辺に primary(ネオンブルー)のアクセント(旧ゴールドは#132で撤回)。
-              'border-primary glass-panel relative z-10 flex min-w-0 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
-              'max-h-full',
-              onDismiss &&
-                'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
-            )}
-            {...dismissWindowProps}
-          >
-            {windowContent}
-          </div>
+          {/* 会話ウィンドウが空のときは隠す(代表決定2026-09-15、上記hasWindowContentコメント
+              参照)。ウィンドウを描画しないだけで、立ち絵の行・centerPanelの表示には影響しない。 */}
+          {hasWindowContent && (
+            <div
+              ref={windowRef}
+              data-testid="conversation-window"
+              className={cn(
+                // 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel、DESIGN.md「半透明（ガラス風）
+                // パネル」節・#133) + 上辺に primary(ネオンブルー)のアクセント(旧ゴールドは#132で撤回)。
+                'border-primary glass-panel relative z-10 flex min-w-0 shrink-0 flex-col gap-3 overflow-y-auto rounded-lg border-t-4 p-3 shadow-lg sm:gap-4 sm:p-6',
+                'max-h-full',
+                onDismiss &&
+                  'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
+              )}
+              {...dismissWindowProps}
+            >
+              {windowContent}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -912,19 +926,22 @@ export function ConversationFrame({
           めり込み)は撤回した(overlay側と同じ理由、renderPortraitRow呼び出し部のコメント参照)。 */}
       {renderPortraitRow('shrink-0 px-2 sm:gap-12', STACKED_PORTRAIT_COLUMN_SIZING)}
       {/* 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel) + 上辺に primary(ネオンブルー、
-          旧ゴールドは#132で撤回)のアクセント。 */}
-      <div
-        ref={windowRef}
-        data-testid="conversation-window"
-        className={cn(
-          'border-primary glass-panel relative z-10 flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
-          onDismiss &&
-            'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
-        )}
-        {...dismissWindowProps}
-      >
-        {windowContent}
-      </div>
+          旧ゴールドは#132で撤回)のアクセント。空のときは隠す(代表決定2026-09-15、上記
+          hasWindowContentコメント参照)。 */}
+      {hasWindowContent && (
+        <div
+          ref={windowRef}
+          data-testid="conversation-window"
+          className={cn(
+            'border-primary glass-panel relative z-10 flex flex-col gap-4 rounded-lg border-t-4 p-4 sm:p-6',
+            onDismiss &&
+              'focus-visible:ring-ring cursor-pointer focus-visible:ring-3 focus-visible:outline-none',
+          )}
+          {...dismissWindowProps}
+        >
+          {windowContent}
+        </div>
+      )}
     </div>
   )
 }
