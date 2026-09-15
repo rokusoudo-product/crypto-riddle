@@ -964,7 +964,12 @@ export function SceneExplorer({
             // (調査結果/danger)では、右下が「解決へ進む」ボタンと衝突しうるため会話ウィンドウ帯の
             // 右上端に表示する。時刻は現在アクティブなシーン(activeScene)のgame_timeを使う
             // (探索中はシーンを行き来できるが、各シーンの時刻を固定表示する。代表承認2026-09-15)。
-            cornerSlot={<GameTimeBadge gameTime={activeScene.game_time} />}
+            cornerSlot={
+              <GameTimeBadge
+                gameTime={activeScene.game_time}
+                compact={boxOrientation === 'portrait'}
+              />
+            }
           >
             <p className="text-muted-foreground text-xs">
               {conversation.kind === 'collect'

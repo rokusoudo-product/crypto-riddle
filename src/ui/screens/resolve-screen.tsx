@@ -270,7 +270,12 @@ export function ResolveScreen() {
                 // 持つ(探索シーンのgame_timeとは独立、docs/scenario_schema.md §2.8)。#134/#135が
                 // このファイルを大きく書き換える予定のため、時刻表示はcornerSlotを差し込むだけの
                 // 最小差分にとどめる(#137 Issue本文)。
-                cornerSlot={<GameTimeBadge gameTime={scenario.resolution.game_time} />}
+                cornerSlot={
+                  <GameTimeBadge
+                    gameTime={scenario.resolution.game_time}
+                    compact={resolveBoxOrientationValue === 'portrait'}
+                  />
+                }
               >
                 {questionChildren}
               </ConversationFrame>

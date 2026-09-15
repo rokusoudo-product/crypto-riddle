@@ -18,6 +18,12 @@
 // テキストノードがそのままアクセシブルネームになる)ため、追加の aria-label は付けない
 // (WCAG的に読み上げ内容と見た目の内容を一致させる。DESIGN.md「ゲーム内時刻」節「支援技術向けに、
 // 意味の分かるラベルを付ける」に対応)。時計アイコンは装飾のため aria-hidden にする。
+//
+// `compact`(秘書レビュー2026-09-15・PR#149・advisor提案): 縦長(9:16)の会話ウィンドウ上辺は、
+// 立ち絵2枠(DESIGN.md「立ち絵の拡大」節、最大で箱幅の40%超になりうる)の間の余白が非常に狭く、
+// フルラベル「ゲーム内時刻 HH:MM」の幅では立ち絵と重なりうる。`compact`指定時は可視テキストを
+// 時刻のみ(`HH:MM`)に切り詰めて表示幅を縮め、フルラベルは`sr-only`で別途提供する
+// (conversation-frame.tsxのタイプライター表示=aria-hidden部分文字列+sr-only全文と同じパターン)。
 import { Clock } from 'lucide-react'
 
 import { cn } from '@/ui/lib/utils'
@@ -25,6 +31,11 @@ import { cn } from '@/ui/lib/utils'
 export interface GameTimeBadgeProps {
   /** `HH:MM`形式のゲーム内時刻(intro/scenes[]/resolutionのgame_time、省略可)。 */
   gameTime?: string
+  /**
+   * 縦長(9:16)の会話ウィンドウ上辺など、立ち絵との横幅の余白が狭い置き場所向けに、可視テキストを
+   * 時刻のみに切り詰める(上記ファイル冒頭コメント参照)。フルラベルはsr-onlyで維持する。
+   */
+  compact?: boolean
   className?: string
 }
 
@@ -32,7 +43,7 @@ export interface GameTimeBadgeProps {
  * ゲーム内時刻バッジ。`gameTime`が省略されている場面(データ側でgame_timeを書いていないシーン・
  * s0-sample等)では何も描画しない(DESIGN.md「粒度・データ」節「省略時、UIは時刻表示を出さない」)。
  */
-export function GameTimeBadge({ gameTime, className }: GameTimeBadgeProps) {
+export function GameTimeBadge({ gameTime, compact = false, className }: GameTimeBadgeProps) {
   if (!gameTime) return null
   return (
     <div
@@ -42,7 +53,14 @@ export function GameTimeBadge({ gameTime, className }: GameTimeBadgeProps) {
       )}
     >
       <Clock aria-hidden="true" className="size-3.5 sm:size-4" />
-      <span>ゲーム内時刻 {gameTime}</span>
+      {compact ? (
+        <>
+          <span aria-hidden="true">{gameTime}</span>
+          <span className="sr-only">ゲーム内時刻 {gameTime}</span>
+        </>
+      ) : (
+        <span>ゲーム内時刻 {gameTime}</span>
+      )}
     </div>
   )
 }

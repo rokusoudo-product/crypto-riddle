@@ -184,6 +184,23 @@ const PORTRAIT_BOX_RELATIVE_SIZE_CLASS: Record<BoxOrientation, string> = {
   portrait: 'h-full max-h-[32cqh] w-auto aspect-[3/4]',
 }
 
+// ゲーム内時刻バッジ(cornerSlot、#136/#137)のoverlay分岐での右オフセット(秘書レビュー
+// 2026-09-15・PR#149)。会話ウィンドウの外側・上辺のすぐ上(`bottom-full`)に置くため縦方向は
+// 立ち絵の行と同じ帯に入るが、右の立ち絵カードの最大幅(PORTRAIT_BOX_RELATIVE_SIZE_CLASSの
+// max-h-cqhにaspect-[3/4]を掛けた値、= 同じcqh単位で48cqh×3/4=36cqh・32cqh×3/4=24cqh)より
+// 大きく右へ逃がすことで、右の立ち絵と重ならないようにする(cqhはPORTRAIT_BOX_RELATIVE_SIZE_CLASS
+// と同じ単位系なので、box高さが変わっても両者は常に同じ比率のまま連動する)。縦長(portrait)は
+// 立ち絵の最大幅が箱の非常に広い割合(24cqh≒箱幅の43%相当)を占めうるため、左の立ち絵の
+// 最大幅(同じく43%相当)と合わせると理論上は隙間が15%程度しか残らない狭さになる。実際の場面
+// (会話文の長さ等で立ち絵の行がこの上限まで伸びるとは限らない)では余裕があることを撮影で
+// 確認したうえで採用した値。
+const TIME_BADGE_CORNER_RIGHT_OFFSET_CLASS: Record<BoxOrientation, string> = {
+  landscape: 'right-[40cqh]',
+  // 縦長(portrait)は呼び出し側がGameTimeBadgeに`compact`(時刻のみ表示)を指定して幅を
+  // 縮めているため、横長ほど大きくは逃がさない(秘書レビュー2026-09-15・PR#149・advisor提案)。
+  portrait: 'right-[8cqh]',
+}
+
 // 話者の枠(#119/#124/#132/#133): いま話している人の立ち絵カードを、フルカラー表示に加えて
 // 白またはネオンブルーの枠線で囲む(DESIGN.md「会話フレーム」節「話者の枠」)。index.cssの
 // --speaker-frame-white/--speaker-frame-neon-blueトークン経由で両方用意してあり、切り替えは
@@ -379,15 +396,20 @@ export interface ConversationFrameProps {
    */
   boxOrientation?: BoxOrientation
   /**
-   * 会話ウィンドウの右上角に重ねる要素(#136/#137、DESIGN.md「ゲーム内時刻」節「会話フレーム」節)。
-   * 現状はゲーム内時刻バッジ(`GameTimeBadge`)専用の差し込み口だが、汎用に`ReactNode`で受ける。
+   * 会話ウィンドウの**外側**・右上(上辺のすぐ上、タブのように接する)に重ねる要素
+   * (#136/#137、DESIGN.md「ゲーム内時刻」節「会話フレーム」節)。現状はゲーム内時刻バッジ
+   * (`GameTimeBadge`)専用の差し込み口だが、汎用に`ReactNode`で受ける。
    *
-   * 会話ウィンドウ**自体**(windowRef)の中には入れない: `onDismiss`指定時、windowRefは
-   * `role="button"`になり`aria-label`を`line`に固定する。ARIAのbuttonロールは子孫を
-   * Presentational化する(children-presentational)ため、内部に置いた要素は支援技術から
-   * 見えなくなってしまう(`aria-label`だけが読み上げられ、cornerSlotの中身は無視される)。
-   * そのため、windowRefの**兄弟**として絶対配置し、見た目だけウィンドウの角に重ねる
-   * (`pointer-events-none`にするのは呼び出し側=GameTimeBadgeの責務)。
+   * 会話ウィンドウ**自体**(windowRef)の中には入れない。理由は2つ:
+   * (1) `onDismiss`指定時、windowRefは`role="button"`になり`aria-label`を`line`に固定する。
+   *     ARIAのbuttonロールは子孫をPresentational化する(children-presentational)ため、
+   *     内部に置いた要素は支援技術から見えなくなってしまう(`aria-label`だけが読み上げられ、
+   *     cornerSlotの中身は無視される)。
+   * (2) 見た目上も、名前の帯(NamePlate)が#147時点からウィンドウ幅いっぱいに伸びる不具合
+   *     (#138で解消予定・本Issueの範囲外)があり、ウィンドウ**内側**の右上に置くと名前の帯と
+   *     重なって見える(秘書レビュー2026-09-15・PR#149で指摘)。
+   * そのため、windowRefの**兄弟**として絶対配置し、`bottom-full`でウィンドウの外側・
+   * 上辺のすぐ上へ重ねる(`pointer-events-none`にするのは呼び出し側=GameTimeBadgeの責務)。
    */
   cornerSlot?: ReactNode
 }
@@ -673,7 +695,17 @@ export function ConversationFrame({
     // `max-h-full`を最後の安全弁として残すが、通常の表示状態では発火しない設計
     // (E2E/E2E-shot.mjsのno-scroll確認対象)。#136/#137: `shrink-0`/`max-h-full`/`relative
     // z-10`は、cornerSlot(ゲーム内時刻バッジ)を挟むために追加した外側ラッパー
-    // (下記`<div className="relative z-10 flex max-h-full shrink-0 flex-col">`)へ移した。
+    // (下記`<div className="relative flex max-h-full shrink-0 flex-col">`)へ移した。
+    // このラッパーに`z-10`を明示すると、それ自体が新しいスタッキングコンテキストを作ってしまい、
+    // 内部のcornerSlot(z-20)が立ち絵の行(renderPortraitRowのz-20)より**下**に閉じ込められる
+    // (両者とも兄弟レベルでz-20同士を比較する必要があるが、ラッパーに明示z-indexがあると
+    // cornerSlotの比較対象がラッパー内部に限定されてしまうため。秘書レビュー2026-09-15・
+    // PR#149で発覚: 2人目の立ち絵が実際に描画されている場面でバッジが完全に見えなくなっていた)。
+    // ラッパー自体は`z-index`を指定しない(`relative`のみ)ことで、window(旧・単体でz-10を
+    // 持っていた要素。現在はwindow自身も明示z-indexを持たず、z-index:autoとして扱われる)は
+    // 従来どおり立ち絵の行より下に留まりつつ(#124の意図的な重なり=立ち絵が窓の上端に
+    // わずかに被さる演出を維持)、cornerSlotだけがz-20として立ち絵の行と同じ土俵で
+    // 比較され、DOM順(cornerSlot側が後)で立ち絵より手前に出る。
     // windowRef自体(`data-testid="conversation-window"`)は変わらず、この段落が指す
     // 「会話ウィンドウ側」は実質そのラッパーを指す。
     const portraitSizeClass = PORTRAIT_BOX_RELATIVE_SIZE_CLASS[boxOrientation]
@@ -696,9 +728,21 @@ export function ConversationFrame({
               参照するDOM要素のため、参照先は変えない)。cornerSlotはwindowRefの兄弟として
               絶対配置し、windowRefが`role="button"`(onDismiss指定時)になってもARIAの
               children-presentational化の影響を受けないようにする(上記cornerSlot JSDoc参照)。 */}
-          <div className="relative z-10 flex max-h-full shrink-0 flex-col">
+          <div className="relative flex max-h-full shrink-0 flex-col">
             {cornerSlot && (
-              <div className="pointer-events-none absolute top-2 right-2 z-20 sm:top-3 sm:right-3">
+              // 秘書レビュー(2026-09-15・PR#149): 会話ウィンドウの内側(top-2/top-3)に置くと、
+              // #147時点から名前の帯(NamePlate)がウィンドウ幅いっぱいに伸びる不具合(#138で
+              // 名前箱を立ち絵の下へ移す際に解消予定・本Issueの範囲外)と重なって見えた。
+              // `bottom-full`でウィンドウの**外側**・上辺のすぐ上(タブのように接する。
+              // ウィンドウの矩形とは重ならない)へ変更した。右オフセットは固定値ではなく
+              // TIME_BADGE_CORNER_RIGHT_OFFSET_CLASS(上記コメント参照)で、右の立ち絵と
+              // 重ならないよう箱の向きに応じて逃がす。
+              <div
+                className={cn(
+                  'pointer-events-none absolute bottom-full z-20',
+                  TIME_BADGE_CORNER_RIGHT_OFFSET_CLASS[boxOrientation],
+                )}
+              >
                 {cornerSlot}
               </div>
             )}
@@ -736,10 +780,15 @@ export function ConversationFrame({
       {/* 会話ウィンドウ: 半透明（ガラス風）パネル(glass-panel) + 上辺に primary(ネオンブルー、
           旧ゴールドは#132で撤回)のアクセント。#136/#137: cornerSlot(ゲーム内時刻バッジ)は
           windowRef自体ではなくその兄弟として重ねる(overlay分岐と同じ理由、上記cornerSlot
-          JSDoc参照)。 */}
-      <div className="relative z-10 flex flex-col">
+          JSDoc参照)。ラッパーに`z-10`を明示しない理由もoverlay分岐と同じ(上記
+          `if (layout === 'overlay')`ブロック内のコメント参照): cornerSlot(z-20)が
+          立ち絵の行(renderPortraitRowのz-20)と同じ土俵で比較され、DOM順で手前に出るように
+          するため。 */}
+      <div className="relative flex flex-col">
         {cornerSlot && (
-          <div className="pointer-events-none absolute top-2 right-2 z-20 sm:top-3 sm:right-3">
+          // 秘書レビュー(2026-09-15・PR#149): overlay分岐と同じ理由で、ウィンドウの外側・
+          // 上辺のすぐ上(bottom-full)へ変更した(上記overlay分岐のコメント参照)。
+          <div className="pointer-events-none absolute right-2 bottom-full z-20 sm:right-3">
             {cornerSlot}
           </div>
         )}

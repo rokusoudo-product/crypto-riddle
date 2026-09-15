@@ -23,4 +23,19 @@ describe('GameTimeBadge(#136/#137)', () => {
     // DESIGN.md「ゲーム内時刻」節「支援技術向けに、意味の分かるラベルを付ける」)。
     expect(screen.getByText('ゲーム内時刻 09:42')).toBeInTheDocument()
   })
+
+  it(
+    'compact指定時は可視テキストを時刻のみに切り詰め、フルラベルはsr-onlyで提供する' +
+      '(秘書レビュー2026-09-15・PR#149: 縦長では立ち絵との幅の余白が狭いため)',
+    () => {
+      render(<GameTimeBadge gameTime="09:42" compact />)
+      // 可視テキスト(aria-hidden)は時刻のみ。「ゲーム内時刻」というテキストノード単体は
+      // 存在しない(sr-only側は「ゲーム内時刻 09:42」を1つのテキストノードとして持つ)。
+      const visible = screen.getByText('09:42', { selector: 'span[aria-hidden="true"]' })
+      expect(visible).toBeInTheDocument()
+      // フルラベルはsr-onlyとして別途DOMに存在する(支援技術には従来どおり伝わる)。
+      const fullLabel = screen.getByText('ゲーム内時刻 09:42', { selector: '.sr-only' })
+      expect(fullLabel).toBeInTheDocument()
+    },
+  )
 })

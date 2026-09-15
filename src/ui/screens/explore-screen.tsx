@@ -232,7 +232,9 @@ export function ExploreScreen() {
         speaker="橘"
         line="材料は揃ったわ。そろそろ問題を整理しましょう。"
         onOutsideDismiss={handleDismissWrapUpPrompt}
-        cornerSlot={<GameTimeBadge gameTime={activeGameTime} />}
+        cornerSlot={
+          <GameTimeBadge gameTime={activeGameTime} compact={wrapUpBoxOrientation === 'portrait'} />
+        }
       >
         <div className="flex items-center justify-between gap-2">
           <p className="text-muted-foreground text-xs">

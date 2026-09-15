@@ -202,7 +202,12 @@ export function IntroScreen() {
               dismissAnywhere
               // ゲーム内時刻(#136/#137、DESIGN.md「ゲーム内時刻」節): game_time省略時は
               // GameTimeBadgeがnullを返し何も表示しない。
-              cornerSlot={<GameTimeBadge gameTime={scenario.intro.game_time} />}
+              cornerSlot={
+                <GameTimeBadge
+                  gameTime={scenario.intro.game_time}
+                  compact={boxOrientation === 'portrait'}
+                />
+              }
             />
           </BackgroundBox>
         ) : (
