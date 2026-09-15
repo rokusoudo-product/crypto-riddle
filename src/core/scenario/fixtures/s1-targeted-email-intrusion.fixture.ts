@@ -161,7 +161,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
       hotspots: [
         {
           object_type: 'pc',
-          position: { landscape: [0.52, 0.57], portrait: [0.54, 0.61] },
+          position: { landscape: [0.47, 0.62], portrait: [0.52, 0.635] },
           label: '経理部 中野の端末',
           actions: [
             {
@@ -192,7 +192,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: { landscape: [0.53, 0.4], portrait: [0.55, 0.52] },
+          position: { landscape: [0.61, 0.45], portrait: [0.545, 0.565] },
           label: '中野',
           actions: [
             {
@@ -215,7 +215,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: { landscape: [0.39, 0.27], portrait: [0.25, 0.38] },
+          position: { landscape: [0.355, 0.26], portrait: [0.245, 0.45] },
           label: '経理部長',
           actions: [
             {
@@ -238,7 +238,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'book',
-          position: { landscape: [0.62, 0.2], portrait: [0.59, 0.44] },
+          position: { landscape: [0.26, 0.4], portrait: [0.6, 0.5] },
           label: '資料棚',
           actions: [
             {
@@ -269,7 +269,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: { landscape: [0.84, 0.54], portrait: [0.79, 0.51] },
+          position: { landscape: [0.775, 0.55], portrait: [0.78, 0.58] },
           label: 'サーバ室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-server', label: 'サーバ室へ移動する' }],
         },
@@ -282,7 +282,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
       hotspots: [
         {
           object_type: 'device',
-          position: { landscape: [0.18, 0.45], portrait: [0.11, 0.45] },
+          position: { landscape: [0.17, 0.45], portrait: [0.08, 0.55] },
           label: 'プロキシサーバ',
           actions: [
             {
@@ -306,7 +306,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'device',
-          position: { landscape: [0.82, 0.45], portrait: [0.89, 0.47] },
+          position: { landscape: [0.83, 0.45], portrait: [0.88, 0.55] },
           label: 'メールサーバ',
           actions: [
             {
@@ -325,7 +325,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: { landscape: [0.51, 0.43], portrait: [0.51, 0.42] },
+          position: { landscape: [0.485, 0.46], portrait: [0.505, 0.555] },
           label: 'サーバ管理者',
           prompt: 'サーバ管理者「どうしましたか？」',
           actions: [
@@ -372,7 +372,7 @@ export const s1TargetedEmailIntrusionFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: { landscape: [0.5, 0.9], portrait: [0.7, 0.41] },
+          position: { landscape: [0.645, 0.52], portrait: [0.73, 0.55] },
           label: '執務室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-office', label: '執務室へ移動する' }],
         },
