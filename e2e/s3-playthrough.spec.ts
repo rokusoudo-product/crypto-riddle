@@ -191,9 +191,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     // --- 解決(会話モード): q-entry-point → q-immediate-response → q-response-policy の3問。 ---
     const entryPrompt =
       'カード情報は自社のデータベースに保存していなかった。それなのになぜ漏れたと見る？'
-    // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
-    await expect(page.getByText(entryPrompt).first()).toBeVisible()
-    await skipTypewriter(page, entryPrompt)
+    // 問いの文は中央選択パネルだけに出る(代表決定2026-09-15・会話ウィンドウには出さない)。
+    await expect(page.getByText(entryPrompt)).toBeVisible()
 
     // わざと「SQLインジェクション」を選び、誤答フォローで問い・選択肢が残ることを確認する
     // (⑥失敗解説の独立画面は廃止済み。会話モード内で完結する。S1/S2の教育的失敗テストと対)。
@@ -204,8 +203,8 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
     await expect(
       page.getByText('そもそもカード番号は保存されていない', { exact: false }),
     ).toBeVisible()
-    // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
-    await expect(page.getByText(entryPrompt).first()).toBeVisible()
+    // 問いの文は中央選択パネルだけに出る(代表決定2026-09-15・会話ウィンドウには出さない)。
+    await expect(page.getByText(entryPrompt)).toBeVisible()
     await expect(sqliChoice).toBeVisible()
 
     // 再挑戦で正しい起点(フォームジャッキング)を選ぶ。
@@ -216,8 +215,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
       .click()
 
     const immediatePrompt = '決済ページの改ざんが確認できました。技術的にまず取るべき対応は？'
-    await expect(page.getByText(immediatePrompt).first()).toBeVisible()
-    await skipTypewriter(page, immediatePrompt)
+    await expect(page.getByText(immediatePrompt)).toBeVisible()
     await page
       .getByRole('button', {
         name: '決済ページを一時停止するかカード決済の受付を止め、改ざんされたファイルと通信先を保全した上で、脆弱性のあるプラグインを修正してから正規のファイルに戻す',
@@ -225,8 +223,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
       .click()
 
     const policyPrompt = 'クレジットカード情報の漏えいが濃厚な状況です。今後の対応方針は？'
-    await expect(page.getByText(policyPrompt).first()).toBeVisible()
-    await skipTypewriter(page, policyPrompt)
+    await expect(page.getByText(policyPrompt)).toBeVisible()
     await page
       .getByRole('button', {
         name: 'カード会社・決済代行事業者へ速やかに連絡するとともに、個人データの漏えいのおそれがある以上、個人情報保護委員会への報告要否を速やかに判断し、必要な範囲で本人への通知も行う',
@@ -281,7 +278,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
 
     const entryPrompt =
       'カード情報は自社のデータベースに保存していなかった。それなのになぜ漏れたと見る？'
-    await skipTypewriter(page, entryPrompt)
+    await expect(page.getByText(entryPrompt)).toBeVisible()
     await page
       .getByRole('button', {
         name: '決済ページのスクリプトが改ざんされ、入力中のカード情報が確定前にブラウザから外部のサーバへ直接送信されていた(フォームジャッキング)',
@@ -289,8 +286,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
       .click()
 
     const immediatePrompt = '決済ページの改ざんが確認できました。技術的にまず取るべき対応は？'
-    await expect(page.getByText(immediatePrompt).first()).toBeVisible()
-    await skipTypewriter(page, immediatePrompt)
+    await expect(page.getByText(immediatePrompt)).toBeVisible()
     await page
       .getByRole('button', {
         name: '決済ページを一時停止するかカード決済の受付を止め、改ざんされたファイルと通信先を保全した上で、脆弱性のあるプラグインを修正してから正規のファイルに戻す',
@@ -298,8 +294,7 @@ test.describe('S3「ECサイトのカード情報漏洩」通しプレイ(#75)',
       .click()
 
     const policyPrompt = 'クレジットカード情報の漏えいが濃厚な状況です。今後の対応方針は？'
-    await expect(page.getByText(policyPrompt).first()).toBeVisible()
-    await skipTypewriter(page, policyPrompt)
+    await expect(page.getByText(policyPrompt)).toBeVisible()
     await page
       .getByRole('button', {
         name: 'カード会社・決済代行事業者へ速やかに連絡するとともに、個人データの漏えいのおそれがある以上、個人情報保護委員会への報告要否を速やかに判断し、必要な範囲で本人への通知も行う',

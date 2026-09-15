@@ -62,19 +62,13 @@ function renderApp() {
   )
 }
 
-// #64/T042: 会話フレーム(ConversationFrame)にタイプライター表示を追加したため、選択肢・相談・
-// カードドロワー等の操作要素(children)は、会話文の全文表示(またはスキップ)後にしか描画されない
-// (送り途中の誤タップ防止、DESIGN.md「タイプライター表示」節)。既存の「選択肢がすぐ押せる」
-// 前提のテストは、スキップ操作を挟むよう更新する。
-//
-// タイプライター演出中、スキップ用ボタンは会話ウィンドウ内で最初(かつ唯一)のフォーカス可能要素
-// になる(選択肢等はまだ非表示のため)。スキップするとchildren内の最初のフォーカス可能要素へ
-// 自動的にフォーカスが移る(ConversationFrame側の仕様、#64/T042)ため、Tab+Enterで
-// キーボードのみでスキップできる。
-async function skipTypewriterByKeyboard(user: ReturnType<typeof userEvent.setup>): Promise<void> {
-  await user.tab()
-  await user.keyboard('{Enter}')
-}
+// #64/T042: 会話フレーム(ConversationFrame)にタイプライター表示を追加したため、探索の
+// 調査結果・危険操作の会話オーバーレイ等は会話文の全文表示(またはスキップ)後にしか操作要素
+// (children)が出ない(送り途中の誤タップ防止、DESIGN.md「タイプライター表示」節)。
+// 解決⑤の選択肢・相談ボタンは#134(代表決定2026-09-15)で中央選択パネルへ移り、問いの文は
+// 会話ウィンドウに出さなくなったため、パネルの表示と同時に操作できる(スキップ操作は不要)。
+// 誤答時の返答(reply)は引き続き会話ウィンドウでタイプライター表示されるため、下記
+// skipTypewriterByClickでスキップする。
 
 /**
  * タップ(クリック)でタイプライターをスキップする。ConversationFrame は演出中、sr-only の
@@ -136,17 +130,14 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       await playThroughExplorationToResolution(user)
 
       // 会話フレーム: 発話者=霧島(名札は会話ウィンドウ内の1箇所だけに表示。#119/#124で
-      // 立ち絵カード側の重複名札表示を廃止した)、問い文が表示される(会話モード, spec §8.2)。
-      // タイプライター演出中でも、問い文の全文は支援技術向けにsr-onlyで一度に渡されているため
-      // (#64/T042)、この時点で getByText は見つかる。
+      // 立ち絵カード側の重複名札表示を廃止した)、問い文は中央選択パネルだけに表示される
+      // (代表決定2026-09-15・会話ウィンドウには出さない、#134)。
       expect(screen.getAllByText('霧島').length).toBeGreaterThanOrEqual(1)
-      // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため件数のみ確認する。
-      expect(screen.getAllByText('この侵入、どこから入られたと見る？').length).toBeGreaterThan(0)
+      expect(screen.getByText('この侵入、どこから入られたと見る？')).toBeInTheDocument()
 
-      // 選択肢はタイプライターの全文表示(またはスキップ)後にしか出ない(#64/T042)ため、
-      // まずキーボード(Tab→Enter)でスキップする。スキップすると children 内の最初の
-      // フォーカス可能要素(=choice[0])へ自動的にフォーカスが移る。
-      await skipTypewriterByKeyboard(user)
+      // 問いの文が会話ウィンドウを介さずパネルへ直接表示されるため、選択肢はパネルの表示と
+      // 同時に操作可能になる(会話ウィンドウのタイプライターをスキップする操作は不要)。
+      // resolve-screen.tsxが選択パネルの最初の選択肢(choice[0])へ自動的にフォーカスを移す。
       expect(document.activeElement).toHaveTextContent('取引先を装った請求書メールの添付ファイル')
 
       // --- q-entry-point: キーボードで誤答を選ぶ(choices[1] = 公開サーバーの脆弱性〜) ---
@@ -164,7 +155,7 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
         screen.getByText(/「怪しく見える」ことと「今回の侵入を裏付ける証拠」は違う/),
       ).toBeInTheDocument()
       // 問い文(選択パネル側)は誤答後も変わらず表示され続ける(プレイヤーが問いを見失わない、#134)。
-      expect(screen.getAllByText('この侵入、どこから入られたと見る？').length).toBeGreaterThan(0)
+      expect(screen.getByText('この侵入、どこから入られたと見る？')).toBeInTheDocument()
 
       // --- 相談(コストあり)をキーボードで使う ---
       await user.tab() // choice[2]
@@ -213,14 +204,11 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
       expect(document.activeElement).toHaveTextContent('取引先を装った請求書メールの添付ファイル')
       await user.keyboard('{Enter}')
 
-      // q-initial-response(橘)へ進む。line(問い文)が変わったのでタイプライターは先頭から
-      // 再生され、選択肢は再び全文表示(またはスキップ)後まで非表示になる(#64/T042)。
-      // 旧版(タイプライター導入前)は選択肢ボタンが同じkeyで再利用されフォーカスが移り続けたが、
-      // 現在は children ごと一旦消えるため、ここでも改めてスキップが必要。
-      expect(
-        (await screen.findAllByText('感染が疑われる端末への初動対応は？')).length,
-      ).toBeGreaterThan(0)
-      await skipTypewriterByKeyboard(user)
+      // q-initial-response(橘)へ進む。問いの文は会話ウィンドウを介さずパネルへ直接表示される
+      // ため、選択肢は新しい問いのパネル表示と同時に操作可能になり、resolve-screen.tsxが
+      // 選択パネルの最初の選択肢へ自動的にフォーカスを移す(会話ウィンドウのタイプライターを
+      // スキップする操作は不要)。
+      expect(await screen.findByText('感染が疑われる端末への初動対応は？')).toBeInTheDocument()
       expect(document.activeElement).toHaveTextContent('ネットワークから論理的に隔離し')
       await user.keyboard('{Enter}')
 
@@ -263,17 +251,15 @@ describe('S1「標的型メールからの侵入」通しプレイ(T016/T033)', 
 
     await playThroughExplorationToResolution(user)
 
-    // 選択肢はタイプライターの全文表示(またはスキップ)後にしか出ない(#64/T042)。
-    await skipTypewriterByClick(user, 'この侵入、どこから入られたと見る？')
+    // 問いの文は中央選択パネルだけに出る(代表決定2026-09-15・会話ウィンドウには出さない)ため、
+    // パネルの表示と同時に選択肢を操作できる(会話ウィンドウのタイプライターをスキップする
+    // 操作は不要)。
     await user.click(
       screen.getByRole('button', {
         name: '取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)',
       }),
     )
-    expect(
-      (await screen.findAllByText('感染が疑われる端末への初動対応は？')).length,
-    ).toBeGreaterThan(0)
-    await skipTypewriterByClick(user, '感染が疑われる端末への初動対応は？')
+    expect(await screen.findByText('感染が疑われる端末への初動対応は？')).toBeInTheDocument()
     await user.click(
       screen.getByRole('button', {
         name: 'ネットワークから論理的に隔離し(LANケーブル抜線・無線LAN無効化)、電源は落とさず揮発性メモリとディスクの証拠を保全する',

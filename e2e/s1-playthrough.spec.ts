@@ -118,8 +118,8 @@ async function playThroughExplorationToResolution(page: import('@playwright/test
   await expect(enterResolution).toBeEnabled()
   await enterResolution.click()
   await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
-  // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
-  await expect(page.getByText('この侵入、どこから入られたと見る？').first()).toBeVisible()
+  // 問いの文は中央選択パネルだけに出る(代表決定2026-09-15・会話ウィンドウには出さない)。
+  await expect(page.getByText('この侵入、どこから入られたと見る？')).toBeVisible()
 }
 
 test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T036)', () => {
@@ -135,8 +135,9 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
   }) => {
     await playThroughExplorationToResolution(page)
 
-    // q-entry-point: 選択肢はタイプライターの全文表示後(またはスキップ)にしか出ない(#64/T042)。
-    await skipTypewriter(page, 'この侵入、どこから入られたと見る？')
+    // q-entry-point: 問いの文は中央選択パネルだけに出る(代表決定2026-09-15・会話ウィンドウ
+    // には出さない)ため、会話ウィンドウのタイプライターをスキップする操作は不要になった。
+    // 選択肢はパネル自体の表示と同時に操作可能になる。
     await page
       .getByRole('button', {
         name: '取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)',
@@ -145,8 +146,7 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
 
     // q-initial-response(橘)へ進む。正解時の一言(reply)が新しい問いの上に表示される
     // (誤答肢の reply 本執筆(#46/T035)により、この reply も本 PR で新規に追加した内容)。
-    await expect(page.getByText('感染が疑われる端末への初動対応は？').first()).toBeVisible()
-    await skipTypewriter(page, '感染が疑われる端末への初動対応は？')
+    await expect(page.getByText('感染が疑われる端末への初動対応は？')).toBeVisible()
     await expect(
       page.getByText('その通りだ、新人。フィッシングメールの実在', { exact: false }),
     ).toBeVisible()
@@ -241,15 +241,14 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
   }) => {
     await playThroughExplorationToResolution(page)
 
-    // q-entry-point: 選択肢はタイプライターの全文表示後(またはスキップ)にしか出ない(#64/T042)。
-    await skipTypewriter(page, 'この侵入、どこから入られたと見る？')
+    // q-entry-point: 問いの文は中央選択パネルだけに出るため、会話ウィンドウのタイプライターを
+    // スキップする操作は不要(代表決定2026-09-15)。
     await page
       .getByRole('button', {
         name: '取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)',
       })
       .click()
-    await expect(page.getByText('感染が疑われる端末への初動対応は？').first()).toBeVisible()
-    await skipTypewriter(page, '感染が疑われる端末への初動対応は？')
+    await expect(page.getByText('感染が疑われる端末への初動対応は？')).toBeVisible()
 
     // わざと「電源を直ちに落とす」対策(教育的失敗の分岐)を選ぶ。
     const shutdownChoice = page.getByRole('button', {
@@ -273,7 +272,7 @@ test.describe('S1「標的型メールからの侵入」通しプレイ(T017/T03
         exact: false,
       }),
     ).toBeVisible()
-    await expect(page.getByText('感染が疑われる端末への初動対応は？').first()).toBeVisible()
+    await expect(page.getByText('感染が疑われる端末への初動対応は？')).toBeVisible()
     await expect(shutdownChoice).toBeVisible()
 
     // 再挑戦で正しい初動(論理的隔離)を選べばクリアできる。

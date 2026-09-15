@@ -205,9 +205,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     // --- 解決(会話モード): q-cause → q-report-duty → q-corrective-action の3問。 ---
     const causePrompt = '顧客の個人データが漏えいした原因は、どこにあると見る？'
-    // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
-    await expect(page.getByText(causePrompt).first()).toBeVisible()
-    await skipTypewriter(page, causePrompt)
+    // 問いの文は中央選択パネルだけに出る(代表決定2026-09-15・会話ウィンドウには出さない)。
+    await expect(page.getByText(causePrompt)).toBeVisible()
 
     // わざと「委託先の従業員が意図的に持ち出した」を選び、誤答フォローで問い・選択肢が残ることを確認する
     // (⑥失敗解説の独立画面は廃止済み。会話モード内で完結する。S1〜S3の教育的失敗テストと対)。
@@ -218,8 +217,8 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await expect(
       page.getByText('共有設定の誤変更という単純なミスだ', { exact: false }),
     ).toBeVisible()
-    // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
-    await expect(page.getByText(causePrompt).first()).toBeVisible()
+    // 問いの文は中央選択パネルだけに出る(代表決定2026-09-15・会話ウィンドウには出さない)。
+    await expect(page.getByText(causePrompt)).toBeVisible()
     await expect(insiderChoice).toBeVisible()
 
     // 再挑戦で正しい原因(共有設定ミス)を選ぶ。
@@ -231,8 +230,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     const reportDutyPrompt =
       '個人データの漏えいのおそれが確認できました。報告義務は誰に生じると考えますか？'
-    await expect(page.getByText(reportDutyPrompt).first()).toBeVisible()
-    await skipTypewriter(page, reportDutyPrompt)
+    await expect(page.getByText(reportDutyPrompt)).toBeVisible()
     await page
       .getByRole('button', {
         name: '個人データを取り扱う委託元である自社にも個人情報保護委員会への報告義務があり、委託先と連携して対応する必要がある',
@@ -240,8 +238,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
       .click()
 
     const correctivePrompt = '再発防止に向けて、今後どのような方針を取るべきですか？'
-    await expect(page.getByText(correctivePrompt).first()).toBeVisible()
-    await skipTypewriter(page, correctivePrompt)
+    await expect(page.getByText(correctivePrompt)).toBeVisible()
     await page
       .getByRole('button', {
         name: '委託契約の内容を見直し、委託先の安全管理措置の実施状況を定期的に確認する体制を整え、再委託の状況も把握できるようにする',
@@ -296,7 +293,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
     await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
 
     const causePrompt = '顧客の個人データが漏えいした原因は、どこにあると見る？'
-    await skipTypewriter(page, causePrompt)
+    await expect(page.getByText(causePrompt)).toBeVisible()
     await page
       .getByRole('button', {
         name: '委託先のクラウドストレージの共有設定が誤って「限定公開」から「リンクを知っていれば誰でも閲覧可能」に変更されており、外部からアクセスされた',
@@ -305,8 +302,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
 
     const reportDutyPrompt =
       '個人データの漏えいのおそれが確認できました。報告義務は誰に生じると考えますか？'
-    await expect(page.getByText(reportDutyPrompt).first()).toBeVisible()
-    await skipTypewriter(page, reportDutyPrompt)
+    await expect(page.getByText(reportDutyPrompt)).toBeVisible()
     await page
       .getByRole('button', {
         name: '個人データを取り扱う委託元である自社にも個人情報保護委員会への報告義務があり、委託先と連携して対応する必要がある',
@@ -314,8 +310,7 @@ test.describe('SL「委託先クラウドストレージからの個人データ
       .click()
 
     const correctivePrompt = '再発防止に向けて、今後どのような方針を取るべきですか？'
-    await expect(page.getByText(correctivePrompt).first()).toBeVisible()
-    await skipTypewriter(page, correctivePrompt)
+    await expect(page.getByText(correctivePrompt)).toBeVisible()
     await page
       .getByRole('button', {
         name: '委託契約の内容を見直し、委託先の安全管理措置の実施状況を定期的に確認する体制を整え、再委託の状況も把握できるようにする',

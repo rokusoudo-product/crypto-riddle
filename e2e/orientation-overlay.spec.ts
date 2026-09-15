@@ -83,9 +83,9 @@ for (const [label, viewport] of Object.entries({
       await expect(page.getByRole('heading', { name: '解決' })).toBeVisible()
 
       // 解決: 問1の表示(直前の探索シーンの背景を引き継いだ箱の上に重ねて表示される)。
+      // 問いの文は中央選択パネルだけに出る(代表決定2026-09-15・会話ウィンドウには出さない)。
       const questionLine = 'この侵入、どこから入られたと見る？'
-      // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
-      await expect(page.getByText(questionLine, { exact: false }).first()).toBeVisible()
+      await expect(page.getByText(questionLine, { exact: false })).toBeVisible()
       await expectNoPageScroll(page)
     })
   })
@@ -188,8 +188,7 @@ for (const [label, viewport] of Object.entries({
       // 位置に押し出されていない)。会話ウィンドウ自体もスクロールしていない
       // (#124「解決の会話ウィンドウが窮屈」の回帰確認)。
       const questionLine = 'この侵入、どこから入られたと見る？'
-      // #134: 問いは中央選択パネルと会話ウィンドウの2箇所に表示されるため.first()で曖昧さを解消する。
-      await expect(page.getByText(questionLine, { exact: false }).first()).toBeInViewport()
+      await expect(page.getByText(questionLine, { exact: false })).toBeInViewport()
       const choices = [
         '取引先を装った請求書メールの添付ファイル(マクロ悪用によるマルウェア感染)',
         '公開サーバーの脆弱性を突かれた侵入',
