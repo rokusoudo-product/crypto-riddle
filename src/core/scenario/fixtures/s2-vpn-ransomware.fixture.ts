@@ -133,7 +133,7 @@ export const s2VpnRansomwareFixture: Scenario = {
       hotspots: [
         {
           object_type: 'pc',
-          position: { landscape: [0.44, 0.65] },
+          position: { landscape: [0.49, 0.68] },
           label: '情シス管理端末',
           actions: [
             {
