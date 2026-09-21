@@ -132,7 +132,7 @@ export const s3EcCardLeakFixture: Scenario = {
       hotspots: [
         {
           object_type: 'pc',
-          position: { landscape: [0.4, 0.65] },
+          position: { landscape: [0.28, 0.77] },
           label: 'EC運営担当者の端末',
           actions: [
             {
@@ -160,7 +160,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: { landscape: [0.2, 0.4] },
+          position: { landscape: [0.46, 0.49] },
           label: 'EC運営担当者',
           actions: [
             {
@@ -174,7 +174,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: { landscape: [0.78, 0.55] },
+          position: { landscape: [0.61, 0.48] },
           label: '管理部門長',
           actions: [
             {
@@ -188,7 +188,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'book',
-          position: { landscape: [0.6, 0.16] },
+          position: { landscape: [0.53, 0.6] },
           label: '資料棚',
           actions: [
             {
@@ -209,7 +209,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: { landscape: [0.95, 0.5] },
+          position: { landscape: [0.82, 0.62] },
           label: 'システム運用ルームへの扉',
           actions: [
             { kind: 'goto', scene_id: 'scene-ops-room', label: 'システム運用ルームへ移動する' },
@@ -226,7 +226,7 @@ export const s3EcCardLeakFixture: Scenario = {
       hotspots: [
         {
           object_type: 'device',
-          position: { landscape: [0.18, 0.45] },
+          position: { landscape: [0.55, 0.38] },
           label: '運用監視端末',
           actions: [
             {
@@ -247,7 +247,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: { landscape: [0.51, 0.43] },
+          position: { landscape: [0.42, 0.53] },
           label: '開発委託先の担当者',
           prompt: '開発委託先「何かお困りですか？」',
           actions: [
@@ -263,7 +263,7 @@ export const s3EcCardLeakFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: { landscape: [0.5, 0.9] },
+          position: { landscape: [0.74, 0.57] },
           label: '執務室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-office', label: '執務室へ移動する' }],
         },

@@ -135,7 +135,7 @@ scenes:
     hotspots:
       - object_type: pc
         position:
-          landscape: [0.4, 0.65]
+          landscape: [0.28, 0.77]
         label: EC運営担当者の端末
         actions:
           - kind: collect
@@ -155,7 +155,7 @@ scenes:
             label: 今は触らない
       - object_type: person
         position:
-          landscape: [0.2, 0.4]
+          landscape: [0.46, 0.49]
         label: EC運営担当者
         actions:
           - kind: collect
@@ -165,7 +165,7 @@ scenes:
             speaker: 橘
       - object_type: person
         position:
-          landscape: [0.78, 0.55]
+          landscape: [0.61, 0.48]
         label: 管理部門長
         actions:
           - kind: collect
@@ -175,7 +175,7 @@ scenes:
             speaker: 橘
       - object_type: book
         position:
-          landscape: [0.6, 0.16]
+          landscape: [0.53, 0.6]
         label: 資料棚
         actions:
           - kind: collect
@@ -190,7 +190,7 @@ scenes:
             speaker: 霧島
       - object_type: door
         position:
-          landscape: [0.95, 0.5]
+          landscape: [0.82, 0.62]
         label: システム運用ルームへの扉
         actions:
           - kind: goto
@@ -204,7 +204,7 @@ scenes:
     hotspots:
       - object_type: device
         position:
-          landscape: [0.18, 0.45]
+          landscape: [0.55, 0.38]
         label: 運用監視端末
         actions:
           - kind: collect
@@ -219,7 +219,7 @@ scenes:
             speaker: 霧島
       - object_type: person
         position:
-          landscape: [0.51, 0.43]
+          landscape: [0.42, 0.53]
         label: 開発委託先の担当者
         prompt: "開発委託先「何かお困りですか？」"
         actions:
@@ -232,7 +232,7 @@ scenes:
             label: 何でもない
       - object_type: door
         position:
-          landscape: [0.5, 0.9]
+          landscape: [0.74, 0.57]
         label: 執務室への扉
         actions:
           - kind: goto
