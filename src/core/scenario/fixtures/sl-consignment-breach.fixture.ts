@@ -190,7 +190,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'book',
-          position: { landscape: [0.88, 0.42] },
+          position: { landscape: [0.88, 0.75] },
           label: '委託先の安全管理措置報告書',
           actions: [
             {
