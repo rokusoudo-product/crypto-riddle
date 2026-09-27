@@ -1,4 +1,4 @@
-# DESIGN.md — crypto-riddle
+# DESIGN.md — Securiddle
 
 > 全プロジェクト共通の `DESIGN_STANDARDS.md` を上位規範とし、本ファイルはプロジェクト固有の決定を記録する。
 > UI 実装は本ファイルのトークン・ルールに従う（カラーコード・サイズの直書き禁止）。

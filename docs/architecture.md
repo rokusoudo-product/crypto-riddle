@@ -1,4 +1,4 @@
-# crypto-riddle — 環境構成図
+# Securiddle — 環境構成図
 
 > plan.md（`specs/001-mvp/plan.md`）§8 の正本。構成が変わる実装をしたら、同じコミットで本図と README を更新する。
 
