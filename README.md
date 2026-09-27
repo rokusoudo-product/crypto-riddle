@@ -1,8 +1,8 @@
-# crypto-riddle
+# Securiddle ― サイバー事件簿
 
 暗号パズル×謎解きで、ハッカーの攻撃から防衛するセキュリティ学習ゲーム（Web アプリ / スマホブラウザ対応）。
 
-※ プロジェクト名は仮決め（2026-07-20）。正式名称は spec 承認までに確定する。
+正式名称は **Securiddle**（security × riddle の造語。読み仮名は定めない）、日本語副題は「サイバー事件簿」（2026-09-27 代表決定・spec §11-1）。GitHub リポジトリ名・clone 先のパスは当面 `crypto-riddle` のまま。
 
 > IPA 情報処理技術者試験の過去問題を題材の参考として使用しています（設問の転載はありません）。
 > 表記規則の詳細は [docs/citation-policy.md](docs/citation-policy.md) を参照。
