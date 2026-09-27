@@ -11,7 +11,7 @@ import { AppRoutes } from '@/ui/routes'
 afterEach(() => cleanup())
 
 describe.each([
-  ['/', 'crypto-riddle'],
+  ['/', 'Securiddle'],
   ['/maps', 'マップ選択'],
   ['/intro', '導入'],
   ['/explore', '探索'],
@@ -38,7 +38,7 @@ describe('未定義ルート', () => {
       </MemoryRouter>,
     )
 
-    expect(screen.getByRole('heading', { level: 1, name: 'crypto-riddle' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'Securiddle' })).toBeInTheDocument()
   })
 })
 

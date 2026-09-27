@@ -20,7 +20,10 @@ export function TitleScreen() {
   }, [saveStatus, hydrate])
 
   return (
-    <ScreenContainer title="crypto-riddle">
+    <ScreenContainer title="Securiddle">
+      {/* 正式名称の直下に日本語副題を小さく添える（2026-09-27 代表決定・DESIGN.md ①タイトル）。
+          色・サイズは既存トークン/ユーティリティ(text-muted-foreground・text-sm)を使い、直書きしない。 */}
+      <p className="text-muted-foreground text-sm">サイバー事件簿</p>
       <StateFrame
         state={state}
         loading={<p className="text-muted-foreground">セーブデータを読み込んでいます…</p>}
