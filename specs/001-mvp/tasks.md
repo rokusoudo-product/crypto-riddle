@@ -6,7 +6,8 @@ status: active
 created: 2026-08-06
 updated: 2026-09-13 (Phase 4.9 追加: 会話フレーム左右2枠入れ替わり・立ち絵拡大・導入クリック送り〔#108/#110〕。T053-docsは#108で完了・T054-uiは後続Issue。
   Phase 4.10 追加: 背景を画面の向きで切替・重ね配置一般化・話者枠・対策室背景新規作成〔#119〜#124〕。T055-docsは本Issue（#119）・T056-core以降は後続Issue。
-  2026-09-14 Phase 4.11 追加: サイバーパンク配色・トーン改訂と解決画面の中央選択パネル構成〔#132〜#143〕。T061-docsは本Issue（#132）・T062-ui以降は後続Issue)
+  2026-09-14 Phase 4.11 追加: サイバーパンク配色・トーン改訂と解決画面の中央選択パネル構成〔#132〜#143〕。T061-docsは本Issue（#132）・T062-ui以降は後続Issue。
+  2026-09-28 実態との同期: Phase 4.7〜4.11・Phase 5（S2/S3/法務）の完了済みタスクにチェックを反映し、T004 に Cloudflare Pages プロジェクト名 `securiddle` を追記)
 spec: specs/001-mvp/spec.md
 plan: specs/001-mvp/plan.md
 issue: https://github.com/rokusoudo-product/crypto-riddle/issues/12
@@ -55,6 +56,8 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 - [ ] **T004** 【代表】Cloudflare Pages 接続（依存: T003）
   - Cloudflare アカウントでの Pages プロジェクト作成・GitHub 連携・Cloudflare Web Analytics 有効化は
     **代表が実施するアカウント操作**（#12 代表回答 2026-08-02）
+  - Pages プロジェクト名は **`securiddle`**（本番 URL `https://securiddle.pages.dev`）を使う。
+    正式名称は #28 で「Securiddle ― サイバー事件簿」に確定した（2026-09-27・PR #159）
   - 完了条件: main への push で本番 URL に自動デプロイされ、プレースホルダ画面が公開されている
 
 **チェックポイント①**: 空アプリが CI を通過して 0 円構成で本番配信される（plan §8 の実証）
@@ -386,13 +389,13 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 > 確定仕様（T018''・2026-09-11 代表決定）: 調査結果はすべて会話フレームで台詞提示／タイプライターは探索・解決共通（スキップ可・reduced-motion 即全文・支援技術には全文提供）／非発話側は直前話者を残しグレーアウト（支援役2名固定）／ホットスポットはアイコン・名前とも常時非表示でホバー/フォーカス時に□マーカー（`aria-label` 保持・一覧フォールバック維持・モバイルは一覧初期表示）／探索会話上にもカード閲覧（無料）の ? ボタン。
 > 委譲条件「**スキーマ差分は commit 前に報告して停止**」を維持。
 
-- [ ] **T042** 会話フレーム共通強化（依存: T033）
+- [x] **T042** 会話フレーム共通強化（依存: T033）
   - `conversation-frame.tsx` にタイプライター表示（1文字ずつ・タップ/Enter でスキップ・`prefers-reduced-motion` で即全文・支援技術には全文を渡し1文字ずつ読み上げさせない）。操作要素（選択肢・相談・カード）は全文表示/スキップ後に提示。直前話者を残しグレーアウトを明文どおり担保。
   - 完了条件: 会話フレーム単体テスト（タイプライター/スキップ/reduced-motion/a11y 全文提供）が通り、解決⑤の既存テスト・e2e がスキップ操作を挟んで通る
-- [ ] **T043** core: `collect` に `line`/`speaker` を追加（依存: T037）
+- [x] **T043** core: `collect` に `line`/`speaker` を追加（依存: T037）
   - `src/core/model/scenario.ts` の `collect` アクションに**省略可能な `line`（台詞）と `speaker`** を追加（`danger` の `feedback` と対称）。**schema_version 0.4.0 → 0.5.0**（既存 YAML の版数追随＝T037 と同手順）。整合性チェックは現行維持。
   - 完了条件: zod 単体テスト（`line`/`speaker` 有無・省略時フォールバック・0.5.0 検証）が通り `npm run build:data` 成功
-- [ ] **T044** 探索の会話フレーム化＋不可視ホットスポット＋S1 台詞＋E2E（依存: T042, T043, T038, T040）
+- [x] **T044** 探索の会話フレーム化＋不可視ホットスポット＋S1 台詞＋E2E（依存: T042, T043, T038, T040）
   - `SceneExplorer`：調査結果（人物・PC・書籍すべて）を会話フレームで台詞提示（話者は `speaker` or 3系統既定 ログ→霧島/証言→橘/文献→橘）。ホットスポットは通常不可視・ホバー/フォーカスで□マーカー（`aria-label` 保持・フォーカス可視）。探索会話上に ? ボタン（`card-drawer`・無料）。モバイルは一覧を初期表示。**#62（証言カード選択の不具合）を吸収**（`pickTestimonyCard` 経路を廃止）。
   - S1（`s1-targeted-email-intrusion.yaml`）の 9 collect に `line`/`speaker` を執筆。fixture 追随。
   - E2E：背景シーン経由で調査結果が会話フレームで出る・タイプライター/スキップ・?ボタン・一覧フォールバックの各経路。
@@ -400,7 +403,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 **チェックポイント③'''（2026-09-11・結果=クリア可＋ポリッシュ要望）**: 探索も会話フレームで S1 をクリアまで通せた（タイプライター速度OK・#62 解消）。代表から仕上げ要望3点（①□マーカーを赤枠に ②探索完了時に霧島/橘が「問題をまとめようか」と解決へ促す ③情シス担当の位置が不自然→サーバ室背景を人物入りで再生成＋座標調整）が返り、**T045 で対応**。量産可の最終判断は T045 反映後の再確認（または代表判断で並行量産）。
 
-- [ ] **T045** Phase 4.7 仕上げ（③''' フィードバック反映）（依存: T044）
+- [x] **T045** Phase 4.7 仕上げ（③''' フィードバック反映）（依存: T044）
   - **□マーカーの枠線を赤系トークン**にする（`scene-explorer.tsx`。DESIGN「探索シーン」節。カラーコード直書きしない）。
   - **探索完了→解決の誘導**：必要な手がかりが揃い「解決へ」活性時に、霧島/橘が会話フレームで「そろそろ問題をまとめようか」と1回促す（spec §7.1・DESIGN）。
   - **サーバ室背景を人物入り版へ差し替え済**（`assets/backgrounds/bg-s1-server.png`・DESIGN P-4）に合わせ、**情シス担当ホットスポットの座標を人物位置へ調整**（`scenarios/s1-targeted-email-intrusion.yaml`＋fixture）。
@@ -412,17 +415,17 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 > ③'''' 代表フィードバック。①背景のドア（`goto`/`door`）でシーン移動（タブと併用）②物理的に同じ場所の人と機器を1ホットスポットに統合（サーバ管理者＝証言＋PC・挨拶 `prompt`）。詳細は spec §7.1・DESIGN「探索シーン」節・plan §5・`docs/scenario_schema.md` §2.5。委譲条件「**スキーマ差分は commit 前に報告して停止**」を維持。
 
-- [ ] **T046-core** `goto`/`door`/`prompt` を追加（依存: T043）
+- [x] **T046-core** `goto`/`door`/`prompt` を追加（依存: T043）
   - `collect`/`danger`/`noop` に **`goto`（`scene_id` 指定）** を追加、`object_type` に **`door`**、ホットスポットに**省略可能な `prompt`** を追加。整合性チェックに「`goto.scene_id` 実在＋自シーン以外」を追加。**schema_version 0.5.0 → 0.6.0**（版数追随は同手順）。
   - 完了条件: zod 単体テスト（goto 正常・不正な scene_id reject・自シーン参照 reject・door・prompt 有無）が通り `npm run build:data` 成功。**スキーマ差分は commit 前に報告して停止**。
-- [ ] **T046-ui-data** ドア移動・管理者統合の UI＋S1 データ＋E2E（依存: T046-core, T044）
+- [x] **T046-ui-data** ドア移動・管理者統合の UI＋S1 データ＋E2E（依存: T046-core, T044）
   - `scene-explorer.tsx`：`goto` でシーン移動（タブと併用）、`prompt` をアクションシート見出しに表示、`door` の□マーカー・`aria-label`。
   - S1 データ：執務室に「サーバ室への扉」（`goto scene-server`）、サーバ室に「執務室への扉」（`goto scene-office`）を追加。**サーバ室の 解析用端末(pc・ip-sandbox-analysis) と 情シス担当(person・ip-witness-itstaff) を「サーバ管理者」1ホットスポットに統合**（prompt「どうしましたか？」／話を聞く＝ip-witness-itstaff・橘／PCを確認する＝ip-sandbox-analysis・霧島／何でもない＝noop）。背景の再生成はしない。fixture 追随。
   - 完了条件: ドア・タブ両方でシーン移動でき、管理者統合後も全ポイント調査→解決へ進める。Vitest・Playwright e2e・`npm run build:data` が通る。
 
 **チェックポイント③'''''**: ドア動線・管理者統合の反映後、代表が最終確認（任意。量産と並行可）。
 
-- [ ] **T047** 探索の会話オーバーレイ化（2状態）＋一覧トグル（T018''''' 代表モック・依存: T044/T046-ui-data）
+- [x] **T047** 探索の会話オーバーレイ化（2状態）＋一覧トグル（T018''''' 代表モック・依存: T044/T046-ui-data）
   - `scene-explorer.tsx` を**2状態**にする。**探索状態（既定）＝背景＋ホットスポットのみ（立ち絵・会話ウィンドウは非表示）**＝カーソル探索を邪魔しない（代表指定）。**会話状態（調査結果/証言/danger 表示中）＝背景を保持したまま、左右端に立ち絵（発話フルカラー/非発話グレーアウト）＋下部に会話ウィンドウ（名札・タイプライター・文脈行・左「閉じる」・右下「? カード閲覧」）を重ねる**。閉じるで探索状態へ戻り立ち絵/ウィンドウは消える。
   - **右上に「調査ポイント」ボタン**を常時表示（探索/会話とも）→ 一覧をトグルで開く（旧「モバイル一覧初期表示」を置換）。キーボード完遂・`aria-label` 保持を維持。
   - 従来の「背景の下に立ち絵バンド＋一覧を常時積む」レイアウトは廃止。レイアウト正本は `DESIGN.md`「探索シーン」節。
@@ -430,7 +433,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 **チェックポイント③''''''（2026-09-11・結果=概ねOK＋微調整4点）**: 会話オーバーレイは意図どおり。代表FBで T048（UI微調整）と S1 経理部長の配置改善（背景再生成）へ。
 
-- [ ] **T048** 探索オーバーレイの微調整（T018'''''' 代表FB・依存: T047）
+- [x] **T048** 探索オーバーレイの微調整（T018'''''' 代表FB・依存: T047）
   - **会話ウィンドウの「閉じる」ボタンを廃止**し、**会話中に画面クリック/タップで閉じる**（タイプライター送出中はスキップ→全文表示、全文後のクリックで閉じる）。
   - **右上ボタン群を不透明化**（surface＋border で視認可能に）。**「調査ポイント一覧」の左に「ヒント確認」（＝カード閲覧 `card-drawer`・無料）を移設**し、? アイコンは廃止・会話ウィンドウ内のカードボタンも廃止（右上に集約）。探索状態・会話状態とも常時表示。
   - 完了条件: 上記が反映され、キーボード完遂・4マップ e2e・build 通過。
@@ -444,16 +447,16 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 > 代表確定の台本 v2.2（2026-09-12。ナレーション全廃・完全会話劇化／発見時の多ターン化＋NPC直接発話／誤答ヒント2段／小鳥遊は①導入・⑦結果のみ）を反映する一連の Issue。**docs 先行 Issue #100**（本 Issue・コード変更なし）で spec/DESIGN/scenario_schema の仕様を確定し、承認ゲートを経たうえで **core Issue #101**（zod スキーマ 0.7.0 実装）→ **UI Issue #102**（会話フレーム3枠・NPC名札・explanations話者表示・表情フォールバック）→ **data Issue #103**（S1 シナリオを v2.2 台本へ本移植＋全 YAML/fixture の `schema_version` 更新＋e2e）の順で進める。詳細仕様は spec §5/§7.1/§8.2、`DESIGN.md`「会話フレーム」「探索シーン」節、`docs/scenario_schema.md` §2.6。委譲条件「**スキーマ差分は commit 前に報告して停止**」を維持。
 
-- [ ] **T049-docs** spec/DESIGN/scenario_schema へのスキーマ0.7.0仕様反映（#100・本 Issue・docs のみ）
+- [x] **T049-docs** spec/DESIGN/scenario_schema へのスキーマ0.7.0仕様反映（#100・本 Issue・docs のみ）
   - `docs/scenario_schema.md` §2.6: スキーマ0.7.0の7点（`characterSchema` 拡張／`expressionSchema` 新設／`intro.background` 省略可／`collect.dialogue` 追加／NPC直接発話・`explanations` union化／`schema_version` 0.7.0）＋小鳥遊ガードを明記。
   - `DESIGN.md`「会話フレーム」節: 支援役「2名固定」前提の記述を一括改訂（導入=3枠・探索/解決=2枠のまま、グレーアウトを「発話者以外は全員」に一般化、表情フォールバック・`bg-sl-office` 流用を追記。**`bg-sl-office` 流用は #119 で撤回・`bg-hq-taskforce` へ変更**）。「探索シーン」節に NPC 直接発話の描画（両立ち絵グレーアウト＋`npc` 名札＋トリガーホットスポット□強調）を追記。
   - `specs/001-mvp/spec.md` §5（小鳥遊の登場範囲）・§7.1（多ターン化・NPC直接発話）・§8.2（誤答ヒント2段・用語クッションの担い手）を反映。
   - `plan.md` §5 に本 Phase の仕様概要を追記。
   - 完了条件: `npm run format:check`（変更した各 md）が通過し、PR 作成（**マージは代表**。spec/plan の承認ゲートに該当するため #101 着手前に代表承認を得る）。
-- [ ] **T050-core** シナリオスキーマ 0.7.0 の zod 実装（#101・依存: T049-docs のマージ・代表承認）
+- [x] **T050-core** シナリオスキーマ 0.7.0 の zod 実装（#101・依存: T049-docs のマージ・代表承認）
   - `src/core/model/common.ts` / `src/core/model/scenario.ts` を `docs/scenario_schema.md` §2.6 のとおり改訂。`collect.dialogue` と `line`/`speaker` の併用拒否・小鳥遊ガード（探索の `dialogue`・`questions[].speaker`・`questions[].explanations` での使用不可）を `superRefine` で実装。**schema_version 0.6.0 → 0.7.0**（版数追随は T037/T043/T046-core と同手順）。
   - 完了条件: zod 単体テスト（`expression` 有無・`dialogue`/`line` 併用 reject・NPC union・`explanations` union・小鳥遊ガード reject・0.7.0 検証）が通り `npm run build:data` 成功。**スキーマ差分は commit 前に報告して停止**。
-- [ ] **T051-ui** 会話フレーム3枠・NPC名札・explanations話者表示・表情フォールバック（#102・依存: T050-core）
+- [x] **T051-ui** 会話フレーム3枠・NPC名札・explanations話者表示・表情フォールバック（#102・依存: T050-core）
   - ⚠️ **導入のレイアウト部分は #108/#110 で置き換え**: 以下「3枠（霧島/橘/小鳥遊）の対策室レイアウト」は #100 時点（Phase 4.8 策定時）の仕様。S1 実装台本レビュー第1回（2026-09-13 代表）を受けて #108 で「導入・探索・解決すべて左右2枠の入れ替わり方式」に改訂されたため、導入の枠レイアウト実装は本タスクではなく **T054-ui（#110）→ T060-ui（#124）に引き継ぎ** で行う。本タスクの NPC名札・explanations話者表示・表情フォールバックの実装スコープは変更なし。
   - ⚠️ **導入の背景は #119/T059-data（#123）で置き換え**: 下記「`bg-sl-office` を UI 定数で背景流用」は #100 時点の仕様。#119 でこの流用は撤回され、対策室の新規背景 `bg-hq-taskforce`（横・縦）に変更されたため、導入の背景差し替え実装は本タスクではなく **T059-data（#123）** で行う。
   - 導入（`intro-screen.tsx`）を3枠（霧島/橘/小鳥遊）の対策室レイアウトに刷新し、`bg-sl-office` を UI 定数で背景流用（ナレーション全廃に伴う会話劇化）。
@@ -461,7 +464,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   - 解決（`resolve-screen.tsx`）の `explanations` を話者付き表示（文字列/オブジェクト混在）に対応。
   - 立ち絵は `PORTRAIT_SRC[character][expression]` を解決し、該当 PNG が無ければ `neutral` にフォールバック。
   - 完了条件: Vitest・Playwright e2e・axe が通る。既存3マップ（S2/S3/SL）を壊さない。
-- [ ] **T052-data** S1 シナリオを台本v2.2へ本移植＋全 YAML/fixture の schema_version 更新＋E2E（#103・依存: T051-ui）
+- [x] **T052-data** S1 シナリオを台本v2.2へ本移植＋全 YAML/fixture の schema_version 更新＋E2E（#103・依存: T051-ui）
   - `scenarios/s1-targeted-email-intrusion.yaml` を台本v2.2（導入9往復・多ターン発見・NPC直接発話・誤答ヒント2段）へ書き直し。
   - `scenarios/*.yaml`・`legal/*.yaml` 等の fixture の `schema_version` を 0.7.0 へ一括更新（内容は無改訂。S2/S3/SL は版数のみ）。
   - E2E: S1 通しプレイ（導入（左右2枠の入れ替わり。#108/T054-ui（#110）→ T060-ui（#124）に引き継ぎ）→探索多ターン/NPC→解決2段ヒント→結果の小鳥遊ねぎらい）。
@@ -475,13 +478,13 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 > S1 実装台本レビュー第1回（2026-09-13 代表）で、Phase 4.8（#100）にて定めた「探索④・解決⑤＝霧島＝左・橘＝右の固定2枠／導入③のみ小鳥遊を加えた3枠の対策室レイアウト」への追加フィードバック（導入のタップ送りボタン廃止・立ち絵拡大・左右2枠への統一）が返った。**docs 先行 Issue #108**（本 Issue・コード変更なし）で spec/DESIGN/scenario_schema の仕様を改訂し、承認ゲートを経たうえで **UI Issue #110**（左右2枠入れ替わりロジックの実装・立ち絵拡大・導入クリック送り化）で実装する（**#110 は PR #118 で着手したが、レイアウトは Phase 4.10／#119 の改訂を受けて T060-ui（#124）に引き継ぐ**）。データモデル・zod スキーマへの変更はない（Phase 4.8／T050-core のスキーマ0.7.0実装はそのまま有効）。詳細仕様は spec §5/§8、`DESIGN.md`「会話フレーム」「探索シーン」節、`docs/scenario_schema.md` §2.6「小鳥遊ガード」。
 
-- [ ] **T053-docs** spec/DESIGN/scenario_schema への左右2枠入れ替わり方式の反映（#108・本 Issue・docs のみ）
+- [x] **T053-docs** spec/DESIGN/scenario_schema への左右2枠入れ替わり方式の反映（#108・本 Issue・docs のみ）
   - `DESIGN.md`「会話フレーム」節: 「探索④・解決⑤は2枠固定（霧島＝左・橘＝右）／導入③のみ3枠（対策室レイアウト）」の記述を、**導入・探索・解決すべて共通の左右2枠の入れ替わり方式**（最初の話者は左、画面にいる人が話せば自分の枠をカラー・他方をグレー、画面にいない人が話せば直前の話者ではない枠に入れ替え、NPC発話は枠を動かさず両方グレー、並びは導入/探索の会話ごと/解決の開始でリセットし解決は問いをまたいで保つ）に一括改訂。導入9行の見え方の表を追記。立ち絵の拡大寸法（デスクトップ／モバイル）を追記。画面一覧③導入の主要アクションを「画面クリックで進行・SKIP」に改訂。「探索シーン」節の立ち絵固定配置の記述も同じロジックへ改訂。
   - `specs/001-mvp/spec.md` §5（小鳥遊の登場範囲の記述）・§8（会話フレーム共通演出の記述）を反映。
   - `docs/scenario_schema.md` §2.6「小鳥遊ガード」: ガード自体（探索の `dialogue`・`collect.speaker`・`questions[].speaker`/`explanations` での小鳥遊拒否）は維持し、**理由の記述のみ**「2枠のままで描画先が無い」から「庶務のため現場（探索・解決）に同行しない設定を型で守る」に改訂。
   - `plan.md` §5 に本 Phase の仕様概要を追記。
   - 完了条件: 変更した各 md の `prettier --check` が通過し、PR 作成（**マージは代表**。spec/DESIGN の承認ゲートに該当するため #110 着手前に代表承認を得る）。
-- [ ] **T054-ui** 会話フレームの左右2枠入れ替わり実装・立ち絵拡大・導入クリック送り（#110・依存: T053-docs のマージ・代表承認）
+- [x] **T054-ui** 会話フレームの左右2枠入れ替わり実装・立ち絵拡大・導入クリック送り（#110・依存: T053-docs のマージ・代表承認）
   - ⚠️ **#119 の改訂により PR #118 はマージせず、レイアウト部分は T060-ui（#124）に置き換え**。`src/ui/lib/two-slot-frame.ts` とその単体テストは T060-ui で流用。クローズは代表判断。
   - 枠の並びを決めるロジックを**純粋関数として切り出し単体テスト**する（`DESIGN.md`「会話フレーム」節の決まりと、導入9行の見え方の表をテストケースにする）。
   - 導入（`intro-screen.tsx`）の3枠対策室レイアウトを廃止し、探索・解決と同じ左右2枠の入れ替わりコンポーネントに統一。「タップで進行」ボタンを廃止し画面クリック送り（Enter/Space 併用）に統一。
@@ -497,7 +500,7 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 > S1 実装台本レビュー第1回（2026-09-13 代表）の追加フィードバック（背景の下に立ち絵・会話フレームを積む形では立ち絵を大きくしきれず縦スクロールが出る・名札が二重に出る）を受けた代表決定。**docs 先行 Issue #119**（本 Issue・コード変更なし）で spec/DESIGN/scenario_schema の仕様を改訂し、承認ゲートを経たうえで **core Issue #120**（schema 0.8.0）→ **assets Issue #121/#122**（S1 縦背景・対策室背景の横縦）→ **data Issue #123**（S1 縦座標データ・導入背景差し替え）→ **UI Issue #124**（#118/#110 の後継。背景の箱・重ね配置・立ち絵比率・話者枠の実装）の順で進める。詳細仕様は `DESIGN.md`「会話フレーム」「探索シーン」「アセット」各節、`docs/scenario_schema.md` §2.7、`specs/001-mvp/spec.md` §7.1/§8。委譲条件「**スキーマ差分は commit 前に報告して停止**」を維持。
 
-- [ ] **T055-docs** spec/DESIGN/scenario_schema への向き別背景・重ね配置・話者枠・対策室背景の反映（#119・本 Issue・docs のみ）
+- [x] **T055-docs** spec/DESIGN/scenario_schema への向き別背景・重ね配置・話者枠・対策室背景の反映（#119・本 Issue・docs のみ）
   - `DESIGN.md`「探索シーン」節: 「背景の箱」（画面の向きで16:9/9:16を切替・余りは背景色トークン）と「重ねる要素は背景の箱に対する相対位置」の原則を新設。旧「16:9を既定・モバイル縦はレターボックス」は撤回。
   - `DESIGN.md`「会話フレーム」節: 立ち絵寸法を固定pxから背景の箱の高さに対する比率へ改訂（#108のpxは撤回）。話者の枠（黒/白・未決）・名札は会話ウィンドウ内の1箇所だけ、を明記。
   - `DESIGN.md`「アセット」節: 導入の背景を `bg-sl-office` 流用から `bg-hq-taskforce`（横・縦・P-12）へ変更。S1縦背景（`bg-s1-office-portrait`/`bg-s1-server-portrait`）の行を追加。S2/S3/SLの縦は「未作成（NPCの外見の確定後）」と明記。プロンプト本文は書かない。
@@ -506,19 +509,19 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
   - `specs/001-mvp/spec.md` §7.1（背景の向き切替）・§8（話者枠・立ち絵比率・名札1箇所）を反映。
   - `plan.md` §5 に本 Phase の仕様概要（Phase 4.10）を追記。
   - 完了条件: 変更した各 md の `prettier --check` が通過し、PR 作成（**マージは代表**。spec/DESIGN/scenario_schema の承認ゲートに該当するため #120 着手前に代表承認を得る）。
-- [ ] **T056-core** シナリオスキーマ 0.8.0 の zod 実装（#120・依存: T055-docs のマージ・代表承認）
+- [x] **T056-core** シナリオスキーマ 0.8.0 の zod 実装（#120・依存: T055-docs のマージ・代表承認）
   - `src/core/model/scenario.ts` の `sceneHotspotSchema.position` を `docs/scenario_schema.md` §2.7 のとおり `{ landscape, portrait? }` オブジェクトへ改訂。既存4マップの `position` 配列値をすべて `landscape` へ機械移植（値は変更しない）。**schema_version 0.7.0 → 0.8.0**（版数追随は 0.4.0〜0.7.0 と同手順）。
   - 完了条件: zod 単体テスト（`landscape` 必須・`portrait` 省略可・旧配列形式 reject・0.8.0 検証）が通り `npm run build:data` 成功。**スキーマ差分は commit 前に報告して停止**。
-- [ ] **T057-img** S1 探索背景の縦版生成（#121・依存: T055-docs のマージ・代表承認）
+- [x] **T057-img** S1 探索背景の縦版生成（#121・依存: T055-docs のマージ・代表承認）
   - `bg-s1-office-portrait`／`bg-s1-server-portrait`（9:16）を IMAGE_WORKFLOW の承認ゲート（アセット定義＋プロンプト提示→代表承認→image_agent 生成）で用意。縦の背景プロンプトの原則（上端と下1/3を空け・人物機器は中段。`DESIGN.md`「アセット」節）に従う。生成物パス・プロンプトを DESIGN.md アセット節に追記。
   - 完了条件: 2背景が確定し DESIGN.md に記録、`assets/` に配置。
-- [ ] **T058-img** 導入用 対策室背景の生成（横・縦）（#122・依存: T055-docs のマージ・代表承認）
+- [x] **T058-img** 導入用 対策室背景の生成（横・縦）（#122・依存: T055-docs のマージ・代表承認）
   - `bg-hq-taskforce`（横16:9）／`bg-hq-taskforce-portrait`（縦9:16。上記 P-12）を IMAGE_WORKFLOW の承認ゲートで用意。4人分の机とPCのみ描き、**人物は描かない**（室長 日野は姿を見せない設定）。生成物パス・プロンプトを DESIGN.md アセット節に追記。
   - 完了条件: 横・縦の2背景が確定し DESIGN.md に記録、`assets/` に配置。
-- [ ] **T059-data** S1 の縦用座標の配置と導入背景の差し替え（#123・依存: T056-core, T057-img, T058-img）
+- [x] **T059-data** S1 の縦用座標の配置と導入背景の差し替え（#123・依存: T056-core, T057-img, T058-img）
   - `scenarios/s1-targeted-email-intrusion.yaml` の全ホットスポットに `position.portrait`（縦座標）を追加。`intro-screen.tsx` の UI 定数を `bg-sl-office` から `bg-hq-taskforce`（横・縦）へ差し替え。fixture 追随。
   - 完了条件: S1 が 0.8.0 検証を通過し `npm run build:data` 成功。導入・探索とも縦長の画面で新背景が表示される。
-- [ ] **T060-ui** 向き別背景の全面表示と立ち絵・会話ウィンドウの重ね直し（#124・#118/#110 の後継・依存: T055-docs, T056-core）
+- [x] **T060-ui** 向き別背景の全面表示と立ち絵・会話ウィンドウの重ね直し（#124・#118/#110 の後継・依存: T055-docs, T056-core）
   - 背景の箱（`orientation` 判定・16:9/9:16・余りは背景色トークン）を共通コンポーネント化し、探索・導入・**解決**の背景表示に適用。**解決パートは直前の探索シーンの背景をそのまま使う**（新規背景は持たない・代表決定・#119）。
   - 立ち絵・会話ウィンドウ・右上ボタン群・ホットスポットを背景の箱に対する相対位置へ統一（背景の下に積む旧レイアウトを撤去）。
   - 立ち絵の拡大を固定pxから箱の高さに対する比率へ変更（T054-ui の実装を置き換え）。話者の枠は**白**（代表決定 2026-09-14）を実装する。黒案は切替可能なトークンとして残す。
@@ -533,34 +536,34 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 > 2026-09-14 の改善レビューで、代表から解決画面（会話モード）のモック画像と変更メモが出た（配色をサイバーパンク風に全面変更・画面構成をサンプルに合わせる・選択肢の強調表示／相談ボタンの表示改善／解決中のXPバー／ゲーム内の時刻表示）。**docs 先行 Issue #132**（本 Issue・コード変更なし。例外: コントラスト検証スクリプト `scripts/check-contrast.mjs` のみ新規追加）で DESIGN/spec/characters/tasks の仕様を改訂し、承認ゲートを経たうえで実装 Issue（#133〜#143）に進む。#13（カラートークン AA 実測）は #132 に含めて完了させる。詳細仕様は `DESIGN.md`「基本方針」「カラートークン」「半透明（ガラス風）パネル」「会話フレーム」「探索シーン」「ゲーム内時刻」「縦長（9:16）の構成」「アセット」各節、`docs/design-contrast.md`。
 
-- [ ] **T061-docs** DESIGN/spec/characters/tasks へのサイバーパンク改訂の反映（#132・本 Issue・docs のみ。例外: コントラスト検証スクリプト）
+- [x] **T061-docs** DESIGN/spec/characters/tasks へのサイバーパンク改訂の反映（#132・本 Issue・docs のみ。例外: コントラスト検証スクリプト）
   - `DESIGN.md`: トーン&マナー・単一ダーク文脈への統一・カラートークン全面改訂（CSS変数対応表を含む）・半透明パネルの最小不透明度と合成検証規則・解決⑤の中央選択パネル構成・名前箱（立ち絵の下・初期サイズ・NPC発話時の位置）・選択肢5状態・相談ボタン・XPバー・ゲーム内時刻・縦長（9:16）の構成表・アセット節（作り直し方針・色名翻訳例・立ち絵のCSS補正）を改訂。
   - `docs/design-contrast.md`（新設）: 全トークンペアの AA コントラスト検証結果・旧→新トークン対応（#13 の受け入れ基準を満たす）。
   - `specs/001-mvp/spec.md`・`docs/characters.md`: トーン・世界観の記述を追随（人物設定・関係性は変更しない）。
   - `specs/001-mvp/tasks.md`: 本 Phase 4.11 を追加。
   - 完了条件: 代表が改訂内容を承認（PR マージ）。`docs/design-contrast.md` の全ペアが基準を満たす（未達は値修正または使用禁止の明記）。**docs/DESIGN.md/specs は `.prettierignore` の対象のため prettier を掛けない**。新規スクリプト（`scripts/check-contrast.mjs`）のみ `npx prettier --check` を通す。
-- [ ] **T062-ui** カラートークンと半透明パネルの刷新・全画面（#133・依存: T061-docs のマージ・代表承認）
+- [x] **T062-ui** カラートークンと半透明パネルの刷新・全画面（#133・依存: T061-docs のマージ・代表承認）
   - `src/index.css` の色トークンを #132 確定値へ置換（success/warning/info/error の新規 CSS 変数追加を含む）。半透明パネルの共通スタイルを会話ウィンドウ・アクションシート・カードドロワー等に適用。
   - 完了条件: 全画面で新配色を確認（横長・縦長のスクリーンショットを秘書が確認）。`npm run test`/`typecheck`/`lint`/`build`/Playwright（axe含む）成功。
-- [ ] **T063-core** シナリオスキーマ 0.9.0 ゲーム内時刻フィールドの追加（#136・依存: T061-docs のマージ・代表承認。T062-ui と並行可）
+- [x] **T063-core** シナリオスキーマ 0.9.0 ゲーム内時刻フィールドの追加（#136・依存: T061-docs のマージ・代表承認。T062-ui と並行可）
   - 導入・探索の各シーン・解決に `HH:MM` の省略可能フィールドを追加。`schema_version` 0.8.0→0.9.0。
   - 完了条件: 新旧データで zod 検証が通り `npm run build:data` 成功。**スキーマ差分は commit 前に報告して停止**。
-- [ ] **T064-ui** 解決画面の中央選択パネルと選択肢の強調（#134・依存: T062-ui のマージ）
+- [x] **T064-ui** 解決画面の中央選択パネルと選択肢の強調（#134・依存: T062-ui のマージ）
   - 問い・選択肢・相談ボタンを中央選択パネルへ移設。5状態（通常/ホバー/フォーカス/押下/無効）を実装。`prefers-reduced-motion` 対応。
   - 完了条件: 横長・縦長のS1解決の撮影を秘書が確認。テスト・axe成功。
-- [ ] **T065-ui** 相談ボタンの改善・解決中のXPバー（#135・依存: T062-ui のマージ）
+- [x] **T065-ui** 相談ボタンの改善・解決中のXPバー（#135・依存: T062-ui のマージ）
   - 残り回数カウンタ・XP減警告アイコン（lucide-react）・aria-label。XPバー（見込みXP）を `save-integration.ts` の式と共有する純粋関数で実装。
   - 完了条件: XP計算の一致を確認する単体テストがある。横長・縦長の撮影を秘書が確認。
-- [ ] **T066-ui** 会話フレームの名前箱を立ち絵の下へ移動（#138・依存: T062-ui のマージ）
+- [x] **T066-ui** 会話フレームの名前箱を立ち絵の下へ移動（#138・依存: T062-ui のマージ）
   - 話者名を立ち絵下の名前箱（#132 初期サイズ）に表示。会話ウィンドウ内の名札ピルを廃止。NPC発話時は会話ウィンドウ上端左に同じ見た目で表示。
   - 完了条件: 左右2枠入れ替わりの既存単体テストが通る。横長・縦長の撮影を秘書が確認。
-- [ ] **T067-ui** ゲーム内時刻の表示（#137・依存: T063-core のマージ）
+- [x] **T067-ui** ゲーム内時刻の表示（#137・依存: T063-core のマージ）
   - `HH:MM` を #132 で定めた位置（箱右下、探索④のみ会話ウィンドウ帯右上端）に表示。
   - 完了条件: 横長・縦長で時刻表示が他要素と重ならないことを確認。
-- [ ] **T068-img** 対策室背景の作り直し（横・縦）（#139・独立・依存: 代表の間取りとプロンプトの承認）
+- [x] **T068-img** 対策室背景の作り直し（横・縦）（#139・独立・依存: 代表の間取りとプロンプトの承認）
   - 4人（霧島・橘・小鳥遊・新任）の部屋として間取りを決め、画面には部屋の一部を切り取って映す（見える席は奥の2席でよい）。間取り: 奥の壁＝机2台と壁掛けモニタ／入口側の壁＝机2台（画面に映らない）／左の壁＝窓／右の壁＝ホワイトボード／入口のそば＝紅茶のテーブル（代表決定 2026-09-14）。昼の自然光の明るい部屋（配色統一の例外。`DESIGN.md`「会話フレーム」節「対策室の例外」参照）。
   - 完了条件: 代表承認画像を `assets/backgrounds/` に配置、`DESIGN.md` P-12 を更新。
-- [ ] **T069-img** 探索背景10枚の作り直し（#140〜#143・依存: T061-docs のマージ・代表承認。量産マップは対象外）
+- [x] **T069-img** 探索背景10枚の作り直し（#140〜#143・依存: T061-docs のマージ・代表承認。量産マップは対象外）
   - S1（#140・4枚＝執務室・サーバ室の横・縦）／S2（#141・2枚＝執務室・サーバ室）／S3（#142・2枚＝執務室・システム運用ルーム）／SL（#143・2枚＝自社執務室・委託先ブース）の探索背景をサイバーパンク配色で作り直す（`DESIGN.md`「アセット」節の色名翻訳方針に従う）。**背景12枚（横8・縦4）のうち対策室の横・縦2枚は T068-img（#139）で作成済みのため、本タスクの対象は残り10枚**。
   - S2/S3/SL は、背景に写る NPC（S2: 情シス担当・管理部門長・保守業者／S3: EC運営担当者・管理部門長・開発委託先担当者／SL: 委託先担当者）の外見メモを、生成前に既存背景画像から書き起こして `docs/characters.md` §13.2 に追記する（S1 のサーバ管理者と同じやり方）。
   - 構図が変わるため、各マップの全ホットスポット座標を新しい背景の上で測り直す（S1 は横・縦両方の9ホットスポット、S2/S3/SL は横のみ。縦版の新規作成は S2/S3/SL では対象外）。
@@ -574,9 +577,15 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 
 > **⚠️ 量産ゲート（#42・#52）**: **③''''（2026-09-11）の「MVP としては OK」で量産ゲートは開放可**。Phase 4.5（会話モード）・4.6（背景シーン化）・4.7（会話フレーム化）は main マージ済。**T046（ドア動線・管理者統合）は量産と並行**でよいが、**`goto` スキーマ（T046-core・0.6.0）は量産 YAML の執筆開始前に main へ入れる**（量産マップは複数シーンでドア移動を最初から使うため）。旧フォーマット（`required_card_ids`／背景なし／台詞なし）は全て書き直しになるため、量産は schema 0.6.0 確定後の様式で開始する。各量産マップには**背景2〜3枚（IMAGE_WORKFLOW）**を各制作 Issue に含める。着手可否（ゲートを開けるか）は代表判断。
 
-- [ ] **T019** S2 制作（依存: T018、**Issue #6**: フォーマット確定後に個別 Issue を切り出して進める）
-- [ ] **T020** S3 制作（依存: T019 と同条件）
-- [ ] **T021** 法務関連の新規マップ制作（依存: T019 と同条件。MVP は計4本 = S1+S2+S3+法務、#6 代表回答）
+- [x] **T019** S2 制作（依存: T018、**Issue #6**: フォーマット確定後に個別 Issue を切り出して進める）
+  - **完了（#74・PR マージ済）**: `scenarios/s2-vpn-ransomware.yaml`（VPN脆弱性→ランサムウェア）。背景は
+    `bg-s2-office`/`bg-s2-server`（#141・#156 で #132 のサイバーパンク配色に作り直し済み）
+- [x] **T020** S3 制作（依存: T019 と同条件）
+  - **完了（#75・PR マージ済）**: `scenarios/s3-ec-card-leak.yaml`（ECサイトのカード情報漏洩）。背景は
+    `bg-s3-office`/`bg-s3-ops-room`（#142・#157 で #132 のサイバーパンク配色に作り直し済み）
+- [x] **T021** 法務関連の新規マップ制作（依存: T019 と同条件。MVP は計4本 = S1+S2+S3+法務、#6 代表回答）
+  - **完了（#76・PR マージ済）**: `scenarios/sl-consignment-breach.yaml`（委託先漏えい・橘主役）。背景は
+    `bg-sl-office`/`bg-sl-vendor`（#143・#158 で #132 のサイバーパンク配色に作り直し済み）
 - [ ] **T022** バランス調整（依存: T019〜T021）
   - パラメータの正本は `specs/001-mvp/balance.csv`（ゲーム開発拡張フロー）として整備する
   - 完了条件: 4マップの難易度カーブ（spec §9）が代表レビューで承認される
@@ -627,14 +636,14 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#4](https://github.com/rokusoudo-product/crypto-riddle/issues/4) 用語カードマスタ＋習得機構 | closed（完了・PR #20、2026-08-07） | **T023**（T024 が後続） | 成果物: `schemas/term_card.schema.json`/`schemas/quiz_misuse.schema.json`（暫定, T005で削除済み）・`terms/terms_core.yaml`（45語）・`terms/quiz_misuse_sample.yaml`・`scripts/validate_terms.py`（T010で削除済み）・`docs/term_cards.md` |
 | [#5](https://github.com/rokusoudo-product/crypto-riddle/issues/5) シナリオS1完全版 | closed（完了・PR #40、2026-09-10） | **T015・T016・T017**（T018 で会話モード刷新を決定） | 成果物: `scenarios/s1-targeted-email-intrusion.yaml`・S1 縦スライス。解決パートは #42（Phase 4.5・T035）で会話モードへ移植 |
 | [#6](https://github.com/rokusoudo-product/crypto-riddle/issues/6) S2-S8 バックログ | future | **T019〜T021** | フォーマット確定後に個別 Issue 切り出し。MVP は計4本 |
-| [#13](https://github.com/rokusoudo-product/crypto-riddle/issues/13) カラートークン AA 実測 | future→#132 で検証完了（クローズは代表判断） | **T061-docs**（#132）に合流 | 旧「T012 に合流」を改訂。サイバーパンク改訂（#132）で AA 実測を実施し `docs/design-contrast.md` に確定値・検証結果を記載。`scripts/check-contrast.mjs` で再実行可能 |
+| [#13](https://github.com/rokusoudo-product/crypto-riddle/issues/13) カラートークン AA 実測 | closed（#132 で検証完了・クローズ済） | **T061-docs**（#132）に合流 | 旧「T012 に合流」を改訂。サイバーパンク改訂（#132）で AA 実測を実施し `docs/design-contrast.md` に確定値・検証結果を記載。`scripts/check-contrast.mjs` で再実行可能 |
 | [#14](https://github.com/rokusoudo-product/crypto-riddle/issues/14) IPA 過去問の出典表記規則 | future | **T015 の前提** | 採用時は T015 より先に完了させる |
 | [#22](https://github.com/rokusoudo-product/crypto-riddle/issues/22) 分野タグ（subject_tags）の値集合統一 | proposal（本 PR マージで closed 予定・`Closes #22`） | **T005**（zod 移行と同時実施） | 案2（7種に統一・`ネットワーク基盤`を正式採用）を採用。決定理由は `specs/001-mvp/spec.md` §9 に記載。値集合の正本は `src/core/model/tags.ts` |
 | [#42](https://github.com/rokusoudo-product/crypto-riddle/issues/42) 解決パートを会話モードに刷新 | closed（ドキュメント改訂 PR マージ済み） | **T014 を supersede**・**Phase 4.5（T030〜T036）** | T018 プレイテスト由来。spec §8＝会話モード。実装は #44（T030〜T032, core）・#45（T033/T034, UI）で完了済み。#46（T035/T036, データ本執筆・結線）も実装完了（本PR、代表マージ待ち）でPhase 4.5が完了する |
 | [#44](https://github.com/rokusoudo-product/crypto-riddle/issues/44) 会話モード core 実装 | closed（完了） | **T030・T031・T032** | zod スキーマ・判定エンジン・ステートマシンを会話モードへ改訂。S1/s0 は暫定機械移植のみ（本格移行は #46）。UI(resolve/result/fail-screen等)は型エラー解消の最小限に留めた（#45） |
 | [#45](https://github.com/rokusoudo-product/crypto-riddle/issues/45) 会話フレーム＋会話モードUI＋XP減算 | closed（完了・PR #48） | **T033・T034** | 会話フレーム/カードドロワー新設・dnd-kit 削除・⑥失敗解説廃止・XP減算 |
 | [#46](https://github.com/rokusoudo-product/crypto-riddle/issues/46) 会話モード データ本執筆・結線・E2E | closed（完了・PR #49） | **T035・T036** | S1 誤答肢 reply 本執筆・explanations 多段化・e2e 会話モード化。**Phase 4.5 完了** |
-| [#52](https://github.com/rokusoudo-product/crypto-riddle/issues/52) 探索を背景シーン＋クリック可能オブジェクトにする（探索刷新の umbrella） | open（Phase 4.6＋4.7〔T042-T045〕マージ済・③''''=「MVPとしてOK」。追補 T046 対応中。量産ゲート開放可） | **Phase 4.6（T037〜T041）＋Phase 4.7（T042〜T046）** | T018/T018''/T018'''/T018'''' 由来。spec §7.1。Phase 4.6=背景シーン化。Phase 4.7=会話フレーム化＋仕上げ（□赤・まとめ促し・背景人物入り）＋T046（ドア動線 goto・管理者統合・schema 0.6.0）。#50 の探索④部分を統合。クローズは追補完了後に代表 |
+| [#52](https://github.com/rokusoudo-product/crypto-riddle/issues/52) 探索を背景シーン＋クリック可能オブジェクトにする（探索刷新の umbrella） | closed（Phase 4.6＋4.7〔T037〜T048〕マージ済・③''''=「MVPとしてOK」。追補 T046（#78・PR #77/#78）・仕上げ T047/T048（PR #90/#91）完了。量産ゲート開放済） | **Phase 4.6（T037〜T041）＋Phase 4.7（T042〜T048）** | T018/T018''/T018'''/T018'''' 由来。spec §7.1。Phase 4.6=背景シーン化。Phase 4.7=会話フレーム化＋仕上げ（□赤・まとめ促し・背景人物入り）＋T046（ドア動線 goto・管理者統合・schema 0.6.0）＋T047/T048（会話オーバーレイ2状態化・微調整）。#50 の探索④部分を統合 |
 | [#55](https://github.com/rokusoudo-product/crypto-riddle/issues/55) 探索スキーマ scenes[]（0.4.0） | closed（完了・PR #58） | **T037** | scenes/hotspots/actions の zod・schema 0.4.0 |
 | [#56](https://github.com/rokusoudo-product/crypto-riddle/issues/56) 探索UI 背景シーン＋ホットスポット | closed（完了・PR #59） | **T038** | 背景シーン＋一覧フォールバック。#50 探索④を統合 |
 | [#57](https://github.com/rokusoudo-product/crypto-riddle/issues/57) S1/s0 scenes データ＋探索E2E | closed（完了・PR #61） | **T040＋T041** | S1 に2シーン投入・s0 は省略でフォールバック検証。T039 背景は #60 |
@@ -643,18 +652,18 @@ CI とテスト基盤が無いままコードを書き始めるのを防ぐた�
 | [#50](https://github.com/rokusoudo-product/crypto-riddle/issues/50) 会話フレームを③導入・④探索にも適用 | フォロー（探索④分は #52 に統合。残=③導入分は #102 が吸収） | **T051-ui**（#102） | 会話モード刷新の残作業。残っていた③導入分は Phase 4.8・UI Issue #102 のスコープに含めて吸収する |
 | [#51](https://github.com/rokusoudo-product/crypto-riddle/issues/51) 暗号ステージ誤答のXP減算の要否 | フォロー（spec §8.4 で決定→反映） | T022 と連動 | 現行 S1 は暗号なしで実害なし |
 | [#53](https://github.com/rokusoudo-product/crypto-riddle/issues/53) 選択肢を南京錠でロック | future（MVP外） | 別途 | ヒント未収集で選択肢ロック。#52 と関連 |
-| [#100](https://github.com/rokusoudo-product/crypto-riddle/issues/100) docs: S1会話フロー刷新のspec/DESIGN/scenario_schema反映 | open（本 PR で対応・docs のみ） | **T049-docs・Phase 4.8** | 台本v2.2（2026-09-12代表確定）のスキーマ0.7.0仕様・会話フレーム3枠・表情フォールバックをdocsに先行反映。マージは代表（spec/plan承認ゲート該当）。実装は #101/#102/#103 |
-| [#101](https://github.com/rokusoudo-product/crypto-riddle/issues/101) feat(core): シナリオスキーマ0.7.0 | open（#100 のマージ・代表承認待ち） | **T050-core・Phase 4.8** | `docs/scenario_schema.md` §2.6 を zod（`src/core/model/`）に実装。小鳥遊/表情/多ターンdialogue/NPC発話/explanations話者/背景任意化 |
-| [#102](https://github.com/rokusoudo-product/crypto-riddle/issues/102) feat(ui): 導入の会話フレーム化（#50吸収）＋探索の多ターン送り・NPC名札・explanations話者・表情フォールバック | open（依存: #101） | **T051-ui・Phase 4.8** | #50（③導入の会話フレーム化）を吸収 |
-| [#103](https://github.com/rokusoudo-product/crypto-riddle/issues/103) feat(data): S1シナリオをv2.2台本へ移植＋e2e | open（依存: #102） | **T052-data・Phase 4.8** | 全シナリオYAML/fixtureの `schema_version` 0.7.0 更新を含む（内容はS2/S3/SL無改訂） |
+| [#100](https://github.com/rokusoudo-product/crypto-riddle/issues/100) docs: S1会話フロー刷新のspec/DESIGN/scenario_schema反映 | closed（マージ済み） | **T049-docs・Phase 4.8** | 台本v2.2（2026-09-12代表確定）のスキーマ0.7.0仕様・会話フレーム3枠・表情フォールバックをdocsに先行反映。実装は #101/#102/#103 |
+| [#101](https://github.com/rokusoudo-product/crypto-riddle/issues/101) feat(core): シナリオスキーマ0.7.0 | closed（マージ済み） | **T050-core・Phase 4.8** | `docs/scenario_schema.md` §2.6 を zod（`src/core/model/`）に実装。小鳥遊/表情/多ターンdialogue/NPC発話/explanations話者/背景任意化 |
+| [#102](https://github.com/rokusoudo-product/crypto-riddle/issues/102) feat(ui): 導入の会話フレーム化（#50吸収）＋探索の多ターン送り・NPC名札・explanations話者・表情フォールバック | closed（マージ済み） | **T051-ui・Phase 4.8** | #50（③導入の会話フレーム化）を吸収 |
+| [#103](https://github.com/rokusoudo-product/crypto-riddle/issues/103) feat(data): S1シナリオをv2.2台本へ移植＋e2e | closed（マージ済み） | **T052-data・Phase 4.8** | 全シナリオYAML/fixtureの `schema_version` 0.7.0 更新を含む（内容はS2/S3/SL無改訂） |
 | [#108](https://github.com/rokusoudo-product/crypto-riddle/issues/108) docs: 会話フレームを左右2枠の入れ替わり方式に変更（全パート・立ち絵拡大・画面クリック送り） | closed（PR #114 マージ済み） | **T053-docs・Phase 4.9** | S1実装台本レビュー第1回（2026-09-13代表）を受け、#100 の「探索・解決2枠固定／導入のみ3枠」を撤回し全パート共通の左右2枠入れ替わり方式へ改訂。立ち絵拡大寸法・導入クリック送りも定義。実装は #110 |
-| [#110](https://github.com/rokusoudo-product/crypto-riddle/issues/110) feat(ui): 会話フレームの2枠入れ替わり・立ち絵拡大・画面クリック送り | open（PR #118 は保留。レイアウトは #124 に引き継ぎ・クローズは代表判断） | **T054-ui・Phase 4.9** | 枠並びロジックの純粋関数化・単体テスト／導入の3枠レイアウト廃止・クリック送り化／立ち絵拡大（寸法の比率化は #119/#124 へ） |
-| [#119](https://github.com/rokusoudo-product/crypto-riddle/issues/119) docs: 背景を画面の向きで切り替える方式（横16:9／縦9:16）と重ね配置・立ち絵比率・話者枠・対策室背景の定義 | open（本 PR で対応・docs のみ） | **T055-docs・Phase 4.10** | S1実装台本レビュー第1回（2026-09-13代表）の追加フィードバックを受け、背景を画面全体表示＋要素を上に重ねる方式・向き別背景・立ち絵比率・話者枠・対策室新規背景を定義。マージは代表（spec/DESIGN/scenario_schema承認ゲート該当）。実装は #120〜#124 |
-| [#120](https://github.com/rokusoudo-product/crypto-riddle/issues/120) feat(core): schema 0.8.0 ホットスポット座標を横・縦の組に変更（4マップ移行・縦は当面省略可） | open（#119 のマージ・代表承認待ち） | **T056-core・Phase 4.10** | `position` を `{landscape, portrait?}` へ改訂・既存4マップを機械移植 |
-| [#121](https://github.com/rokusoudo-product/crypto-riddle/issues/121) assets: S1 探索背景の縦版（執務室・サーバ室） | open（#119 のマージ・代表承認待ち） | **T057-img・Phase 4.10** | `bg-s1-office-portrait`/`bg-s1-server-portrait`（9:16）を IMAGE_WORKFLOW 承認ゲートで生成 |
-| [#122](https://github.com/rokusoudo-product/crypto-riddle/issues/122) assets: 導入用 対策室背景（横・縦） | open（#119 のマージ・代表承認待ち） | **T058-img・Phase 4.10** | `bg-hq-taskforce`/`bg-hq-taskforce-portrait`（P-12）を IMAGE_WORKFLOW 承認ゲートで生成。人物は描かない |
-| [#123](https://github.com/rokusoudo-product/crypto-riddle/issues/123) feat(data): S1 の縦用座標の配置と導入背景の差し替え | open（依存: #120,#121,#122） | **T059-data・Phase 4.10** | S1 全ホットスポットに `position.portrait` を追加。導入背景を `bg-hq-taskforce` へ差し替え |
-| [#124](https://github.com/rokusoudo-product/crypto-riddle/issues/124) feat(ui): 向き別背景の全面表示と立ち絵・会話ウィンドウの重ね直し（#118 の後継） | open（依存: #119,#120） | **T060-ui・Phase 4.10** | 背景の箱の共通コンポーネント化・重ね配置統一・立ち絵比率化・話者枠実装。#110（T054-ui）の寸法実装を置き換え。S1縦背景（#121・T057-img）が未完でも横背景で実装を進められる |
+| [#110](https://github.com/rokusoudo-product/crypto-riddle/issues/110) feat(ui): 会話フレームの2枠入れ替わり・立ち絵拡大・画面クリック送り | closed（state_reason=completed・2026-09-14。PR #118 自体は未マージだがレイアウトは #124 に引き継がれ、枠並びロジック（`two-slot-frame.ts`）・導入クリック送りは main に反映済み） | **T054-ui・Phase 4.9** | 枠並びロジックの純粋関数化・単体テスト／導入の3枠レイアウト廃止・クリック送り化／立ち絵拡大（寸法の比率化は #119/#124 へ） |
+| [#119](https://github.com/rokusoudo-product/crypto-riddle/issues/119) docs: 背景を画面の向きで切り替える方式（横16:9／縦9:16）と重ね配置・立ち絵比率・話者枠・対策室背景の定義 | closed（マージ済み） | **T055-docs・Phase 4.10** | S1実装台本レビュー第1回（2026-09-13代表）の追加フィードバックを受け、背景を画面全体表示＋要素を上に重ねる方式・向き別背景・立ち絵比率・話者枠・対策室新規背景を定義。実装は #120〜#124 |
+| [#120](https://github.com/rokusoudo-product/crypto-riddle/issues/120) feat(core): schema 0.8.0 ホットスポット座標を横・縦の組に変更（4マップ移行・縦は当面省略可） | closed（マージ済み） | **T056-core・Phase 4.10** | `position` を `{landscape, portrait?}` へ改訂・既存4マップを機械移植 |
+| [#121](https://github.com/rokusoudo-product/crypto-riddle/issues/121) assets: S1 探索背景の縦版（執務室・サーバ室） | closed（マージ済み） | **T057-img・Phase 4.10** | `bg-s1-office-portrait`/`bg-s1-server-portrait`（9:16）を IMAGE_WORKFLOW 承認ゲートで生成 |
+| [#122](https://github.com/rokusoudo-product/crypto-riddle/issues/122) assets: 導入用 対策室背景（横・縦） | closed（マージ済み） | **T058-img・Phase 4.10** | `bg-hq-taskforce`/`bg-hq-taskforce-portrait`（P-12）を IMAGE_WORKFLOW 承認ゲートで生成。人物は描かない |
+| [#123](https://github.com/rokusoudo-product/crypto-riddle/issues/123) feat(data): S1 の縦用座標の配置と導入背景の差し替え | closed（マージ済み） | **T059-data・Phase 4.10** | S1 全ホットスポットに `position.portrait` を追加。導入背景を `bg-hq-taskforce` へ差し替え |
+| [#124](https://github.com/rokusoudo-product/crypto-riddle/issues/124) feat(ui): 向き別背景の全面表示と立ち絵・会話ウィンドウの重ね直し（#118 の後継） | closed（マージ済み） | **T060-ui・Phase 4.10** | 背景の箱の共通コンポーネント化・重ね配置統一・立ち絵比率化・話者枠実装。#110（T054-ui）の寸法実装を置き換え。S1縦背景（#121・T057-img）が未完でも横背景で実装を進められる |
 
 ## 依存関係の要約
 
