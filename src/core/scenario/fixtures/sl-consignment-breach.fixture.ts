@@ -108,7 +108,7 @@ export const slConsignmentBreachFixture: Scenario = {
       hotspots: [
         {
           object_type: 'book',
-          position: { landscape: [0.17, 0.32] },
+          position: { landscape: [0.13, 0.47] },
           label: '委託契約書棚',
           actions: [
             {
@@ -129,7 +129,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'pc',
-          position: { landscape: [0.56, 0.45] },
+          position: { landscape: [0.52, 0.54] },
           label: '委託先の一次報告を受けた端末',
           actions: [
             {
@@ -160,7 +160,7 @@ export const slConsignmentBreachFixture: Scenario = {
       hotspots: [
         {
           object_type: 'device',
-          position: { landscape: [0.19, 0.68] },
+          position: { landscape: [0.22, 0.65] },
           label: '委託先のクラウドストレージ管理端末',
           actions: [
             {
@@ -174,7 +174,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'person',
-          position: { landscape: [0.44, 0.55] },
+          position: { landscape: [0.41, 0.55] },
           label: '委託先担当者',
           prompt: '委託先担当者「何かご質問はありますか？」',
           actions: [
@@ -190,7 +190,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'book',
-          position: { landscape: [0.84, 0.62] },
+          position: { landscape: [0.88, 0.75] },
           label: '委託先の安全管理措置報告書',
           actions: [
             {
@@ -204,7 +204,7 @@ export const slConsignmentBreachFixture: Scenario = {
         },
         {
           object_type: 'door',
-          position: { landscape: [0.6, 0.5] },
+          position: { landscape: [0.52, 0.65] },
           label: '執務室への扉',
           actions: [{ kind: 'goto', scene_id: 'scene-office', label: '執務室へ移動する' }],
         },
