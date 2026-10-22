@@ -17,3 +17,6 @@ tmp
 CLAUDE.md
 DESIGN.md
 README.md
+
+# shadcn から無改変で取り込んだ CSS（Issue #161）。整形すると出典との差分確認ができなくなるため対象外
+src/styles/shadcn-tailwind.css
