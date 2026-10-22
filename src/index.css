@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import 'shadcn/tailwind.css';
+@import './styles/shadcn-tailwind.css';
 
 /* DESIGN.md タイポグラフィ: 本文・操作UI=Noto Sans JP（ゴシック）／見出し・世界観=Noto Serif JP（明朝） */
 /* NFR-1（スマホで軽量）配慮のため、フルレンジの可変フォントではなく */
